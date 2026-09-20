@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+source_root="$repo_root/.work/upstreams"
+context_root="$repo_root/.work/build-contexts"
+
+for source_name in vllm b12x flashinfer cutlass; do
+  source_path="$source_root/$source_name"
+  destination="$context_root/$source_name"
+  if [ ! -d "$source_path" ]; then
+    echo "missing prepared source: $source_path" >&2
+    exit 1
+  fi
+  mkdir -p "$destination"
+  rsync -a --delete \
+    --exclude=.git \
+    --exclude=__pycache__ \
+    "$source_path/" "$destination/"
+done

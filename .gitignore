@@ -1,0 +1,7 @@
+.work/
+.env
+*.local.json
+*.local.env
+__pycache__/
+*.pyc
+results/private/

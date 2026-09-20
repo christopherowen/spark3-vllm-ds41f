@@ -1,0 +1,35 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate configuration
+        run: bin/spark3 doctor
+      - name: Compile helper
+        run: python3 -m py_compile bin/spark3
+      - name: Validate JSON and patches
+        run: |
+          git diff --check
+          find config manifests experiments/_template -name '*.json' -print0 \
+            | xargs -0 -n1 python3 -m json.tool >/dev/null
+
+  patch-stacks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        source: [vllm, b12x]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply pinned upstream and local series
+        run: bin/spark3 upstream prepare "${{ matrix.source }}"
+      - name: Reject whitespace errors
+        run: git -C ".work/upstreams/${{ matrix.source }}" diff --check

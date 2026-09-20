@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "generated_from_baseline": "2026-09-20-live",
+  "sources": {
+    "vllm": {
+      "kind": "git",
+      "upstream": "https://github.com/vllm-project/vllm.git",
+      "contribution_remote": "https://github.com/christopherowen/vllm.git",
+      "tracking_ref": "refs/heads/main",
+      "revision": "c687594b8a8082e18af9fe2f64eb5f9ee442e251",
+      "revision_url": "https://github.com/vllm-project/vllm/commit/c687594b8a8082e18af9fe2f64eb5f9ee442e251",
+      "role": "serving source overlaid in the current image",
+      "patch_series": "patches/vllm/series"
+    },
+    "vllm_base_image": {
+      "kind": "oci",
+      "upstream": "docker.io/vllm/vllm-openai",
+      "tag": "nightly-af1c01499b289be555c475669ba50a88e96d846e",
+      "source_revision": "af1c01499b289be555c475669ba50a88e96d846e",
+      "recorded_base_digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+      "role": "CUDA 13.0.2 and vLLM runtime base"
+    },
+    "b12x": {
+      "kind": "git",
+      "upstream": "https://github.com/local-inference-lab/b12x.git",
+      "contribution_remote": null,
+      "tracking_ref": "refs/heads/main",
+      "revision": "f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+      "revision_url": "https://github.com/local-inference-lab/b12x/commit/f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+      "applied_upstream_commits": [
+        {
+          "revision": "02407f653609e2c4c49db2efb5f77835d2e04e32",
+          "url": "https://github.com/local-inference-lab/b12x/commit/02407f653609e2c4c49db2efb5f77835d2e04e32",
+          "purpose": "correct native E4M3 conversion for subnormal FP4 scales"
+        }
+      ],
+      "role": "DeepSeek V4.1 kernels and RoCE collectives",
+      "patch_series": "patches/b12x/series"
+    },
+    "flashinfer": {
+      "kind": "git",
+      "upstream": "https://github.com/flashinfer-ai/flashinfer.git",
+      "contribution_remote": null,
+      "tracking_ref": "refs/heads/main",
+      "revision": "07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
+      "revision_url": "https://github.com/flashinfer-ai/flashinfer/commit/07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
+      "submodules": true,
+      "role": "FlashInfer 0.7.0rc1 source used for native DeepSeek V4.1 sparse attention"
+    },
+    "cutlass": {
+      "kind": "git",
+      "upstream": "https://github.com/NVIDIA/cutlass.git",
+      "contribution_remote": null,
+      "tracking_ref": "refs/heads/main",
+      "revision": "da5e086dab31d63815acafdac9a9c5893b1c69e2",
+      "revision_url": "https://github.com/NVIDIA/cutlass/commit/da5e086dab31d63815acafdac9a9c5893b1c69e2",
+      "release_tag": "v4.4.2",
+      "role": "CUTLASS source used to build the SM121 stable vLLM extension"
+    },
+    "cutlass_dsl": {
+      "kind": "pypi-wheel-set",
+      "upstream": "https://pypi.org/project/nvidia-cutlass-dsl/4.6.2/",
+      "version": "4.6.2",
+      "lockfile": "requirements/cutlass-dsl-aarch64.txt",
+      "role": "CuTe DSL compiler and CUDA 12/13 runtime libraries required by B12X"
+    },
+    "model": {
+      "kind": "huggingface",
+      "upstream": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash",
+      "repository": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+      "role": "unchanged native FP8/FP4 weights and tokenizer"
+    }
+  },
+  "references": {
+    "glm_switchless_tp4": {
+      "url": "https://github.com/jnardiello/GLM-5.3-Flash-FP8-4-DGX-Spark-Switchless",
+      "role": "research reference only; not an upstream dependency"
+    }
+  }
+}

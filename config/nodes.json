@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "ssh_user": "swank",
+  "nodes": [
+    {
+      "name": "dgx1",
+      "rank": 0,
+      "management_ip": "10.0.1.71",
+      "head": true,
+      "roce_peer_hcas": {
+        "1": ["rocep1s0f0", "roceP2p1s0f0"],
+        "2": ["rocep1s0f1", "roceP2p1s0f1"]
+      }
+    },
+    {
+      "name": "dgx2",
+      "rank": 1,
+      "management_ip": "10.0.1.70",
+      "head": false,
+      "roce_peer_hcas": {
+        "0": ["rocep1s0f1", "roceP2p1s0f1"],
+        "2": ["rocep1s0f0", "roceP2p1s0f0"]
+      }
+    },
+    {
+      "name": "dgx3",
+      "rank": 2,
+      "management_ip": "10.0.1.72",
+      "head": false,
+      "roce_peer_hcas": {
+        "0": ["rocep1s0f0", "roceP2p1s0f0"],
+        "1": ["rocep1s0f1", "roceP2p1s0f1"]
+      }
+    }
+  ]
+}

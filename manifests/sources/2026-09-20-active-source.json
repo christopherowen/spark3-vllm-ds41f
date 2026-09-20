@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-20",
+  "vllm": {
+    "base_revision": "c687594b8a8082e18af9fe2f64eb5f9ee442e251",
+    "patch_series": "patches/vllm/series",
+    "patchset_sha256": "0aaf897271a232ccb57a0d65a465e751ae1d753a765302fe80b40dc183372b5d",
+    "verified_files": {
+      "vllm/v1/attention/backends/mla/indexer.py": "aaccd55ab9aaacddd647717b0917a9cdf13916c0940da236887e90baa84edcf2"
+    },
+    "verification": "fresh pinned checkout plus series matches the live mounted override"
+  },
+  "b12x": {
+    "base_revision": "f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+    "applied_upstream_revision": "02407f653609e2c4c49db2efb5f77835d2e04e32",
+    "patch_series": "patches/b12x/series",
+    "patchset_sha256": "f1a7f59fbe68904b58b50ad67c72fac36c8ce82b583ed0c85cea37ec517e418a",
+    "verified_files": {
+      "b12x/_lib/intrinsics.py": "b21b08200b2bd6817bb116cdd89d5b713d5b411019295a98913062d0232668a9",
+      "b12x/attention/_shared/mla/prefill_mg.py": "b43399ae26e94e8235e29329e8a273fb5c5948c98d795240578c591c585d3cc3",
+      "b12x/comm/roce/_proxy.py": "a18f2c2966d4818e47530bd92b79ad3a22221a985dd572d3cee48ac8eb268ef9",
+      "b12x/comm/roce/_roce_proxy.c": "1cf5f9dbba9e48ef1d7b4143e6fa379aa8b6a237385896974c8e71ffb83c5a9d",
+      "b12x/comm/roce/roce_oneshot.py": "0f06fe79ed61a6bb61234b7a9017d5df6010637d224be870a55063cbae47615e",
+      "b12x/norm/mhc/_policy.py": "e9d87256af5b08bb172bb3f169d4f2779752b9231e588f1ee85425b11479dc46"
+    },
+    "verification": "fresh pinned checkout plus upstream fix and ordered local series matches every modified file in the live image"
+  },
+  "runtime_foundation": {
+    "vllm_base_image_digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "vllm_base_source_revision": "af1c01499b289be555c475669ba50a88e96d846e",
+    "flashinfer_revision": "07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
+    "flashinfer_version": "0.7.0rc1",
+    "flashinfer_evidence": "live OCI label plus installed package metadata",
+    "cutlass_revision": "da5e086dab31d63815acafdac9a9c5893b1c69e2",
+    "cutlass_release_tag": "v4.4.2",
+    "cutlass_verification": "fresh pinned checkout matches the original build directory byte-for-byte",
+    "cutlass_dsl_version": "4.6.2",
+    "cutlass_dsl_lockfile": "requirements/cutlass-dsl-aarch64.txt",
+    "cutlass_dsl_verification": "all five live wheel files were captured by filename and SHA-256"
+  }
+}

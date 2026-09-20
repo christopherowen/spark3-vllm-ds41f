@@ -1,0 +1,4 @@
+# Applied after the pinned base and upstream commit 02407f653609e2c4c49db2efb5f77835d2e04e32.
+0001-bound-mla-prefill-indices.patch
+0002-add-3072-token-mhc-prefill-policy.patch
+0003-route-rocenante-by-peer-and-hca.patch

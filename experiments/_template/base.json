@@ -1,0 +1,7 @@
+{
+  "repository_commit": "REQUIRED",
+  "promoted_baseline": "REQUIRED",
+  "image_digest": "REQUIRED",
+  "upstream_lock_sha256": "REQUIRED",
+  "cluster_state_receipt": "runs/REQUIRED"
+}

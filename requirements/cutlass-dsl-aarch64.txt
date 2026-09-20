@@ -1,0 +1,12 @@
+# CPython 3.12 / manylinux_2_28_aarch64 wheels captured from the live image.
+# Download with scripts/fetch-cutlass-dsl-wheels. Hashes are mandatory.
+nvidia-cutlass-dsl==4.6.2 \
+    --hash=sha256:06ac62deb182a852dfb053032cf945bf02b9aa1bf502a18b129d280d7babb26c
+nvidia-cutlass-dsl-libs-base==4.6.2 \
+    --hash=sha256:e129db7155d56ba4478be098c0f819e37690a6ce5d43a9a9a83bf1300d32c57f
+nvidia-cutlass-dsl-libs-core==4.6.2 \
+    --hash=sha256:571d4b46fca1bfbb123d0dc348eaa7fd80af0014ddffc07b849e8195b2364333
+nvidia-cutlass-dsl-libs-cu12==4.6.2 \
+    --hash=sha256:ea3b96dd6b627fe20637acfa7876ea1adfa8d81a2b106ffff0bb2d042c0c2731
+nvidia-cutlass-dsl-libs-cu13==4.6.2 \
+    --hash=sha256:b9543257622ce70d696c6a2bda7e9617ef5b1cc9f29bfe66f4b38d1d1e29a8cb

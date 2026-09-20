@@ -1,0 +1,546 @@
+#!/usr/bin/env python3
+"""Read-only cluster control and reproducibility helpers."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE_TREES = {
+    "vllm": ROOT / ".work/upstreams/vllm",
+    "b12x": ROOT / ".work/upstreams/b12x",
+    "flashinfer": ROOT / ".work/upstreams/flashinfer",
+    "cutlass": ROOT / ".work/upstreams/cutlass",
+}
+BUILD_CONTEXTS = {
+    "vllm-source": ROOT / ".work/build-contexts/vllm",
+    "b12x-source": ROOT / ".work/build-contexts/b12x",
+    "flashinfer-source": ROOT / ".work/build-contexts/flashinfer",
+    "cutlass-source": ROOT / ".work/build-contexts/cutlass",
+    "cutlass-dsl-wheels": ROOT / ".work/wheels/cutlass-dsl",
+}
+
+
+def read_json(relative: str) -> dict:
+    with (ROOT / relative).open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def configuration() -> tuple[dict, dict, dict]:
+    return (
+        read_json("config/cluster.json"),
+        read_json("config/nodes.json"),
+        read_json("upstreams.lock.json"),
+    )
+
+
+def node_by_name(nodes: dict, name: str) -> dict:
+    for node in nodes["nodes"]:
+        if node["name"] == name:
+            return node
+    raise SystemExit(f"unknown node {name!r}")
+
+
+def expected_environment(cluster: dict, node: dict) -> dict[str, str]:
+    env = {key: str(value) for key, value in cluster["environment"].items()}
+    env["VLLM_HOST_IP"] = node["management_ip"]
+    env["B12X_ROCE_PEER_HCAS"] = json.dumps(
+        node["roce_peer_hcas"], separators=(",", ":")
+    )
+    return env
+
+
+def expected_command(cluster: dict, node: dict) -> list[str]:
+    command = list(cluster["serve_args"])
+    command.extend(
+        [
+            "--node-rank",
+            str(node["rank"]),
+            "--master-addr",
+            cluster["distributed"]["master_addr"],
+            "--master-port",
+            cluster["distributed"]["master_port"],
+        ]
+    )
+    if not node["head"]:
+        command.append("--headless")
+    return command
+
+
+def rendered_docker_command(cluster: dict, node: dict) -> list[str]:
+    container = cluster["container"]
+    home = cluster["host"]["home"]
+    command = ["docker", "run", "-d", "--name", container["name"]]
+    command.extend(container["docker_run_args"])
+    for key, value in sorted(expected_environment(cluster, node).items()):
+        command.extend(["--env", f"{key}={value}"])
+    for source, destination, mode in container["mounts"]:
+        source = source.format(home=home)
+        command.extend(["--volume", f"{source}:{destination}:{mode}"])
+    command.append(container["image"])
+    command.extend(expected_command(cluster, node))
+    return command
+
+
+def run_ssh(node: str, *command: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["ssh", node, shlex.join(command)],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+
+def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
+    problems: list[str] = []
+    node_list = nodes.get("nodes", [])
+    ranks = sorted(node.get("rank") for node in node_list)
+    if ranks != [0, 1, 2]:
+        problems.append(f"node ranks must be [0, 1, 2], got {ranks}")
+    if sum(bool(node.get("head")) for node in node_list) != 1:
+        problems.append("exactly one node must be the API head")
+    if cluster.get("promoted_baseline") != upstreams.get("generated_from_baseline"):
+        problems.append("cluster and upstream locks name different baselines")
+    for name, source in upstreams["sources"].items():
+        if not source.get("upstream"):
+            problems.append(f"{name}: canonical upstream is not recorded")
+        if source["kind"] == "git":
+            if len(source["revision"]) != 40:
+                problems.append(f"{name}: revision is not a full commit SHA")
+            if not source.get("tracking_ref"):
+                problems.append(f"{name}: upstream tracking ref is not recorded")
+        series = source.get("patch_series")
+        if series:
+            series_path = ROOT / series
+            if not series_path.is_file():
+                problems.append(f"{name}: missing patch series {series}")
+            else:
+                for patch_name in read_series(series_path):
+                    if not patch_name.startswith("TODO-") and not (
+                        series_path.parent / patch_name
+                    ).is_file():
+                        problems.append(f"{name}: missing patch {patch_name}")
+        lockfile = source.get("lockfile")
+        if lockfile and not (ROOT / lockfile).is_file():
+            problems.append(f"{name}: missing dependency lock {lockfile}")
+    source_manifest = read_json("manifests/sources/2026-09-20-active-source.json")
+    for name in ("vllm", "b12x"):
+        wanted = source_manifest[name].get("patchset_sha256")
+        actual = patchset_sha256(upstreams["sources"][name])
+        if wanted != actual:
+            problems.append(f"{name}: patch-set fingerprint differs from source manifest")
+    return problems
+
+
+def live_doctor(cluster: dict, nodes: dict) -> list[str]:
+    problems: list[str] = []
+    name = cluster["container"]["name"]
+    for node in nodes["nodes"]:
+        result = run_ssh(node["name"], "docker", "inspect", name)
+        if result.returncode:
+            problems.append(f"{node['name']}: cannot inspect {name}: {result.stderr.strip()}")
+            continue
+        inspection = json.loads(result.stdout)[0]
+        if not inspection["State"]["Running"]:
+            problems.append(f"{node['name']}: container is not running")
+        if inspection["Config"]["Image"] != cluster["container"]["image"]:
+            problems.append(
+                f"{node['name']}: image tag {inspection['Config']['Image']!r} differs"
+            )
+        actual_command = inspection["Config"]["Cmd"]
+        wanted_command = expected_command(cluster, node)
+        if actual_command != wanted_command:
+            problems.append(f"{node['name']}: vLLM command differs from promoted config")
+        actual_env = dict(item.split("=", 1) for item in inspection["Config"]["Env"])
+        for key, wanted in expected_environment(cluster, node).items():
+            if actual_env.get(key) != wanted:
+                problems.append(
+                    f"{node['name']}: {key}={actual_env.get(key)!r}, expected {wanted!r}"
+                )
+        label_result = run_ssh(
+            node["name"],
+            "docker",
+            "image",
+            "inspect",
+            cluster["container"]["image"],
+        )
+        if label_result.returncode:
+            problems.append(f"{node['name']}: cannot inspect image labels")
+            continue
+        labels = json.loads(label_result.stdout)[0]["Config"].get("Labels") or {}
+        for key, wanted in cluster["container"]["expected_labels"].items():
+            if labels.get(key) != wanted:
+                problems.append(
+                    f"{node['name']}: image label {key}={labels.get(key)!r}, expected {wanted!r}"
+                )
+    return problems
+
+
+def command_doctor(args: argparse.Namespace) -> int:
+    cluster, nodes, upstreams = configuration()
+    problems = local_doctor(cluster, nodes, upstreams)
+    if args.live:
+        problems.extend(live_doctor(cluster, nodes))
+    if problems:
+        for problem in problems:
+            print(f"WARN: {problem}")
+        return 1
+    print("configuration OK" + ("; live cluster matches" if args.live else ""))
+    return 0
+
+
+def command_status(_: argparse.Namespace) -> int:
+    cluster, nodes, _ = configuration()
+    name = cluster["container"]["name"]
+    failed = False
+    for node in nodes["nodes"]:
+        result = run_ssh(
+            node["name"],
+            "docker",
+            "ps",
+            "--filter",
+            f"name=^{name}$",
+            "--format",
+            "{{.Names}}|{{.Image}}|{{.Status}}",
+        )
+        output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+        print(f"{node['name']}\t{output or 'not running'}")
+        failed |= result.returncode != 0 or not bool(result.stdout.strip())
+    return int(failed)
+
+
+def command_render(args: argparse.Namespace) -> int:
+    cluster, nodes, _ = configuration()
+    node = node_by_name(nodes, args.node)
+    print(shlex.join(rendered_docker_command(cluster, node)))
+    return 0
+
+
+def read_series(path: Path) -> list[str]:
+    return [
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+
+def checked(command: list[str], cwd: Path | None = None) -> None:
+    subprocess.run(command, cwd=cwd, check=True)
+
+
+def command_upstream(args: argparse.Namespace) -> int:
+    _, _, upstreams = configuration()
+    sources = upstreams["sources"]
+    git_sources = {key: value for key, value in sources.items() if value["kind"] == "git"}
+    if args.upstream_command == "list":
+        for name, source in git_sources.items():
+            print(f"{name}\t{source['revision']}\t{source['upstream']}")
+        return 0
+
+    source = git_sources.get(args.name)
+    if source is None:
+        raise SystemExit(f"unknown Git upstream {args.name!r}")
+    destination = ROOT / ".work" / "upstreams" / args.name
+    if destination.exists():
+        raise SystemExit(f"{destination} already exists; remove it explicitly to recreate")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    checked(["git", "clone", source["upstream"], str(destination)])
+    checked(["git", "remote", "rename", "origin", "upstream"], cwd=destination)
+    contribution = source.get("contribution_remote")
+    if contribution:
+        checked(["git", "remote", "add", "origin", contribution], cwd=destination)
+    # Release commits are not always reachable from the canonical default branch.
+    # Fetch the full pinned object explicitly before detaching at it.
+    checked(["git", "fetch", "upstream", source["revision"]], cwd=destination)
+    checked(["git", "checkout", "--detach", source["revision"]], cwd=destination)
+    if source.get("submodules"):
+        checked(["git", "submodule", "update", "--init", "--recursive"], cwd=destination)
+    for commit in source.get("applied_upstream_commits", []):
+        checked(["git", "fetch", "upstream", commit["revision"]], cwd=destination)
+        checked(["git", "cherry-pick", commit["revision"]], cwd=destination)
+    pending: list[str] = []
+    series = source.get("patch_series")
+    if series:
+        series_path = ROOT / series
+        for patch_name in read_series(series_path):
+            if patch_name.startswith("TODO-"):
+                pending.append(patch_name)
+                continue
+            checked(["git", "apply", str(series_path.parent / patch_name)], cwd=destination)
+    print(f"prepared {args.name} in {destination}")
+    print("remotes:")
+    checked(["git", "remote", "-v"], cwd=destination)
+    if pending:
+        print("pending local patches not yet exported:", file=sys.stderr)
+        for patch_name in pending:
+            print(f"  {patch_name}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if ".git" in relative.parts or "__pycache__" in relative.parts:
+            continue
+        digest.update(str(relative).encode())
+        if path.is_symlink():
+            digest.update(b"L")
+            digest.update(path.readlink().as_posix().encode())
+        elif path.is_file():
+            digest.update(b"F")
+            digest.update(oct(path.stat().st_mode & 0o777).encode())
+            with path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        elif path.is_dir():
+            digest.update(b"D")
+    return digest.hexdigest()
+
+
+def expected_wheel_hashes() -> dict[str, str]:
+    lock = ROOT / "requirements/cutlass-dsl-aarch64.txt"
+    expected: dict[str, str] = {}
+    package = ""
+    for raw_line in lock.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "==" in line:
+            package = line.split("==", 1)[0].replace("-", "_")
+        if "--hash=sha256:" in line and package:
+            expected[package] = line.split("--hash=sha256:", 1)[1].rstrip(" \\")
+    return expected
+
+
+def patchset_sha256(source: dict) -> str:
+    digest = hashlib.sha256()
+    for commit in source.get("applied_upstream_commits", []):
+        digest.update(commit["revision"].encode())
+        digest.update(b"\0")
+    series = source.get("patch_series")
+    if series:
+        series_path = ROOT / series
+        digest.update(series_path.read_bytes())
+        for patch_name in read_series(series_path):
+            if patch_name.startswith("TODO-"):
+                continue
+            digest.update(patch_name.encode())
+            digest.update(b"\0")
+            digest.update((series_path.parent / patch_name).read_bytes())
+    return digest.hexdigest()
+
+
+def build_input_problems() -> list[str]:
+    problems: list[str] = []
+    _, _, upstreams = configuration()
+    for name, path in BUILD_CONTEXTS.items():
+        if not path.is_dir():
+            problems.append(f"missing {name}: {path}")
+    for name, path in SOURCE_TREES.items():
+        if not path.is_dir():
+            continue
+        source = upstreams["sources"][name]
+        upstream_url = subprocess.run(
+            ["git", "remote", "get-url", "upstream"],
+            cwd=path,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if upstream_url.returncode or upstream_url.stdout.strip() != source["upstream"]:
+            problems.append(f"{name}: prepared upstream remote differs from lock")
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", source["revision"], "HEAD"],
+            cwd=path,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if ancestor.returncode:
+            problems.append(f"{name}: pinned revision is not an ancestor of prepared HEAD")
+        diff_check = subprocess.run(
+            ["git", "diff", "--check"],
+            cwd=path,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if diff_check.returncode:
+            problems.append(f"{name}: prepared source fails git diff --check")
+        if source.get("submodules"):
+            submodules = subprocess.run(
+                ["git", "submodule", "status", "--recursive"],
+                cwd=path,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if submodules.returncode or any(
+                line.startswith(("-", "+", "U"))
+                for line in submodules.stdout.splitlines()
+            ):
+                problems.append(f"{name}: pinned submodules are not fully initialized")
+        if not source.get("patch_series") and not source.get("applied_upstream_commits"):
+            status = subprocess.run(
+                ["git", "status", "--porcelain", "--untracked-files=all"],
+                cwd=path,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if status.returncode or status.stdout.strip():
+                problems.append(f"{name}: unrecorded source changes are present")
+    source_manifest = read_json("manifests/sources/2026-09-20-active-source.json")
+    for name in ("vllm", "b12x"):
+        path = SOURCE_TREES[name]
+        if not path.is_dir():
+            continue
+        for relative, wanted in source_manifest[name]["verified_files"].items():
+            candidate = path / relative
+            if not candidate.is_file():
+                problems.append(f"{name}: missing verified source file {relative}")
+            elif sha256(candidate) != wanted:
+                problems.append(f"{name}: verified source file differs: {relative}")
+    for name, source_tree in SOURCE_TREES.items():
+        context = BUILD_CONTEXTS[f"{name}-source"]
+        if source_tree.is_dir() and context.is_dir():
+            if tree_digest(source_tree) != tree_digest(context):
+                problems.append(f"{name}: staged build context differs from prepared source")
+    wheel_dir = BUILD_CONTEXTS["cutlass-dsl-wheels"]
+    if wheel_dir.is_dir():
+        wheels = list(wheel_dir.glob("*.whl"))
+        expected = expected_wheel_hashes()
+        found: set[str] = set()
+        for wheel in wheels:
+            normalized = wheel.name.replace("-", "_").lower()
+            for package in sorted(expected, key=len, reverse=True):
+                if normalized.startswith(package.lower() + "_"):
+                    wanted = expected[package]
+                    found.add(package)
+                    actual = sha256(wheel)
+                    if actual != wanted:
+                        problems.append(
+                            f"{wheel.name}: sha256 {actual} differs from lock {wanted}"
+                        )
+                    break
+        for package in sorted(set(expected) - found):
+            problems.append(f"missing locked wheel for {package}")
+    return problems
+
+
+def command_build(args: argparse.Namespace) -> int:
+    if args.build_command == "check":
+        problems = build_input_problems()
+        if problems:
+            for problem in problems:
+                print(f"WARN: {problem}")
+            return 1
+        print("build inputs OK")
+        return 0
+
+    _, _, upstreams = configuration()
+    vllm = upstreams["sources"]["vllm"]["revision"][:12]
+    b12x = upstreams["sources"]["b12x"]["revision"][:12]
+    revision_result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    repository_revision = (
+        revision_result.stdout.strip()
+        if revision_result.returncode == 0
+        else "uncommitted"
+    )
+    tag = f"ghcr.io/christopherowen/spark3-vllm-ds41f:vllm-{vllm}-b12x-{b12x}"
+    command = [
+        "docker",
+        "buildx",
+        "build",
+        "--platform=linux/arm64",
+        "--file=docker/Dockerfile",
+        "--target=runtime",
+        f"--tag={tag}",
+        f"--build-arg=DEPLOYMENT_COMMIT={repository_revision}",
+        "--build-arg=VLLM_COMMIT=" + upstreams["sources"]["vllm"]["revision"],
+        "--build-arg=B12X_COMMIT=" + upstreams["sources"]["b12x"]["revision"],
+        "--build-arg=B12X_UPSTREAM_PATCHES="
+        + ",".join(
+            commit["revision"]
+            for commit in upstreams["sources"]["b12x"].get(
+                "applied_upstream_commits", []
+            )
+        ),
+        "--build-arg=FLASHINFER_COMMIT="
+        + upstreams["sources"]["flashinfer"]["revision"],
+        "--build-arg=CUTLASS_COMMIT=" + upstreams["sources"]["cutlass"]["revision"],
+        "--build-arg=VLLM_PATCHSET_SHA256="
+        + patchset_sha256(upstreams["sources"]["vllm"]),
+        "--build-arg=B12X_PATCHSET_SHA256="
+        + patchset_sha256(upstreams["sources"]["b12x"]),
+    ]
+    for name, path in BUILD_CONTEXTS.items():
+        command.append(f"--build-context={name}={path.relative_to(ROOT)}")
+    command.append("--push" if args.push else "--load")
+    command.append(".")
+    print(shlex.join(command))
+    return 0
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(prog="spark3")
+    commands = root.add_subparsers(dest="command", required=True)
+    doctor = commands.add_parser("doctor", help="validate repository and optional live state")
+    doctor.add_argument("--live", action="store_true")
+    doctor.set_defaults(func=command_doctor)
+    status = commands.add_parser("status", help="show the three live containers")
+    status.set_defaults(func=command_status)
+    render = commands.add_parser("render", help="render, but do not execute, one rank launch")
+    render.add_argument("node", choices=("dgx1", "dgx2", "dgx3"))
+    render.set_defaults(func=command_render)
+    upstream = commands.add_parser("upstream", help="inspect or prepare pinned upstreams")
+    upstream_commands = upstream.add_subparsers(dest="upstream_command", required=True)
+    upstream_list = upstream_commands.add_parser("list")
+    upstream_list.set_defaults(func=command_upstream)
+    upstream_prepare = upstream_commands.add_parser("prepare")
+    upstream_prepare.add_argument("name", help="Git source key from upstreams.lock.json")
+    upstream_prepare.set_defaults(func=command_upstream)
+    build = commands.add_parser("build", help="validate or render the pinned image build")
+    build_commands = build.add_subparsers(dest="build_command", required=True)
+    build_check = build_commands.add_parser("check")
+    build_check.set_defaults(func=command_build)
+    build_render = build_commands.add_parser("render")
+    build_render.add_argument(
+        "--push", action="store_true", help="render a registry push instead of a local load"
+    )
+    build_render.set_defaults(func=command_build)
+    return root
+
+
+if __name__ == "__main__":
+    arguments = parser().parse_args()
+    raise SystemExit(arguments.func(arguments))

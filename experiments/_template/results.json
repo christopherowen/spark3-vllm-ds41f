@@ -1,0 +1,12 @@
+{
+  "status": "not-run",
+  "runs": [],
+  "summary": {
+    "ttft_seconds": null,
+    "decode_tps_per_stream": null,
+    "decode_tps_aggregate": null,
+    "minimum_host_mem_available_gib": null,
+    "request_failures": null,
+    "quality_gate": null
+  }
+}

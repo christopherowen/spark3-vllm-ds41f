@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "observed-live-state",
+  "captured_at": "2026-09-20T10:41:25+02:00",
+  "container_name": "dsv41-tuned-8192-s3-kv30-g4",
+  "image_tag": "vllm-dsv41:r37-b12x-e4m3fix1-arm64-sm121",
+  "nodes": {
+    "dgx1": {
+      "image_id": "sha256:2e84a2642ffb9309ac6c1593f7a06110463cad2a314cf68416b7bf199f2b7a42",
+      "initial_free_gib": 111.69,
+      "role": "api-head-rank-0"
+    },
+    "dgx2": {
+      "image_id": "sha256:f50c54c17297d45cc064a328876e8163fb42a2ea4f07fd7f0e93f7b60707ed9b",
+      "initial_free_gib": 112.99,
+      "role": "headless-rank-1"
+    },
+    "dgx3": {
+      "image_id": "sha256:10070ad16136a2ae6ab9f89647ef2a718907f51f6f19df2c3fc5ec6f42d4edd1",
+      "initial_free_gib": 112.79,
+      "role": "headless-rank-2"
+    }
+  },
+  "source_identity": {
+    "vllm_commit_label": "c687594b8a8082e18af9fe2f64eb5f9ee442e251",
+    "b12x_commit_label": "f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+    "b12x_upstream_fix": "02407f653609e2c4c49db2efb5f77835d2e04e32",
+    "critical_vllm_model_sha256": "93ec1ac252ce231522e90306b1cacdc1e35e3620051beb3c285fbd68367a355e",
+    "critical_vllm_b12x_sha256": "6bb1eb430a30f37ef785d671eb058a6e50793c7821fa97d73a529c6a22185ccc",
+    "critical_vllm_scheduler_sha256": "5067f0e95eae39a900f21f3ed841877ccfcf711c3a775804137c00b542c410a7",
+    "critical_b12x_mhc_prefill_sha256": "b8f042df113d679035bf9801d5cc2483c615962868316895a659c53817619c01",
+    "mounted_indexer_sha256": "aaccd55ab9aaacddd647717b0917a9cdf13916c0940da236887e90baa84edcf2",
+    "model_config_sha256": "105c0bb119c844fc0d4d10c0665edba73a21c7aee695862ad07a9c78c0145096"
+  },
+  "capacity": {
+    "kv_cache_bytes_per_rank": 3221225472,
+    "kv_cache_tokens": 498145,
+    "max_model_len": 160000,
+    "max_num_seqs": 8,
+    "reported_full_context_concurrency": 3.11
+  },
+  "limitations": [
+    "This is a forensic observation, not yet a reproducible image build.",
+    "The image tag resolves to different node-local image IDs.",
+    "No frozen benchmark suite for this exact configuration is attached yet."
+  ]
+}

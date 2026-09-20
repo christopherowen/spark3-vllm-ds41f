@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+destination="$repo_root/.work/wheels/cutlass-dsl"
+
+mkdir -p "$destination"
+python3 -m pip download \
+  --dest "$destination" \
+  --require-hashes \
+  --no-deps \
+  --only-binary=:all: \
+  --platform manylinux_2_28_aarch64 \
+  --implementation cp \
+  --python-version 3.12 \
+  --abi cp312 \
+  --requirement "$repo_root/requirements/cutlass-dsl-aarch64.txt"
