@@ -178,8 +178,9 @@ passed on GB10, and full model loading then exposed its missing composition
 with ModelOpt's scale transform. Patch 0011 and the exact 160-to-5120 MXFP8
 scale regression pass on GB10. Patch 0012 then restores the omitted disk-Engram
 parent-to-leaf handoff and passes the composed loader regression plus all 18
-focused DS4.1 tests on GB10. The candidate is not promotable until full
-three-rank model-load, quality, capacity, and performance gates pass.
+focused DS4.1 tests on GB10 in the immutable candidate image. The candidate is
+not promotable until full three-rank model-load, quality, capacity, and
+performance gates pass.
 
 ## Quality and safety gates
 
