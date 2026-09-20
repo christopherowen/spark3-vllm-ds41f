@@ -1,0 +1,53 @@
+{
+  "intended_variable": "rebase the source stack onto current upstream architecture and retain only required DS4.1 TP3 behavior",
+  "configuration_delta": {},
+  "source_delta": [
+    {
+      "project": "vllm",
+      "tracking_ref": "refs/heads/main",
+      "upstream_base": "d05da62e9ccdf8e342b15bf6785d83224cc165af",
+      "candidate_commit": "277171c959846de8870732e96d23276575e88ae5",
+      "source_tree": "b5a7e4030186c4347062106b1e1985a220dba19f",
+      "branch": "spark3/ds41f-tp3",
+      "patch": "patches/vllm/0001-quality-preserving-ds41-tp3-padding.patch"
+    },
+    {
+      "project": "b12x",
+      "tracking_ref": "refs/heads/master",
+      "upstream_base": "0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68",
+      "candidate_commits": [
+        "348145ea8b6adaea7c32b1b87898ff59b5d43380",
+        "803d7d795d05be3902a30e82743a817a2c26d53f"
+      ],
+      "source_tree": "f01d0aff9ecf5d4cc048610e5484b1beb63918cb",
+      "branch": "spark3/ds41f-tp3",
+      "patches": [
+        "patches/b12x/0001-retain-qualified-3072-token-mhc-geometry.patch",
+        "patches/b12x/0002-route-switchless-peers-by-local-hca.patch"
+      ]
+    }
+  ],
+  "base_image": {
+    "reference": "docker.io/vllm/vllm-openai:nightly-d05da62e9ccdf8e342b15bf6785d83224cc165af",
+    "index_digest": "sha256:f29125cfaed1b5763ae5378088258c30c9fb2eac7904210c282842a68910f7a8",
+    "arm64_manifest_digest": "sha256:54c6532e846cc2a10685cc685b8f0180cbd136280f86e00247ba0bffba4717d1"
+  },
+  "image_digest": "not-built",
+  "deployment_status": "not-deployed",
+  "integration_status": {
+    "status": "source-carries-prepared-performance-overlay-incomplete",
+    "upstream_native_path": "DS4.1 uses the current upstream FlashInfer sparse-MLA path on SM121",
+    "missing_vllm_consumers": [
+      "current-interface DS4.1 B12X sparse-MLA attention adapter",
+      "current-interface RoCEnante collective adapter"
+    ],
+    "b12x_source_commits_reachable_from_vllm": false,
+    "details": "donor-analysis.md"
+  },
+  "compatibility_gate": {
+    "status": "blocked-pending-explicit-toolchain-qualification",
+    "vllm_cutlass_dsl": "4.7.1",
+    "b12x_cutlass_dsl": "4.6.2",
+    "details": "compatibility.md"
+  }
+}

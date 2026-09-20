@@ -29,16 +29,25 @@ as captured evidence but not as the final deployment method.
 
 ## Known transition gaps
 
-- Build and qualify the committed image reconstruction on a Spark.
+- Do not promote the incomplete release-branch image reconstruction; retain it
+  only as forensic evidence until the upstream-main candidate supersedes it.
 - Build once and distribute a single OCI digest to all ranks.
+- Replace the incomplete release-branch reconstruction with the isolated
+  upstream-main candidate in `experiments/2026-09-20-upstream-main-rebase/`.
+- Keep the upstream-native allocator/model qualification separate from the
+  B12X/RoCEnante performance overlay. The current prepared source carries do
+  not yet include vLLM's DS4.1 B12X or RoCEnante consumer adapters.
 - Qualify the tracked model configuration and indexer artifacts under the
   deterministic `/home/swank/projects/spark3-vllm-ds41f/` node path.
 - Exercise the coordinated deployment rollback path during a scheduled restart.
 - Establish a frozen benchmark baseline for this exact concurrency-tuned runtime.
 
-The vLLM and B12X patch stacks have now been applied to fresh pinned checkouts and
-match every modified live file byte-for-byte. The hashes are recorded in
-`manifests/sources/2026-09-20-active-source.json`.
+The B12X patch stack and the mounted vLLM indexer override have been applied to
+fresh pinned checkouts and match their recorded live files. A later full-tree
+comparison found additional live modifications under the DS4.1 model package,
+plus `vllm/models/deepseek_v4/nvidia/model.py`, that are not represented by the
+vLLM patch series. `manifests/sources/2026-09-20-active-source.json` now states
+that narrower verification scope explicitly.
 
 The reconstruction additionally pins the official vLLM image digest, FlashInfer
 `v0.7.0rc1`, CUTLASS `v4.4.2`, and the five CuTe DSL 4.6.2 wheel hashes. Its

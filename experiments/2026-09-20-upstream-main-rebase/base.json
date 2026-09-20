@@ -1,0 +1,7 @@
+{
+  "repository_commit": "5cdc0f6ef5a9bc83997edeecd68b7bb3eee7c223",
+  "promoted_baseline": "manifests/baselines/2026-09-20-live.json",
+  "image_digest": "node-local image IDs recorded in manifests/baselines/2026-09-20-live.json",
+  "upstream_lock_sha256": "8e675014b30db58e271c463e1083064cee0bfa01ed086d0eba97775231c53127",
+  "cluster_state_receipt": "manifests/baselines/2026-09-20-live.json"
+}

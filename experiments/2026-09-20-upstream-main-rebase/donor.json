@@ -1,0 +1,25 @@
+{
+  "purpose": "behavioral reference only; neither donor is a candidate base or build input",
+  "vllm": {
+    "repository": "https://github.com/local-inference-lab/vllm.git",
+    "reference": "R38 source lock",
+    "revision": "66c293578412417476f842c1da5805d3a3d959a8",
+    "source_tree": "301dddf6d8fd2393aeac4d68e3a954d19911507f",
+    "merge_base_with_candidate_upstream": "299ebd094a9cea1a16077dc2a4419192b85a777c",
+    "donor_only_commits_since_merge_base": 398,
+    "candidate_upstream_only_commits_since_merge_base": 1252,
+    "use": [
+      "DS4.1 B12X sparse-MLA behavior and tests",
+      "RoCEnante collective behavior and health checks"
+    ],
+    "prohibited_use": "wholesale cherry-pick or replacement of current upstream DS4.1 model, allocator, CED, Engram, or preparation architecture"
+  },
+  "b12x": {
+    "repository": "https://github.com/local-inference-lab/b12x.git",
+    "reference": "R38 source lock",
+    "revision": "ce419b52681b7922bb0972d4b58b590a3fd005b2",
+    "source_tree": "6abad73444018f7ce1f0bdc3f0992649a4c21722",
+    "relationship_to_candidate_base": "ancestor",
+    "candidate_base": "0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68"
+  }
+}

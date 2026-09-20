@@ -1,0 +1,53 @@
+{
+  "status": "source-prepared-runtime-not-run",
+  "runs": [],
+  "static_checks": {
+    "vllm_ruff": "passed",
+    "vllm_format": "passed",
+    "vllm_py_compile": "passed",
+    "vllm_virtual_head_unit_tests": "7 passed with Torch 2.13.0 using an isolated module import",
+    "b12x_mhc_policy_tests": "2 passed",
+    "b12x_roce_topology_tests": "7 passed with Torch 2.13.0 using isolated CPU-safe module imports",
+    "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
+    "b12x_py_compile": "passed",
+    "diff_check": "passed",
+    "deterministic_source_preparer": "passed for both source trees against recorded Git tree identities",
+    "repository_doctor": "configuration OK",
+    "live_read_only_doctor": "configuration OK; live cluster matches"
+  },
+  "summary": {
+    "ttft_seconds": null,
+    "decode_tps_per_stream": null,
+    "decode_tps_aggregate": null,
+    "minimum_host_mem_available_gib": null,
+    "request_failures": null,
+    "quality_gate": "not run; requires target hardware and a maintenance window"
+  },
+  "static_allocator_accounting": {
+    "cache_budget_bytes_per_rank": 3221225472,
+    "promoted_runtime": {
+      "observed_tokens": 498145,
+      "effective_bytes_per_token": 6466.441441748888,
+      "effective_mib_per_160k_request": 986.7006594465467,
+      "complete_160k_windows": 3.11340625
+    },
+    "upstream_native_prediction": {
+      "predicted_tokens": 1354538,
+      "effective_bytes_per_token": 2378.099006450908,
+      "effective_mib_per_160k_request": 362.8691110917523,
+      "complete_160k_windows": 8.4658625,
+      "relative_token_capacity": 2.7191640988065724
+    },
+    "confidence": "static source accounting only; requires model-load confirmation before it is a result"
+  },
+  "integration_gate": {
+    "status": "blocked",
+    "reasons": [
+      "canonical vLLM has no current-interface DS4.1 B12X sparse-MLA adapter",
+      "canonical vLLM has no current-interface RoCEnante collective adapter",
+      "vLLM pins CUTLASS DSL 4.7.1 while B12X pins 4.6.2"
+    ],
+    "current_upstream_native_behavior": "FlashInfer sparse MLA plus NCCL; the prepared B12X carries are not reachable",
+    "shortcut_rejected": "no dependency suppression, in-place downgrade, or mixed-revision native extensions"
+  }
+}

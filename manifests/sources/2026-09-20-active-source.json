@@ -8,7 +8,20 @@
     "verified_files": {
       "vllm/v1/attention/backends/mla/indexer.py": "aaccd55ab9aaacddd647717b0917a9cdf13916c0940da236887e90baa84edcf2"
     },
-    "verification": "fresh pinned checkout plus series matches the live mounted override"
+    "verification": "fresh pinned checkout plus series matches the live mounted indexer override only",
+    "verification_scope": "partial forensic capture; not a complete reconstruction of the live vLLM tree",
+    "known_uncaptured_live_changes": [
+      "vllm/models/deepseek_v4/nvidia/model.py",
+      "vllm/models/deepseek_v4_1/attention.py",
+      "vllm/models/deepseek_v4_1/b12x_layers.py",
+      "vllm/models/deepseek_v4_1/common/engram.py",
+      "vllm/models/deepseek_v4_1/compressor.py",
+      "vllm/models/deepseek_v4_1/nvidia/b12x_vision.py",
+      "vllm/models/deepseek_v4_1/nvidia/dspark.py",
+      "vllm/models/deepseek_v4_1/nvidia/model.py",
+      "vllm/models/deepseek_v4_1/nvidia/vl_model.py",
+      "vllm/models/deepseek_v4_1/virtual_heads.py"
+    ]
   },
   "b12x": {
     "base_revision": "f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",

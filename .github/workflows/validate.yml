@@ -17,11 +17,14 @@ jobs:
       - name: Compile helper
         run: python3 -m py_compile bin/spark3
       - name: Validate shell helpers
-        run: find scripts -type f -print0 | xargs -0 -n1 bash -n
+        run: |
+          find scripts -type f -print0 | xargs -0 -n1 sh -n
+          find experiments -type f -name 'prepare-sources' -print0 \
+            | xargs -0 -n1 sh -n
       - name: Validate JSON and patches
         run: |
           git diff --check
-          find config manifests experiments/_template -name '*.json' -print0 \
+          find config manifests experiments -name '*.json' -print0 \
             | xargs -0 -n1 python3 -m json.tool >/dev/null
 
   patch-stacks:

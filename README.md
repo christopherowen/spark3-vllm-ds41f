@@ -92,13 +92,17 @@ but are not build inputs are kept separately in
 
 ## Transition status
 
-The active runtime can now be rendered, deployed, and audited. Fresh pinned vLLM and B12X
-checkouts plus their ordered patch series reproduce every modified live source
-file byte-for-byte. The image reconstruction now pins the official base digest,
-FlashInfer, CUTLASS, and every CuTe DSL wheel, but has not yet been built and
-qualified on a Spark. The current live tag still resolves to node-local image
-IDs. Critical serving source is identical; rank 0 only omits vLLM's unused
-`benchmarks/` package. The next milestone is to qualify
-[docker/Dockerfile](docker/Dockerfile), push one content digest, and promote that
-exact digest to all three nodes. The currently captured node-local image remains
-the promoted runtime until that qualification is complete.
+The active launch can now be rendered, deployed, and audited. The forensic
+source reconstruction is not yet complete: a follow-up comparison found local
+DS4.1 model changes in the live image beyond the captured indexer override. The
+recorded vLLM patch series therefore proves only that override, not the entire
+live serving tree.
+
+Rather than keep reconstructing a divergent release branch, the
+[upstream-main rebase experiment](experiments/2026-09-20-upstream-main-rebase/README.md)
+starts from current upstream architecture and carries each still-required
+change as a separate commit. Neither that experiment nor
+[docker/Dockerfile](docker/Dockerfile) has been built or qualified on a Spark.
+The current live tag still resolves to node-local image IDs and remains the
+promoted runtime until a scheduled qualification produces one tested content
+digest for all three nodes.
