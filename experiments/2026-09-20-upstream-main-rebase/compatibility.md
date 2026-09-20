@@ -7,12 +7,18 @@
 | vLLM | `d05da62e9ccdf8e342b15bf6785d83224cc165af` | `torch==2.13.0`, `nvidia-cutlass-dsl[cu13]==4.7.1`, optional `b12x==1.3.0` |
 | B12X | `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68` plus carry `de8e7fa971eb7ae4c21e634a8931407a0b404568` | all CUTLASS DSL packages `==4.7.1` |
 
-The dependency sets are now co-installable as declared. The experiment image
-uses normal dependency resolution followed by `pip check`; it does not use
-`--no-deps` to conceal a conflict. The migration still requires target
-qualification because B12X compiles and caches kernels through CUTLASS DSL, so
-the toolchain change can affect build correctness, cache behavior, memory use,
-and performance.
+The dependency sets are now co-installable as declared. The official vLLM
+nightly nevertheless deliberately ships NCCL 2.30.7 while Torch metadata names
+2.29.7, and its pristine `pip check` also reports the ARM64 cuSPARSELt marker.
+Allowing pip to resolve an unrelated B12X install therefore downgrades the
+nightly's native communication stack. The experiment instead preserves the
+base NCCL version, verifies every applicable direct B12X requirement, and
+requires the complete pre/post `pip check` output to remain identical. This is
+an explicit base-image exception, not dependency-conflict suppression.
+
+The migration still requires target qualification because B12X compiles and
+caches kernels through CUTLASS DSL, so the toolchain change can affect build
+correctness, cache behavior, memory use, and performance.
 
 The source-integration blocker is also resolved. The candidate adds a
 fail-closed B12X choice to the native DS4.1 model and a RoCEnante communicator
@@ -45,7 +51,9 @@ fallback because it deliberately trails the selected upstream revision.
 
 ## Invalid shortcuts
 
-- Installing B12X with `--no-deps` and declaring the combination supported.
+- Installing B12X with `--no-deps` without checking every direct requirement,
+  preserving the recorded base-native versions, and proving there are no new
+  `pip check` findings.
 - Downgrading CUTLASS DSL inside the published vLLM nightly.
 - Overlaying current vLLM Python on native extensions from an older commit.
 - Promoting the upstream-native FlashInfer result as equivalent to the B12X

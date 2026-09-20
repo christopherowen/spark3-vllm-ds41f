@@ -8,7 +8,7 @@
     "vllm_ds41_b12x_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
     "vllm_rocenante_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
     "local_focused_pytest": "not run: cached Mac test environment lacks tblib, msgspec, and regex",
-    "docker_build_check": "not run: local Docker daemon is unavailable; target build remains pending",
+    "docker_build_check": "first SM121 build exposed the official nightly's pre-existing Torch/NCCL and ARM64 cuSPARSELt pip-check findings; build gate updated to preserve NCCL 2.30.7, validate direct B12X requirements, and require no new pip-check findings",
     "vllm_virtual_head_unit_tests": "7 passed with Torch 2.13.0 using an isolated module import",
     "b12x_mhc_policy_tests": "2 passed",
     "b12x_roce_topology_tests": "7 passed with Torch 2.13.0 using isolated CPU-safe module imports",

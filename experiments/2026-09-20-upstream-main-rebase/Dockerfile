@@ -11,6 +11,7 @@ ARG B12X_BASE=0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68
 ARG B12X_PATCH_HEAD=de8e7fa971eb7ae4c21e634a8931407a0b404568
 ARG B12X_TREE=4dbbf9f0eb784f379d0bc38db8195dd65088aaaa
 ARG DEPLOYMENT_COMMIT=uncommitted
+ARG BASE_NCCL_VERSION=2.30.7
 
 LABEL org.opencontainers.image.source="https://github.com/christopherowen/spark3-vllm-ds41f" \
       org.opencontainers.image.revision="${DEPLOYMENT_COMMIT}" \
@@ -39,11 +40,35 @@ RUN set -eux; \
     find . -type f \( -name '*.so' -o -name '_version.py' \) \
       -exec cp --parents -a '{}' /opt/spark3/candidate/vllm/vllm/ ';'
 
-# Resolve B12X normally. Its candidate metadata now declares the same CUTLASS
-# DSL 4.7.1 toolchain as this vLLM image; dependency conflicts are not hidden.
-RUN python3 -m pip install --no-cache-dir --no-build-isolation \
-      /opt/spark3/candidate/b12x \
-    && python3 -m pip check
+# The official nightly intentionally carries NCCL 2.30.7 over Torch's declared
+# 2.29.7 dependency, and pip check also reports the ARM64 cuSPARSELt marker.
+# Preserve that tested base-image state. Install B12X without allowing pip to
+# downgrade the native stack, verify every applicable direct B12X requirement,
+# and require the complete pip-check output to remain byte-for-byte unchanged.
+RUN set -eux; \
+    python3 -m pip check >/tmp/pip-check.base 2>&1 || true; \
+    python3 -m pip install --no-cache-dir --no-build-isolation --no-deps \
+      /opt/spark3/candidate/b12x
+RUN python3 - <<'PY'
+import importlib.metadata as metadata
+
+from packaging.requirements import Requirement
+
+for raw_requirement in metadata.requires("b12x") or ():
+    requirement = Requirement(raw_requirement)
+    if requirement.marker and not requirement.marker.evaluate():
+        continue
+    installed = metadata.version(requirement.name)
+    if requirement.specifier and installed not in requirement.specifier:
+        raise RuntimeError(
+            f"B12X requires {requirement}, but {installed} is installed"
+        )
+PY
+RUN set -eux; \
+    test "$(python3 -c 'import importlib.metadata as m; print(m.version("nvidia-nccl-cu13"))')" \
+      = "$BASE_NCCL_VERSION"; \
+    python3 -m pip check >/tmp/pip-check.candidate 2>&1 || true; \
+    diff -u /tmp/pip-check.base /tmp/pip-check.candidate
 
 ENV PYTHONPATH=/opt/spark3/candidate/vllm:/opt/spark3/candidate/b12x
 

@@ -34,7 +34,10 @@ prepare() {
   git -C "$temporary" switch --quiet --create spark3/ds41f-tp3 FETCH_HEAD
 
   for patch in "$@"; do
-    git -C "$temporary" am --quiet "$experiment_root/$patch"
+    git -C "$temporary" \
+      -c user.name="Christopher Owen" \
+      -c user.email="root@your.mom" \
+      am --quiet "$experiment_root/$patch"
   done
 
   actual_tree=$(git -C "$temporary" rev-parse HEAD^{tree})
