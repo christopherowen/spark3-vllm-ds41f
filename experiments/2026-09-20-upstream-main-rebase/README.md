@@ -165,9 +165,10 @@ Python with native extensions from a different vLLM revision.
 [compatibility.md](compatibility.md) records the exact matrix and remaining
 SM121 qualification gates. Patch 0010 and the combined DS4.1 adapter suite
 passed on GB10, and full model loading then exposed its missing composition
-with ModelOpt's scale transform. Patch 0011 is source-qualified pending its
-target regression and immutable image build. The candidate is not promotable
-until full three-rank model-load, quality, capacity, and performance gates pass.
+with ModelOpt's scale transform. Patch 0011 and the exact 160-to-5120 MXFP8
+scale regression now pass on GB10 in the immutable candidate image. The
+candidate is not promotable until full three-rank model-load, quality,
+capacity, and performance gates pass.
 
 ## Quality and safety gates
 

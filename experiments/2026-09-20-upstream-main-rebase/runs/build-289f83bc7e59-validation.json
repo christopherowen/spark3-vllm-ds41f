@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "status": "passed-prelaunch-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:164c5d5bde78-8099cee92c78-d2fa6c2c1fbdf",
+    "id": "sha256:289f83bc7e59945dbaad43d9c4f1d42162399df732fa84dab5be57f1f65435d1",
+    "size_bytes": 23240132712,
+    "deployment_revision": "2fa6c2c1fbdff248f9b919b9b0db3f46146dc1ee",
+    "vllm_patch_head": "164c5d5bde7869bff5f2004f01f9f8e432d63d59",
+    "vllm_tree": "124dea53c3611e397f021f16ecd393419ee920f7",
+    "b12x_patch_head": "8099cee92c78dd2472749ca8003053ee73be908d",
+    "b12x_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0"
+  },
+  "checks": {
+    "source_replay": "eleven vLLM and four B12X patches replayed from exact bases to the recorded Git trees",
+    "modelopt_virtual_heads": "the exact raw 160-row to final 5120-row MXFP8 scale transformation passed on GB10",
+    "deepseek_v41": "17 focused virtual-head and B12X adapter tests passed on GB10 from both the prepared source overlay and the finished image",
+    "image_labels": "deployment, vLLM, and B12X commit/tree labels match the recorded candidate",
+    "rollback_state": "promoted containers remain stopped and present on all three nodes; failed candidate containers were removed"
+  },
+  "distribution": {
+    "source": "dgx3",
+    "targets": {
+      "dgx1": "192.168.2.1",
+      "dgx2": "192.168.4.1 via dgx2-internal"
+    },
+    "method": "two parallel uncompressed docker save/load streams over both ConnectX-7 internal rails",
+    "status": "pending"
+  },
+  "remaining": [
+    "distribute and verify the exact image ID on all three ranks",
+    "full three-rank model load and selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}
