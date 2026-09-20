@@ -84,9 +84,10 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
-source trees. It does not stop, restart, or deploy the service. The exact
-prelaunch-qualified image and checks are recorded in
-`runs/build-8649ec7238e3-validation.json`.
+source trees. It does not stop, restart, or deploy the service. The current
+prelaunch-qualified TP3 image and checks are recorded in
+`runs/build-f332c52cb106-validation.json`; the earlier receipt remains as the
+provenance for the pre-vocabulary-fix image.
 
 The experiment has its own deterministic cluster configuration. It can be
 inspected without changing the promoted configuration:

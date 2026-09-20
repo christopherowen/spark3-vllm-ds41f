@@ -50,10 +50,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "previous-image-rejected-at-first-full-model-construction",
-  "deployment_status": "candidate-stopped; promoted rollback retained",
+  "image_digest": "sha256:f332c52cb106e7c86465879e06ebc79a5e7e79d85ca9dbc218e4020bb37bac69",
+  "deployment_status": "prelaunch-qualified on all ranks; promoted rollback retained",
   "integration_status": {
-    "status": "source-integration-complete-with-tp3-vocabulary-fix-pending-rebuild",
+    "status": "source-and-prelaunch-integration-complete-pending-full-model-load",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

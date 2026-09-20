@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "status": "passed-prelaunch-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:38d69a82fdd0-8099cee92c78-d88924daa99c5",
+    "id": "sha256:f332c52cb106e7c86465879e06ebc79a5e7e79d85ca9dbc218e4020bb37bac69",
+    "size_bytes": 23239940644,
+    "deployment_revision": "88924daa99c56e5250f2998d4edf818c285e66fc",
+    "vllm_patch_head": "38d69a82fdd0ea76f8a92c15476bba8cc74184f4",
+    "vllm_tree": "36be6d52dd5bcea30186a42b5215dc0f5d7d7231",
+    "b12x_patch_head": "8099cee92c78dd2472749ca8003053ee73be908d",
+    "b12x_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0"
+  },
+  "checks": {
+    "source_replay": "six vLLM and four B12X patches replayed from exact bases to the recorded Git trees",
+    "source_style": "Ruff check and format passed for the TP-aware vocabulary source and regression test",
+    "tp_vocabulary_alignment": "5 passed for TP1, TP2, TP3, TP5, and TP8 on GB10",
+    "deepseek_v41_integration": "14 virtual-head and native B12X integration tests passed on GB10",
+    "b12x_engram": "8 passed with IPC_LOCK, unlimited memlock, and the production seccomp capability set",
+    "serve_configuration": "real vLLM parser and AsyncEngineArgs engine-config construction passed against the mounted model; resolved max_model_len=160000, max_num_seqs=8, kv_cache_memory_bytes=3221225472, and disk Engram",
+    "plugin_scope": "VLLM_PLUGINS=b12x_loader loads the required native checkpoint loader without the unrelated downstream-only FP6 plugin",
+    "image_identity": "dgx1, dgx2, and dgx3 all reported the exact image ID sha256:f332c52cb106e7c86465879e06ebc79a5e7e79d85ca9dbc218e4020bb37bac69",
+    "rollback_state": "promoted containers remain stopped and present on all three nodes; candidate containers are absent"
+  },
+  "distribution": {
+    "source": "dgx3",
+    "targets": {
+      "dgx1": "192.168.2.1",
+      "dgx2": "dgx2-internal"
+    },
+    "method": "uncompressed docker save/load streams over the ConnectX-7 internal rails",
+    "dgx2_elapsed_seconds": 100
+  },
+  "remaining": [
+    "full three-rank model load and selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}

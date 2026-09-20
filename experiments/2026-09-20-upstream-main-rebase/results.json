@@ -1,5 +1,5 @@
 {
-  "status": "tp3-vocabulary-fix-qualified-pending-rebuild",
+  "status": "tp3-vocabulary-image-qualified-pending-cluster-run",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -21,7 +21,8 @@
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
     "candidate_distribution": "identical image ID on dgx1, dgx2, and dgx3; uncompressed parallel Docker streams traversed the two ConnectX-7 internal rails in approximately 82 seconds",
     "first_full_launch": "failed before weight loading because upstream vocabulary padding aligned 129280 rows to 64 but not TP3; no OOM occurred and all failed candidate containers were removed",
-    "tp3_vocabulary_resolution": "generic lcm(storage alignment, TP size) padding copied from the known-working branch; 129408 physical rows preserve all 129280 native token rows, and TP1/2/3/5/8 regression coverage passes"
+    "tp3_vocabulary_resolution": "generic lcm(storage alignment, TP size) padding copied from the known-working branch; 129408 physical rows preserve all 129280 native token rows, and TP1/2/3/5/8 regression coverage passes",
+    "tp3_corrected_image": "sha256:f332c52cb106e7c86465879e06ebc79a5e7e79d85ca9dbc218e4020bb37bac69 passed 5 vocabulary, 14 DS4.1 integration, and 8 disk-Engram tests plus real serve-config construction; exact image ID verified on every rank"
   },
   "summary": {
     "ttft_seconds": null,
@@ -71,7 +72,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "tp3-vocabulary-fix-pending-content-addressed-rebuild",
+    "status": "tp3-vocabulary-image-qualified-pending-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
