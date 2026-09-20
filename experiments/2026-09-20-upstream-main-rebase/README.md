@@ -23,6 +23,8 @@ patches to the divergent DS4.1 release snapshots.
   RoCEnante collective adapter; generic loader-owned checkpoint routing; and
   an upstream-model disk Engram boundary that stages only requested native rows;
   plus TP-aware vocabulary padding for non-power-of-two tensor parallel sizes.
+  The B12X warmup-provider reference is deliberately non-owning so it cannot
+  create a cycle in PyTorch's child-module graph.
 - B12X carries: the qualified 3072-token mHC policy, per-peer/HCA RoCEnante
   routing for the switchless ring, explicit CUTLASS DSL 4.7.1 alignment, and a
   fail-closed managed-memory loader adapter for current upstream vLLM.
@@ -55,6 +57,16 @@ original token rows and logits. The extra 128 rows are inert padding. The exact
 failure and invariant are recorded in
 `runs/launch-8649ec7238e3-tp3-vocab.json`.
 
+The vocabulary-corrected image passed TP3 construction and entered checkpoint
+loading. That exposed a second isolated adapter defect: assigning the attention
+module to its own warmup-provider attribute through `nn.Module.__setattr__`
+registered it as its own child. The resulting graph cycle made checkpoint
+loader discovery recurse indefinitely. Patch 0007 keeps the identical provider
+reference through `object.__setattr__`, and a regression proves it is absent
+from `_modules` and that `named_modules(remove_duplicate=False)` terminates.
+The exact failure is recorded in
+`runs/launch-f332c52cb106-module-cycle.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -84,10 +96,11 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
-source trees. It does not stop, restart, or deploy the service. The current
-prelaunch-qualified TP3 image and checks are recorded in
+source trees. It does not stop, restart, or deploy the service. The
+vocabulary-corrected TP3 image and its checks are recorded in
 `runs/build-f332c52cb106-validation.json`; the earlier receipt remains as the
-provenance for the pre-vocabulary-fix image.
+provenance for the pre-vocabulary-fix image. Its full launch exposed the
+module-cycle defect above; the next image adds only that isolated fix.
 
 The experiment has its own deterministic cluster configuration. It can be
 inspected without changing the promoted configuration:

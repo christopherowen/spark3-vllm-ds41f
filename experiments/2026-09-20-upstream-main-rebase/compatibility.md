@@ -39,6 +39,15 @@ non-power-of-two TP sizes. The candidate now retains 64-row alignment while
 padding to its least common multiple with TP size. For DS4.1 TP3 this adds only
 inert rows beyond the native vocabulary and leaves token selection unchanged.
 
+The next launch completed that construction boundary and reached checkpoint
+loader discovery, where it exposed a module-ownership error in the carried
+B12X adapter. The warmup provider is a non-owning interface reference to the
+attention object itself; assigning it through `nn.Module.__setattr__` instead
+registered the object as its own child. The candidate now uses
+`object.__setattr__`, preserving provider identity without a cyclic module
+graph. A regression covers `_modules` ownership and duplicate-preserving module
+traversal.
+
 ## Valid routes
 
 ### Selected route: qualify B12X on CUTLASS DSL 4.7.1

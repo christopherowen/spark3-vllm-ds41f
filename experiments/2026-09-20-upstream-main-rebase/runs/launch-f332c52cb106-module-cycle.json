@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "status": "failed-during-checkpoint-loader-discovery",
+  "image_id": "sha256:f332c52cb106e7c86465879e06ebc79a5e7e79d85ca9dbc218e4020bb37bac69",
+  "deployment_revision": "ba77862e",
+  "observed": {
+    "stage": "checkpoint loading after successful TP3 model construction",
+    "error": "RecursionError: maximum recursion depth exceeded",
+    "source": "DeepseekV41B12xAttention assigned itself through nn.Module.__setattr__, registering b12x_warmup_provider as its own child and creating a module graph cycle",
+    "oom_killed": false,
+    "candidate_cleanup": "launcher detected the stopped container and removed failed candidate containers from all three nodes",
+    "rollback_state": "stopped promoted containers remained intact on all three nodes"
+  },
+  "resolution": {
+    "method": "retain the non-owning self reference with object.__setattr__ so it is not inserted into nn.Module._modules",
+    "behavior_invariant": "the warmup driver still resolves the same provider object; only erroneous PyTorch child-module ownership is removed",
+    "provenance": "the same non-registering assignment is used in the previously working downstream branch",
+    "coverage": "regression proves identity, absence from _modules, finite named_modules traversal, and all eight focused DS4.1 B12X tests pass on GB10"
+  }
+}

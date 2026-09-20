@@ -1,0 +1,62 @@
+From 0fe6eed4b7b3a8bcc807d56cdd8a24021d13ea68 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Sun, 20 Sep 2026 23:59:11 +0200
+Subject: [PATCH] fix(deepseek-v41): avoid B12X warmup module cycle
+
+---
+ tests/models/test_deepseek_v41_b12x.py        | 22 ++++++++++++++++++++
+ .../deepseek_v41/nvidia/b12x_attention.py     |  5 +++--
+ 2 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
+index 155f8d38a6..58cd5452e0 100644
+--- a/tests/models/test_deepseek_v41_b12x.py
++++ b/tests/models/test_deepseek_v41_b12x.py
+@@ -108,6 +108,28 @@ def test_b12x_uses_native_tp3_heads_and_v41_cache_abi() -> None:
+     assert _use_v41_mxfp8_kv_record("nvfp4_ds_mla")
+ 
+ 
++def test_b12x_self_warmup_provider_is_not_a_child_module(monkeypatch) -> None:
++    def initialize_base(attention, *_args, **_kwargs) -> None:
++        torch.nn.Module.__init__(attention)
++        attention.kv_cache_dtype = "nvfp4_ds_mla"
++        attention._o_proj_block_size = 128
++
++    current = SimpleNamespace(invocation_from_descriptors=lambda **kwargs: kwargs)
++    monkeypatch.setattr(b12x_attention.DeepseekV4Attention, "__init__", initialize_base)
++    monkeypatch.setattr(
++        b12x_attention, "get_b12x_compressed_sparse_mla", lambda: current
++    )
++    monkeypatch.setattr(
++        b12x_attention, "compute_fp8_einsum_recipe", lambda _size: (None, False)
++    )
++
++    attention = DeepseekV41B12xAttention(SimpleNamespace())
++
++    assert attention.b12x_warmup_provider is attention
++    assert "b12x_warmup_provider" not in attention._modules
++    assert list(attention.named_modules(remove_duplicate=False)) == [("", attention)]
++
++
+ def test_flatten_cache_preserves_packed_page_storage() -> None:
+     cache = torch.empty((3, 64, 528), dtype=torch.uint8)
+     flattened = _flatten_cache(cache, name="test cache")
+diff --git a/vllm/models/deepseek_v41/nvidia/b12x_attention.py b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+index 9ad8271298..e976fde2ad 100644
+--- a/vllm/models/deepseek_v41/nvidia/b12x_attention.py
++++ b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+@@ -199,8 +199,9 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+             self._o_proj_block_size
+         )
+         # The generic warmup driver calls this provider after KV caches bind and
+-        # before CUDA graph capture.
+-        self.b12x_warmup_provider = self
++        # before CUDA graph capture. Bypass nn.Module.__setattr__: registering
++        # this module as its own child creates a cycle in named_modules().
++        object.__setattr__(self, "b12x_warmup_provider", self)
+ 
+     def _o_proj(self, attn_out: torch.Tensor, positions: torch.Tensor) -> torch.Tensor:
+         return deep_gemm_fp8_o_proj(
+-- 
+2.54.0 (Apple Git-157)
+

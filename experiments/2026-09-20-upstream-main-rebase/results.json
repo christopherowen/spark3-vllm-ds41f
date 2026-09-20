@@ -1,5 +1,5 @@
 {
-  "status": "tp3-vocabulary-image-qualified-pending-cluster-run",
+  "status": "module-cycle-fix-source-qualified-pending-image-rebuild",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,14 +15,16 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all six vLLM and four B12X patches replayed from the exact base objects and matched recorded Git tree identities 36be6d52dd5b and a1523b067b4d",
+    "deterministic_source_preparer": "all seven vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 1b0bdd161501 and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
     "candidate_distribution": "identical image ID on dgx1, dgx2, and dgx3; uncompressed parallel Docker streams traversed the two ConnectX-7 internal rails in approximately 82 seconds",
     "first_full_launch": "failed before weight loading because upstream vocabulary padding aligned 129280 rows to 64 but not TP3; no OOM occurred and all failed candidate containers were removed",
     "tp3_vocabulary_resolution": "generic lcm(storage alignment, TP size) padding copied from the known-working branch; 129408 physical rows preserve all 129280 native token rows, and TP1/2/3/5/8 regression coverage passes",
-    "tp3_corrected_image": "sha256:f332c52cb106e7c86465879e06ebc79a5e7e79d85ca9dbc218e4020bb37bac69 passed 5 vocabulary, 14 DS4.1 integration, and 8 disk-Engram tests plus real serve-config construction; exact image ID verified on every rank"
+    "tp3_corrected_image": "sha256:f332c52cb106e7c86465879e06ebc79a5e7e79d85ca9dbc218e4020bb37bac69 passed 5 vocabulary, 14 DS4.1 integration, and 8 disk-Engram tests plus real serve-config construction; exact image ID verified on every rank",
+    "second_full_launch": "passed TP3 construction and reached checkpoint-loader discovery, then failed because the B12X attention adapter registered itself as its own child module; no OOM occurred and automatic cleanup preserved rollback",
+    "module_cycle_resolution": "the provider remains the same object but is retained with object.__setattr__, not nn.Module ownership; finite named_modules traversal and all 8 focused B12X adapter tests pass on GB10"
   },
   "summary": {
     "ttft_seconds": null,
@@ -72,7 +74,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "tp3-vocabulary-image-qualified-pending-three-rank-serving-gates",
+    "status": "module-cycle-fix-source-qualified-pending-rebuild-and-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
