@@ -265,7 +265,10 @@ def command_upstream(args: argparse.Namespace) -> int:
         checked(["git", "submodule", "update", "--init", "--recursive"], cwd=destination)
     for commit in source.get("applied_upstream_commits", []):
         checked(["git", "fetch", "upstream", commit["revision"]], cwd=destination)
-        checked(["git", "cherry-pick", commit["revision"]], cwd=destination)
+        checked(
+            ["git", "cherry-pick", "--no-commit", commit["revision"]],
+            cwd=destination,
+        )
     pending: list[str] = []
     series = source.get("patch_series")
     if series:
@@ -377,16 +380,22 @@ def build_input_problems() -> list[str]:
         )
         if ancestor.returncode:
             problems.append(f"{name}: pinned revision is not an ancestor of prepared HEAD")
-        diff_check = subprocess.run(
-            ["git", "diff", "--check"],
-            cwd=path,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
-        if diff_check.returncode:
-            problems.append(f"{name}: prepared source fails git diff --check")
+        for staged in (False, True):
+            diff_command = ["git", "diff"]
+            if staged:
+                diff_command.append("--cached")
+            diff_command.append("--check")
+            diff_check = subprocess.run(
+                diff_command,
+                cwd=path,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if diff_check.returncode:
+                area = "staged" if staged else "working-tree"
+                problems.append(f"{name}: {area} source fails git diff --check")
         if source.get("submodules"):
             submodules = subprocess.run(
                 ["git", "submodule", "status", "--recursive"],

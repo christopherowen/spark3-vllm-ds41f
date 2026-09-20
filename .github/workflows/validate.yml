@@ -11,7 +11,7 @@ jobs:
   repository:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Validate configuration
         run: bin/spark3 doctor
       - name: Compile helper
@@ -28,8 +28,10 @@ jobs:
       matrix:
         source: [vllm, b12x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Apply pinned upstream and local series
         run: bin/spark3 upstream prepare "${{ matrix.source }}"
       - name: Reject whitespace errors
-        run: git -C ".work/upstreams/${{ matrix.source }}" diff --check
+        run: |
+          git -C ".work/upstreams/${{ matrix.source }}" diff --check
+          git -C ".work/upstreams/${{ matrix.source }}" diff --cached --check
