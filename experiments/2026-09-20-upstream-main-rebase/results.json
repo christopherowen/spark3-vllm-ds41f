@@ -1,5 +1,5 @@
 {
-  "status": "source-prepared-runtime-not-run",
+  "status": "target-qualification-in-progress",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -26,6 +26,28 @@
     "minimum_host_mem_available_gib": null,
     "request_failures": null,
     "quality_gate": "not run; requires target hardware and a maintenance window"
+  },
+  "live_baseline_serving": {
+    "identity": "promoted 2026-09-20 live configuration, reasoning enabled, temperature 0, seed 42, 256 requested completion tokens",
+    "client": "benchmark_serving.py",
+    "receipts": "runs/baseline-live",
+    "foreign_requests_observed": 0,
+    "prose": {
+      "c1": {"mean_ttft_s": 0.32735262499772944, "aggregate_e2e_tps": 31.410171457056986},
+      "c2": {"mean_ttft_s": 0.4850517499980924, "aggregate_e2e_tps": 53.183945309460476},
+      "c4": {"mean_ttft_s": 0.5850354479989619, "aggregate_e2e_tps": 77.65705357414157},
+      "c8": {"mean_ttft_s": 0.6085174428753817, "aggregate_e2e_tps": 57.77650118629789}
+    },
+    "code": {
+      "c1": {"mean_ttft_s": 0.3722792499975185, "aggregate_e2e_tps": 44.27627658907296},
+      "c2": {"mean_ttft_s": 0.47663050000119256, "aggregate_e2e_tps": 64.92218446683948},
+      "c4": {"mean_ttft_s": 0.591730302250653, "aggregate_e2e_tps": 94.35212865345761},
+      "c8": {"mean_ttft_s": 0.6898677291273998, "aggregate_e2e_tps": 76.08071873784837}
+    },
+    "deterministic_outputs": {
+      "prose_c1_sha256": "92f3247eddcb771b73e44540372cfb1b7ff316bc3968a745af20743535a7958a",
+      "code_c1_sha256": "03c3b9d4cfeb6ed5e97f435b8e9be09b2f2983a37f81d0929f1285236bfdd001"
+    }
   },
   "static_allocator_accounting": {
     "cache_budget_bytes_per_rank": 3221225472,

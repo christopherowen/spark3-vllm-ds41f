@@ -107,10 +107,12 @@ deployable serving image until those target tests pass.
 
 ## Workloads
 
-No serving workload is run during source preparation. The maintenance-window
-qualification must run the stable matrix in `docs/methodology.md`, including
-the 4-by-128K target and the normal eight-way Strix workload, against both the
-promoted baseline and this candidate.
+Source preparation ran no serving workload. Maintenance-window qualification
+uses `benchmark_serving.py` for identical temperature-zero prose and code
+requests at concurrency 1, 2, 4, and 8. Raw request-level receipts are retained
+under `runs/`; failed requests are never discarded. The complete qualification
+also includes the 4-by-128K target and the normal eight-way Strix workload
+against both the promoted baseline and this candidate.
 
 ## Acceptance criteria
 
