@@ -5,17 +5,17 @@
     "vllm_ruff": "passed",
     "vllm_format": "passed",
     "vllm_py_compile": "passed",
-    "vllm_ds41_b12x_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
+    "vllm_ds41_b12x_adapter": "ruff, format, py_compile, and diff checks passed for sparse MLA, managed loading, and disk Engram; target runtime tests pending",
     "vllm_rocenante_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
     "local_focused_pytest": "not run: cached Mac test environment lacks tblib, msgspec, and regex",
-    "docker_build_check": "first SM121 build exposed the official nightly's pre-existing Torch/NCCL and ARM64 cuSPARSELt pip-check findings; second build preserved NCCL 2.30.7 with no new findings, then the GPU import probe found the Git overlay omitted an install-only FlashMLA Python module; image assembly now fills absent files from the exact matching base package without overwriting candidate source",
+    "docker_build_check": "the first complete image preserved NCCL 2.30.7, added no pip-check findings, passed GPU imports, and was copied to all ranks; CLI initialization then exposed downstream-only B12X loader contracts before launch. The source now carries minimal owned/file-backed loader routing and disk Engram integration; the superseding image is not built yet",
     "vllm_virtual_head_unit_tests": "7 passed with Torch 2.13.0 using an isolated module import",
     "b12x_mhc_policy_tests": "2 passed",
     "b12x_roce_topology_tests": "7 passed with Torch 2.13.0 using isolated CPU-safe module imports",
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "exported series replayed from both exact local base objects and matched recorded Git tree identities; remote fetch attempt timed out before clone",
+    "deterministic_source_preparer": "all five vLLM and four B12X patches replayed from the exact base objects and matched recorded Git tree identities 4262bf458dc2 and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "configuration OK; live cluster matches"
   },
@@ -67,13 +67,13 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "source-complete-pending-sm121-qualification",
+    "status": "source-complete-pending-rebuild-and-sm121-qualification",
     "remaining_gates": [
-      "build the content-addressed ARM64 image when a Spark is free",
+      "rebuild the content-addressed ARM64 image with the loader and disk Engram carries",
       "compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
     ],
-    "candidate_behavior": "upstream DS4.1 semantics with B12X sparse MLA; eligible small TP collectives use RoCEnante and larger collectives use NCCL",
+    "candidate_behavior": "upstream DS4.1 semantics with B12X sparse MLA, coherent ordinary-weight loading, and native Engram rows staged from disk; eligible small TP collectives use RoCEnante and larger collectives use NCCL",
     "shortcut_rejected": "no dependency suppression, in-place downgrade, or mixed-revision native extensions"
   }
 }

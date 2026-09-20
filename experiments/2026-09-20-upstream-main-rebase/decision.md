@@ -1,23 +1,28 @@
 # Decision
 
-Status: **source-complete; await target qualification**
+Status: **source-complete; rebuilt target qualification required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
-sparse MLA and RoCEnante through current prepared-plan interfaces, and B12X
-declares the same CUTLASS DSL 4.7.1 toolchain as vLLM. No image has been built
-or deployed, and the live vLLM service has not been restarted or modified.
+sparse MLA and RoCEnante through current prepared-plan interfaces, ordinary
+weights load through the coherent GB10 path, and native Engram rows are staged
+from disk instead of consuming about 63 GiB per rank. B12X declares the same
+CUTLASS DSL 4.7.1 toolchain as vLLM.
+
+The first candidate image was built and distributed but deliberately not
+launched because its probe revealed missing downstream loader contracts. It is
+superseded by this source revision. The promoted containers are stopped but
+retained for rollback.
 
 The remaining work is target evidence, not another source port:
 
-1. build the content-addressed ARM64 candidate when a Spark is free;
+1. rebuild the content-addressed ARM64 candidate on dgx3;
 2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
 3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.
 
-The current nodes have only about 5--6 GiB available while serving, so an image
-build or pull was deliberately not started. Dependency suppression or an
-in-place nightly downgrade remains unacceptable. See `compatibility.md` and
+The nodes are now free for qualification. Dependency suppression or an in-place
+nightly downgrade remains unacceptable. See `compatibility.md` and
 `donor-analysis.md`.
 
 The matching ARM64 image must pass the full target-hardware quality/performance

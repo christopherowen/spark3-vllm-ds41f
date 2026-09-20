@@ -5,11 +5,11 @@ ARG BASE_IMAGE=docker.io/vllm/vllm-openai@sha256:54c653f0a663ac04a92c25aba60f264
 FROM ${BASE_IMAGE}
 
 ARG VLLM_BASE=d05da62e9ccdf8e342b15bf6785d83224cc165af
-ARG VLLM_PATCH_HEAD=d6b40631cad4bf406f25093f56436f2b8ef10800
-ARG VLLM_TREE=0b2a255f44e816178e8f3a2f0eb6ffbb9aca1576
+ARG VLLM_PATCH_HEAD=7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177
+ARG VLLM_TREE=4262bf458dc2ccdae405e39c5b3c5c2f4c62a723
 ARG B12X_BASE=0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68
-ARG B12X_PATCH_HEAD=de8e7fa971eb7ae4c21e634a8931407a0b404568
-ARG B12X_TREE=4dbbf9f0eb784f379d0bc38db8195dd65088aaaa
+ARG B12X_PATCH_HEAD=8099cee92c78dd2472749ca8003053ee73be908d
+ARG B12X_TREE=a1523b067b4df679f9aa23d543fa324dc00770f0
 ARG DEPLOYMENT_COMMIT=uncommitted
 ARG BASE_NCCL_VERSION=2.30.7
 
@@ -79,6 +79,9 @@ import importlib.metadata as metadata
 assert metadata.version("nvidia-cutlass-dsl") == "4.7.1"
 import b12x.attention.compressed_sparse_mla  # noqa: F401
 import b12x.comm.roce  # noqa: F401
+import b12x.integration.vllm.loader  # noqa: F401
+import b12x.sequence.engram  # noqa: F401
 import vllm.models.deepseek_v41.nvidia.b12x_attention  # noqa: F401
+import vllm.models.deepseek_v41.nvidia.engram  # noqa: F401
 print("candidate source imports and CUTLASS dependency gate passed")
 PY

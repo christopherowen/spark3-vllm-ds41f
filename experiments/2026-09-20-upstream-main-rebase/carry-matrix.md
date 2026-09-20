@@ -11,10 +11,12 @@
 | 3072-token DS4.1 mHC winner | Old policy did not survive the plan/tuning refactor | Port as isolated `348145ea8b6adaea7c32b1b87898ff59b5d43380` | Candidate after current-main GPU requalification |
 | Switchless peer/HCA RoCEnante routing | Not in B12X `master` | Carry as isolated `803d7d795d05be3902a30e82743a817a2c26d53f` | Candidate for B12X after three-node tests |
 | vLLM RoCEnante collective adapter | Not in canonical vLLM main | Carried as isolated `d6b40631cad4bf406f25093f56436f2b8ef10800`; prepared at startup and captured with the TP graph | Candidate for vLLM; eligible small collectives use RoCE and larger ones remain on NCCL |
+| Loader-owned checkpoint routing | The upstream loader does not expose B12X's immutable file ranges or owned destination allocator | Carry generic routing as isolated `8a82c50a6a3147ed14adb15a90bc7cb4322c0829`; no DS4.1 semantics live in the loader | Candidate for vLLM after loader tests and model-load qualification |
+| B12X loader on current vLLM | B12X master expects downstream coordinated loader and progress interfaces | Carry the minimal managed-memory compatibility boundary as isolated `8099cee92c78dd2472749ca8003053ee73be908d`; reject device/GDS mode until its coordinated hook is upstream | Candidate for B12X after SM121 load and memory qualification |
 | CUTLASS DSL toolchain | vLLM pins 4.7.1; B12X upstream pins 4.6.2 | B12X carry `de8e7fa971eb7ae4c21e634a8931407a0b404568` aligns all declared packages to 4.7.1 | Candidate for B12X after SM121 compile and performance qualification |
 | Indexer workspace factor override | Similar upstream PRs exist and conflict | Do not carry yet | Re-evaluate after main-native measurements |
 | Bounded parallel prefill scheduler | Only on the divergent release branch | Do not mix into the base rebase | Separate experiment after base qualification |
-| Disk-backed Engram table | Not supported by vLLM main DS4.1 Engram | Do not silently replace | Separate memory/TTFT experiment; upstream design needed |
+| Disk-backed Engram table | Not supported by vLLM main DS4.1 Engram; the two native tables are about 189 GiB globally | Carry exact upstream hashing plus B12X bounded row staging as isolated `7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177`; tables remain immutable checkpoint data and row values retain native FP8/E8M0 arithmetic | Candidate for vLLM/B12X after exact-output, disk-I/O, TTFT, and concurrency qualification |
 | CUDA graph and DS4.1 hot-path release commits | Main has newer, independently refactored implementations | Drop by default | Reintroduce only from profiler evidence |
 
 ## Why this is a rebase rather than another patch stack

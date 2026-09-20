@@ -1,0 +1,746 @@
+From 7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Sun, 20 Sep 2026 17:58:17 +0200
+Subject: [PATCH] feat(deepseek-v41): stage Engram rows from disk
+
+Upstream base: d05da62e9ccdf8e342b15bf6785d83224cc165af plus carries
+through 8a82c50a6a3147ed14adb15a90bc7cb4322c0829.
+Rationale: the two immutable Engram tables are about 189 GiB globally and cannot
+remain resident while preserving useful KV capacity on three 128 GiB Sparks.
+Quality: hashes and FP8/E8M0 checkpoint rows are unchanged; only requested rows
+are staged through B12X before the upstream Engram computation.
+Tests: ruff, format, py_compile, exact filter/range unit tests, and config gates;
+deterministic output, I/O, TTFT, and concurrency qualification remain required.
+Upstream status: local carry intended for coordinated vLLM/B12X contribution.
+
+---
+ .../model_loader/test_weight_transfer.py      |  15 ++
+ tests/models/test_deepseek_v41_b12x.py        |  45 +++++
+ tests/test_config.py                          |  15 ++
+ vllm/config/engram.py                         |  28 ++-
+ vllm/model_executor/weight_transfer.py        |   7 +
+ vllm/models/deepseek_v41/nvidia/dspark.py     |   4 +-
+ vllm/models/deepseek_v41/nvidia/engram.py     | 189 ++++++++++++++++++
+ vllm/models/deepseek_v41/nvidia/model.py      |  80 +++++++-
+ .../models/deepseek_v41/nvidia/model_state.py |  16 ++
+ vllm/utils/b12x.py                            |   5 +
+ 10 files changed, 399 insertions(+), 5 deletions(-)
+
+diff --git a/tests/model_executor/model_loader/test_weight_transfer.py b/tests/model_executor/model_loader/test_weight_transfer.py
+index 53ba255085..dd2ecb2830 100644
+--- a/tests/model_executor/model_loader/test_weight_transfer.py
++++ b/tests/model_executor/model_loader/test_weight_transfer.py
+@@ -12,6 +12,7 @@ from vllm.model_executor.model_loader.weight_utils import default_weight_loader
+ from vllm.model_executor.weight_transfer import (
+     allocate_weights,
+     copy_weight,
++    materialize_weight,
+     weight_transfer,
+ )
+ 
+@@ -103,3 +104,17 @@ def test_composed_loader_waits_for_queued_reads_before_transforming():
+     with weight_transfer(DeferredWriter()):
+         loader(parameter, torch.arange(4, dtype=torch.float32))
+     torch.testing.assert_close(parameter, torch.tensor([0.0, 2.0, 4.0, 6.0]))
++
++
++def test_materialize_weight_uses_the_active_writer():
++    class Writer:
++        def __call__(self, destination, source):
++            return False
++
++        def materialize(self, source):
++            return source + 7
++
++    source = torch.arange(3, dtype=torch.float32)
++    with weight_transfer(Writer()):
++        materialized = materialize_weight(source)
++    torch.testing.assert_close(materialized, source + 7)
+diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
+index 3e311e2437..155f8d38a6 100644
+--- a/tests/models/test_deepseek_v41_b12x.py
++++ b/tests/models/test_deepseek_v41_b12x.py
+@@ -8,12 +8,16 @@ import torch
+ 
+ import vllm.models.deepseek_v41.nvidia.b12x_attention as b12x_attention
+ import vllm.models.deepseek_v41.nvidia.model as nvidia_model
++from vllm.model_executor.model_loader.weight_utils import file_source_tensor
++from vllm.model_executor.weight_transfer import FileTensorSource
+ from vllm.models.deepseek_v41.attention import _use_v41_mxfp8_kv_record
+ from vllm.models.deepseek_v41.nvidia.b12x_attention import (
+     DeepseekV41B12xAttention,
+     DeepseekV41B12xBackend,
+     _flatten_cache,
+ )
++from vllm.models.deepseek_v41.nvidia.engram import ParallelEngramEmbedding
++from vllm.models.deepseek_v41.nvidia.model import DeepseekV41LLMForCausalLM
+ from vllm.platforms.interface import DeviceCapability
+ from vllm.v1.attention.backends.registry import AttentionBackendEnum
+ 
+@@ -112,3 +116,44 @@ def test_flatten_cache_preserves_packed_page_storage() -> None:
+ 
+     with pytest.raises(TypeError, match="uint8 packed storage"):
+         _flatten_cache(cache.to(torch.bfloat16), name="test cache")
++
++
++def test_disk_engram_routes_immutable_checkpoint_ranges() -> None:
++    class DiskTable:
++        def __init__(self) -> None:
++            self.shards = []
++
++        def add_shard(self, index, path, offset, *, scale=False) -> None:
++            self.shards.append((index, path, offset, scale))
++
++    embedding = object.__new__(ParallelEngramEmbedding)
++    torch.nn.Module.__init__(embedding)
++    embedding.disk_plan = SimpleNamespace(
++        query=SimpleNamespace(table_rows=7),
++    )
++    embedding.disk_table = DiskTable()
++    weight = file_source_tensor(
++        FileTensorSource("weights.safetensors", 4096, (7, 256), torch.float8_e4m3fn)
++    )
++    scale = file_source_tensor(
++        FileTensorSource("scales.safetensors", 8192, (7, 8), torch.float8_e8m0fnu)
++    )
++
++    loaded = embedding.load_weights((("weight", weight), ("weight_scale_inv", scale)))
++
++    assert loaded == {"weight", "weight_scale_inv"}
++    assert embedding.disk_table.shards == [
++        (0, "weights.safetensors", 4096, False),
++        (0, "scales.safetensors", 8192, True),
++    ]
++
++
++def test_disk_engram_checkpoint_filter_is_exact() -> None:
++    model = object.__new__(DeepseekV41LLMForCausalLM)
++    torch.nn.Module.__init__(model)
++    model.model = SimpleNamespace(disk_engram=True)
++
++    assert model.checkpoint_file_weight_filter("layers.1.engram.embed.weight")
++    assert model.checkpoint_file_weight_filter("layers.14.engram.embed.scale")
++    assert not model.checkpoint_file_weight_filter("layers.1.engram.wkv.weight")
++    assert not model.checkpoint_file_weight_filter("model.layers.1.engram.embed.weight")
+diff --git a/tests/test_config.py b/tests/test_config.py
+index 9da6eced94..44651e2f2d 100644
+--- a/tests/test_config.py
++++ b/tests/test_config.py
+@@ -1284,6 +1284,21 @@ def test_engram_dp_shared_memory_requires_cpu_offload():
+         EngramConfig(cpu_offload=False, dp_shared_memory=True)
+ 
+ 
++def test_engram_disk_requires_resident_offload_disabled():
++    config = EngramConfig(cpu_offload=False, table_memory="disk")
++    assert config.table_memory == "disk"
++
++    with pytest.raises(ValueError, match="requires cpu_offload=False"):
++        EngramConfig(cpu_offload=True, table_memory="disk")
++
++    with pytest.raises(ValueError, match="does not support dp_shared_memory"):
++        EngramConfig(
++            cpu_offload=False,
++            dp_shared_memory=True,
++            table_memory="disk",
++        )
++
++
+ @pytest.mark.parametrize(
+     "dp_size,load_format,multithread,error",
+     [
+diff --git a/vllm/config/engram.py b/vllm/config/engram.py
+index 5abb2bd34a..5f3b984aba 100644
+--- a/vllm/config/engram.py
++++ b/vllm/config/engram.py
+@@ -1,7 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+-from typing import TYPE_CHECKING
++from typing import TYPE_CHECKING, Literal
+ 
+ from pydantic import Field, model_validator
+ from typing_extensions import Self
+@@ -56,8 +56,16 @@ class EngramConfig:
+     memory without per-step Engram DP collectives. Requires sufficient
+     /dev/shm capacity and a shared IPC namespace."""
+ 
++    table_memory: Literal["device", "disk"] = "device"
++    """Store DeepSeek V4.1 Engram tables on the accelerator or stage only
++    the active rows from immutable safetensors files with B12X io_uring."""
++
+     @model_validator(mode="after")
+     def _validate_shared_memory(self) -> Self:
++        if self.table_memory == "disk" and self.cpu_offload:
++            raise ValueError("table_memory='disk' requires cpu_offload=False")
++        if self.table_memory == "disk" and self.dp_shared_memory:
++            raise ValueError("table_memory='disk' does not support dp_shared_memory")
+         if self.dp_shared_memory and not self.cpu_offload:
+             raise ValueError("dp_shared_memory requires cpu_offload=True")
+         return self
+@@ -84,6 +92,15 @@ class EngramConfig:
+ 
+     def verify_parallel_config(self, parallel_config: "ParallelConfig") -> None:
+         """Reject unsupported embedding parallel topologies."""
++        if self.table_memory == "disk":
++            if parallel_config.pipeline_parallel_size != 1:
++                raise ValueError(
++                    "table_memory='disk' requires pipeline_parallel_size=1"
++                )
++            if self.embedding_across_dp:
++                raise ValueError(
++                    "table_memory='disk' does not support embedding_across_dp"
++                )
+         if self.dp_shared_memory:
+             if parallel_config.data_parallel_size <= 1:
+                 raise ValueError("dp_shared_memory requires data_parallel_size > 1.")
+@@ -100,6 +117,15 @@ class EngramConfig:
+ 
+     def verify_load_config(self, load_config: "LoadConfig") -> None:
+         """Shared tables require a loader that invokes parameter weight callbacks."""
++        if self.table_memory == "disk" and load_config.load_format not in (
++            "auto",
++            "safetensors",
++            "b12x",
++        ):
++            raise ValueError(
++                "table_memory='disk' requires load_format 'auto', "
++                f"'safetensors' or 'b12x'; got {load_config.load_format!r}."
++            )
+         if self.dp_shared_memory and load_config.load_format not in (
+             "auto",
+             "safetensors",
+diff --git a/vllm/model_executor/weight_transfer.py b/vllm/model_executor/weight_transfer.py
+index 7af90715cd..3634f39120 100644
+--- a/vllm/model_executor/weight_transfer.py
++++ b/vllm/model_executor/weight_transfer.py
+@@ -78,3 +78,10 @@ def flush_weight_transfers() -> None:
+     flush = getattr(writer, "flush", None)
+     if flush is not None:
+         flush()
++
++
++def materialize_weight(source: torch.Tensor) -> torch.Tensor:
++    """Own checkpoint values needed by a numerical loading transform."""
++    writer = _writer.get()
++    materialize = getattr(writer, "materialize", None)
++    return materialize(source) if materialize is not None else source.clone()
+diff --git a/vllm/models/deepseek_v41/nvidia/dspark.py b/vllm/models/deepseek_v41/nvidia/dspark.py
+index c08de12a12..95aad10642 100644
+--- a/vllm/models/deepseek_v41/nvidia/dspark.py
++++ b/vllm/models/deepseek_v41/nvidia/dspark.py
+@@ -45,6 +45,7 @@ from vllm.model_executor.models.qwen3_dspark import (
+     DSparkMarkovHead,
+ )
+ from vllm.model_executor.models.utils import maybe_prefix
++from vllm.model_executor.weight_transfer import copy_weight, flush_weight_transfers
+ from vllm.models.common.ops.sequence_parallel import (
+     sp_all_gather,
+     sp_padding_mask,
+@@ -469,7 +470,7 @@ class DSparkDeepseekV4ForCausalLM(nn.Module):
+             else:
+                 if "attn_sink" in name:
+                     narrow = loaded_weight[head_start:head_end]
+-                    params_dict[name][: narrow.shape[0]].copy_(narrow)
++                    copy_weight(params_dict[name][: narrow.shape[0]], narrow)
+                     loaded_params.add(name)
+                     continue
+                 if name.endswith(".ffn.gate.bias"):
+@@ -483,6 +484,7 @@ class DSparkDeepseekV4ForCausalLM(nn.Module):
+ 
+         if self.model.confidence_head is not None and not loaded_confidence_head:
+             self.model.confidence_head = None
++        flush_weight_transfers()
+         self.process_weights_after_loading()
+         logger.info_once("DSpark draft model loaded: %d params", len(loaded_params))
+         return loaded_params
+diff --git a/vllm/models/deepseek_v41/nvidia/engram.py b/vllm/models/deepseek_v41/nvidia/engram.py
+index 624a36c214..1183975745 100644
+--- a/vllm/models/deepseek_v41/nvidia/engram.py
++++ b/vllm/models/deepseek_v41/nvidia/engram.py
+@@ -6,6 +6,7 @@ import mmap
+ import tempfile
+ import weakref
+ from contextlib import ExitStack
++from functools import lru_cache
+ 
+ import numpy as np
+ import torch
+@@ -17,17 +18,21 @@ from vllm.distributed import (
+     get_engram_dp_group,
+     get_engram_dp_size,
+     get_tensor_model_parallel_rank,
++    get_tensor_model_parallel_world_size,
+     tensor_model_parallel_all_gather,
++    tensor_model_parallel_all_reduce,
+ )
+ from vllm.distributed.parallel_state import GroupCoordinator
+ from vllm.forward_context import get_forward_context
+ from vllm.logger import init_logger
+ from vllm.model_executor.utils import set_weight_attrs
++from vllm.model_executor.weight_transfer import get_file_tensor_source
+ from vllm.models.deepseek_v41.common.engram import (
+     DEAD_ID,
+     EngramLayout,
+     _engram_head_shard_weight_loader,
+     _engram_select_rows,
++    build_compressed_token_map,
+ )
+ from vllm.models.deepseek_v41.common.engram import (
+     Engram as BaseEngram,
+@@ -35,12 +40,74 @@ from vllm.models.deepseek_v41.common.engram import (
+ from vllm.models.deepseek_v41.common.engram import (
+     ParallelEngramEmbedding as BaseParallelEngramEmbedding,
+ )
++from vllm.utils.b12x import get_b12x_engram
+ from vllm.utils.platform_utils import is_uva_available
+ from vllm.utils.torch_utils import get_accelerator_view_from_cpu_tensor
+ 
+ logger = init_logger(__name__)
+ 
+ 
++@lru_cache(maxsize=2)
++def _disk_token_map(
++    tokenizer_path: str, revision: str | None, trust_remote_code: bool
++) -> tuple[list[int], int]:
++    from transformers import AutoTokenizer
++
++    tokenizer = AutoTokenizer.from_pretrained(
++        tokenizer_path,
++        revision=revision,
++        trust_remote_code=trust_remote_code,
++    )
++    return build_compressed_token_map(tokenizer)
++
++
++def _make_disk_plan(layout: EngramLayout, layer_hash_index: int):
++    native = get_b12x_engram()
++    if native is None:
++        raise RuntimeError("disk Engram requires the current B12X package")
++    vllm_config = get_current_vllm_config()
++    model_config = vllm_config.model_config
++    config = model_config.hf_config
++    token_map, compressed_size = _disk_token_map(
++        model_config.tokenizer,
++        model_config.revision,
++        model_config.trust_remote_code,
++    )
++    if compressed_size != layout.compressed_vocab_size:
++        raise ValueError("Engram tokenizer compressed vocabulary mismatch")
++    geometry = native.build_geometry(
++        layer_ids=layout.layer_ids,
++        base_table_size=config.engram_vocab_size,
++        compressed_vocab_size=layout.compressed_vocab_size,
++    )
++    if tuple(geometry.num_embeddings) != layout.num_embeddings:
++        raise ValueError("B12X Engram table rows do not match the upstream layout")
++    layer_id = layout.layer_ids[layer_hash_index]
++    caps = native.Caps(
++        device=torch.device("cuda", torch.cuda.current_device()),
++        max_tokens=vllm_config.scheduler_config.max_num_batched_tokens,
++        max_seqs=vllm_config.scheduler_config.max_num_seqs,
++        max_requests=vllm_config.scheduler_config.max_num_seqs,
++        vocab_size=config.vocab_size,
++        layer_id=layer_id,
++        tp_size=get_tensor_model_parallel_world_size(),
++        tp_rank=get_tensor_model_parallel_rank(),
++    )
++    plan = native.plan(
++        caps,
++        token_map=token_map,
++        geometry=geometry,
++        invocation={"operation": "lookup", "compact_rows": True},
++    )
++    expected_heads = tuple(
++        size for order in layout.primes[layer_hash_index] for size in order
++    )
++    geometry_index = geometry.layer_ids.index(layer_id)
++    if tuple(geometry.primes[geometry_index]) != expected_heads:
++        raise ValueError("B12X Engram hash geometry does not match upstream")
++    return native, plan, caps
++
++
+ def engram_head_shard_rank() -> int:
+     """This rank's slot among the hash-head shards of one engram table.
+ 
+@@ -227,7 +294,45 @@ class ParallelEngramEmbedding(BaseParallelEngramEmbedding):
+         block_size: int = 32,
+         cpu_offload: bool = False,
+         dp_shared_memory: bool = False,
++        disk_plan=None,
+     ) -> None:
++        if disk_plan is not None:
++            torch.nn.Module.__init__(self)
++            native, plan, caps = disk_plan
++            self.cpu_offload = False
++            self.dp_shared_memory = False
++            self.dp_size = 1
++            self.tp_size = caps.tp_size
++            self.dim = dim
++            self.block_size = block_size
++            self.n_hash_cols = len(head_sizes)
++            self.part_n_hash_cols = self.n_hash_cols
++            self.disk_plan = plan
++            self.disk_table = None
++            self._disk_native = native
++            self._disk_binding = None
++            self._disk_prepared_rows = 0
++            self.register_parameter("weight", None)
++            self.register_parameter("weight_scale_inv", None)
++            max_tokens = caps.max_tokens
++            self.register_buffer(
++                "disk_hashes",
++                torch.empty(
++                    (max_tokens, self.n_hash_cols),
++                    dtype=torch.int64,
++                    device=caps.device,
++                ),
++                persistent=False,
++            )
++            self.register_buffer(
++                "disk_num_tokens",
++                torch.empty((1,), dtype=torch.int32, device=caps.device),
++                persistent=False,
++            )
++            return
++        self.disk_plan = None
++        self.disk_table = None
++        self._disk_native = None
+         self.cpu_offload = cpu_offload
+         self.dp_shared_memory = dp_shared_memory
+         self.dp_size = get_engram_dp_size()
+@@ -261,6 +366,67 @@ class ParallelEngramEmbedding(BaseParallelEngramEmbedding):
+                 "shared across DP replicas" if dp_shared_memory else "per rank",
+             )
+ 
++    def load_weights(self, weights) -> set[str]:
++        if self.disk_table is None or self.disk_plan is None:
++            if self.disk_plan is None or self._disk_native is None:
++                raise RuntimeError("load_weights is only used by disk-backed Engram")
++            from b12x.preparation import require_prepared
++
++            state = require_prepared(self.disk_plan, "sequence.engram")
++            self.disk_table = self._disk_native.DiskTable(state)
++        loaded = set()
++        for name, value in weights:
++            if name not in ("weight", "weight_scale_inv"):
++                raise ValueError(f"Unknown Engram table weight: {name}")
++            source = get_file_tensor_source(value)
++            if source is None:
++                raise ValueError("disk Engram requires a file-backed checkpoint table")
++            scale = name == "weight_scale_inv"
++            width = 8 if scale else 256
++            if source.shape != (self.disk_plan.query.table_rows, width):
++                raise ValueError("Engram source must be the unpadded global table")
++            dtypes = (
++                (torch.uint8, torch.float8_e8m0fnu) if scale else (torch.float8_e4m3fn,)
++            )
++            if source.dtype not in dtypes:
++                raise TypeError(f"Invalid Engram {name} dtype: {source.dtype}")
++            self.disk_table.add_shard(0, source.path, source.offset, scale=scale)
++            loaded.add(name)
++        return loaded
++
++    def prepare_disk(self, indices: torch.Tensor, out: torch.Tensor) -> None:
++        if self.disk_table is None or self.disk_plan is None:
++            raise RuntimeError("Engram table is not disk-backed")
++        if torch.compiler.is_compiling() or torch.cuda.is_current_stream_capturing():
++            raise RuntimeError("disk Engram preparation must run outside capture")
++        token_count = indices.shape[0]
++        self.disk_hashes[:token_count].copy_(indices)
++        self.disk_num_tokens.fill_(token_count)
++        flat_out = out.flatten(1)
++        if (
++            self._disk_binding is None
++            or self._disk_binding.out.data_ptr() != flat_out.data_ptr()
++        ):
++            self._disk_binding = self._disk_native.bind_lookup(
++                self.disk_plan,
++                weight=None,
++                scales=None,
++                hash_ids=self.disk_hashes,
++                num_tokens=self.disk_num_tokens,
++                out=flat_out,
++                disk_table=self.disk_table,
++            )
++            out.zero_()
++            self._disk_prepared_rows = 0
++        if token_count < self._disk_prepared_rows:
++            out[token_count : self._disk_prepared_rows].zero_()
++        self._disk_native.run_lookup(
++            self._disk_binding,
++            token_count=token_count,
++            clear_tail=False,
++        )
++        self._disk_prepared_rows = token_count
++
+     def _get_shard_info(self) -> tuple[int, int]:
+         if self.dp_size == 1:
+             return super()._get_shard_info()
+@@ -357,12 +523,18 @@ class Engram(BaseEngram):
+     ) -> ParallelEngramEmbedding:
+         engram_config = get_current_vllm_config().engram_config
+         assert engram_config is not None
++        disk_plan = None
++        if engram_config.table_memory == "disk":
++            if self.use_sequence_parallel:
++                raise ValueError("disk Engram does not support sequence parallelism")
++            disk_plan = _make_disk_plan(layout, layer_hash_index)
+         return ParallelEngramEmbedding(
+             layout.num_embeddings[layer_hash_index],
+             layout.head_dim,
+             tuple(size for order in layout.primes[layer_hash_index] for size in order),
+             cpu_offload=engram_config.cpu_offload,
+             dp_shared_memory=engram_config.dp_shared_memory,
++            disk_plan=disk_plan,
+         )
+ 
+     def _init_staging(self, max_tokens: int, head_dim: int) -> None:
+@@ -372,12 +544,29 @@ class Engram(BaseEngram):
+ 
+     def prepare_embeddings(self, hash_ids: torch.Tensor) -> None:
+         """Prefetch local shared rows or the DP group's gathered hash IDs."""
++        if self.embed_tokens.disk_table is not None:
++            raise RuntimeError("disk Engram must be prepared by the model state")
+         if self._prefetch_stream is None:
+             return super().prepare_embeddings(hash_ids)
+         rows = self.staged_rows[: hash_ids.shape[0]]
+         assert rows.shape[0] == hash_ids.shape[0], "engram staging buffer too small"
+         self._start_prefetch(hash_ids, rows, self._prefetch_stream)
+ 
++    def prepare_disk(self, hash_ids: torch.Tensor) -> None:
++        rows = self.staged_rows[: hash_ids.shape[0]]
++        if rows.shape[0] != hash_ids.shape[0]:
++            raise ValueError("Engram staging buffer is too small")
++        self.embed_tokens.prepare_disk(hash_ids, self.staged_rows)
++
++    def prepare_dummy_disk(self, num_tokens: int) -> None:
++        self.staged_rows[:num_tokens].zero_()
++
++    def embed(self, hash_ids: torch.Tensor) -> torch.Tensor:
++        if self.embed_tokens.disk_table is None:
++            return super().embed(hash_ids)
++        rows = self.staged_rows[: hash_ids.shape[0]]
++        return tensor_model_parallel_all_reduce(rows)
++
+     @eager_break_during_capture
+     def _start_prefetch(
+         self, hash_ids: torch.Tensor, rows: torch.Tensor, stream: torch.cuda.Stream
+diff --git a/vllm/models/deepseek_v41/nvidia/model.py b/vllm/models/deepseek_v41/nvidia/model.py
+index ad09288563..2c1a173203 100644
+--- a/vllm/models/deepseek_v41/nvidia/model.py
++++ b/vllm/models/deepseek_v41/nvidia/model.py
+@@ -51,6 +51,11 @@ from vllm.model_executor.models.utils import (
+     make_layers,
+     maybe_prefix,
+ )
++from vllm.model_executor.weight_transfer import (
++    copy_weight,
++    flush_weight_transfers,
++    materialize_weight,
++)
+ from vllm.models.common.ops.sequence_parallel import (
+     sp_all_gather,
+     sp_padding_mask,
+@@ -560,6 +565,11 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         self.engram_dp_shared_memory = bool(
+             vllm_config.engram_config and vllm_config.engram_config.dp_shared_memory
+         )
++        self.disk_engram = bool(
++            self.engram_layout is not None
++            and vllm_config.engram_config
++            and vllm_config.engram_config.table_memory == "disk"
++        )
+         self.engram_swa_prefix: str | None = None
+         if self.engram_layout is not None:
+             local_engram = any(
+@@ -575,6 +585,19 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                     vllm_config, self.engram_layout, swa_cache_module
+                 )
+                 self.engram_swa_prefix = swa_cache_module.prefix
++        if self.disk_engram:
++            self.register_buffer(
++                "prepared_engram_hashes",
++                torch.empty(
++                    (
++                        vllm_config.scheduler_config.max_num_batched_tokens,
++                        len(self.engram_layout.layer_ids),
++                        self.engram_layout.n_hash_cols,
++                    ),
++                    dtype=torch.int32,
++                ),
++                persistent=False,
++            )
+ 
+         if get_pp_group().is_last_rank:
+             self.norm = RMSNorm(config.hidden_size, self.rms_norm_eps)
+@@ -594,6 +617,45 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         else:
+             self._mtp_hidden_buffer = None
+ 
++    def prepare_disk_engram(
++        self,
++        input_ids: torch.Tensor,
++        positions: torch.Tensor,
++        query_start_loc: torch.Tensor,
++        lookback_token_ids: torch.Tensor,
++    ) -> None:
++        if not self.disk_engram or self.engram_hash is None:
++            return
++        if torch.compiler.is_compiling() or torch.cuda.is_current_stream_capturing():
++            raise RuntimeError("disk Engram preparation must run outside capture")
++        token_count = input_ids.shape[0]
++        image_mask = image_sentinel_mask(input_ids)
++        hashes = self.engram_hash(
++            input_ids,
++            positions,
++            query_start_loc,
++            image_mask,
++            lookback_token_ids,
++            image_sentinel_mask(lookback_token_ids),
++            None,
++            None,
++        )
++        prepared = self.prepared_engram_hashes[:token_count]
++        prepared.copy_(hashes)
++        for layer in islice(self.layers, self.start_layer, self.end_layer):
++            engram = getattr(layer, "engram", None)
++            if engram is not None:
++                engram.prepare_disk(prepared[:, engram.layer_hash_index])
++
++    def prepare_dummy_disk_engram(self, num_tokens: int) -> None:
++        if not self.disk_engram:
++            return
++        self.prepared_engram_hashes[:num_tokens].fill_(-1)
++        for layer in islice(self.layers, self.start_layer, self.end_layer):
++            engram = getattr(layer, "engram", None)
++            if engram is not None:
++                engram.prepare_dummy_disk(num_tokens)
++
+     def embed_input_ids(self, input_ids: torch.Tensor) -> torch.Tensor:
+         return self.embed_tokens(input_ids)
+ 
+@@ -650,7 +712,10 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         # profile runs (KV cache unbound).
+         engram_hashes: torch.Tensor | None = None
+         engram_mask: torch.Tensor | None = None
+-        if (
++        if self.disk_engram and input_ids is not None:
++            engram_hashes = self.prepared_engram_hashes[: input_ids.shape[0]]
++            engram_mask = ~image_sentinel_mask(input_ids)
++        elif (
+             self.engram_hash is not None
+             and input_ids is not None
+             and is_forward_context_available()
+@@ -692,7 +757,7 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                 # DP-sharded lookups are collective, so a replica skipping the
+                 # hash still has to reach them.
+                 engram_hashes, engram_mask = self.engram_hash.dummy_hashes(input_ids)
+-            if engram_hashes is not None:
++            if engram_hashes is not None and not self.disk_engram:
+                 # Gather all Engram rows before entering the decoder layers.
+                 # One gather feeds every layer sharing the DP-split table.
+                 gathered_hashes = gather_engram_hashes(
+@@ -903,7 +968,7 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                         continue
+                     narrow_weight = loaded_weight[head_rank_start:head_rank_end]
+                     n = narrow_weight.shape[0]
+-                    params_dict[name][:n].copy_(narrow_weight)
++                    copy_weight(params_dict[name][:n], narrow_weight)
+                     loaded_params.add(name)
+                     continue
+                 else:
+@@ -949,6 +1014,7 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         pad = cdiv(loaded_weight.shape[dim], mult) * mult - loaded_weight.shape[dim]
+         if pad == 0:
+             return loaded_weight
++        loaded_weight = materialize_weight(loaded_weight)
+         pad_shape = list(loaded_weight.shape)
+         pad_shape[dim] = pad
+         return torch.cat([loaded_weight, loaded_weight.new_zeros(pad_shape)], dim=dim)
+@@ -1175,6 +1241,13 @@ class DeepseekV41LLMForCausalLM(
+         self.num_moe_layers = len(self.moe_layers)
+         self.extract_moe_parameters(example_moe)
+ 
++    def checkpoint_file_weight_filter(self, name: str) -> bool:
++        return (
++            self.model.disk_engram
++            and re.fullmatch(r"layers\.\d+\.engram\.embed\.(?:weight|scale)", name)
++            is not None
++        )
++
+     def embed_input_ids(self, input_ids: torch.Tensor) -> torch.Tensor:
+         return self.model.embed_input_ids(input_ids)
+ 
+@@ -1230,6 +1303,7 @@ class DeepseekV41LLMForCausalLM(
+     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
+         loader = AutoWeightsLoader(self)
+         loaded_params = loader.load_weights(weights, mapper=self.hf_to_vllm_mapper)
++        flush_weight_transfers()
+         self.process_weights_after_loading()
+         return loaded_params
+ 
+diff --git a/vllm/models/deepseek_v41/nvidia/model_state.py b/vllm/models/deepseek_v41/nvidia/model_state.py
+index af20976ded..14f71c6ab8 100644
+--- a/vllm/models/deepseek_v41/nvidia/model_state.py
++++ b/vllm/models/deepseek_v41/nvidia/model_state.py
+@@ -129,6 +129,13 @@ class DeepseekV41ModelState(DefaultModelState):
+             self.lookback_token_ids = torch.full(
+                 (self.max_num_reqs, depth), -1, dtype=torch.int32, device=device
+             )
++        from .model import DeepseekV4Model
++
++        self.disk_engram_models = tuple(
++            module
++            for module in model.modules()
++            if isinstance(module, DeepseekV4Model) and module.disk_engram
++        )
+ 
+         # Per request state index; batches gather from it (see prepare_attn).
+         self._replay_start_np = np.zeros(self.max_num_reqs, dtype=np.int32)
+@@ -164,6 +171,13 @@ class DeepseekV41ModelState(DefaultModelState):
+             BLOCK_DEPTH=triton.next_power_of_2(depth),
+         )
+         model_inputs["lookback_token_ids"] = window
++        for model in self.disk_engram_models:
++            model.prepare_disk_engram(
++                input_batch.input_ids,
++                input_batch.positions,
++                input_batch.query_start_loc,
++                window,
++            )
+         return model_inputs
+ 
+     def prepare_dummy_inputs(self, num_reqs: int, num_tokens: int) -> dict[str, Any]:
+@@ -172,6 +186,8 @@ class DeepseekV41ModelState(DefaultModelState):
+             # The captured graph reads this buffer; replays refill it in place.
+             self.lookback_token_ids.fill_(-1)
+             model_inputs["lookback_token_ids"] = self.lookback_token_ids
++        for model in self.disk_engram_models:
++            model.prepare_dummy_disk_engram(num_tokens)
+         return model_inputs
+ 
+     def prepare_attn(
+diff --git a/vllm/utils/b12x.py b/vllm/utils/b12x.py
+index 450a54ddf5..cd8022e88b 100644
+--- a/vllm/utils/b12x.py
++++ b/vllm/utils/b12x.py
+@@ -42,6 +42,7 @@ _B12X_SUBMODULES = {
+         "b12x.gemm.mxfp8_linear",
+         "b12x.gemm.tensor_fp8_linear",
+         "b12x.moe.fused_moe",
++        "b12x.sequence.engram",
+     )
+ }
+ 
+@@ -75,6 +76,10 @@ def get_b12x_fused_moe() -> ModuleType | None:
+     return _get_submodule("b12x.moe.fused_moe")
+ 
+ 
++def get_b12x_engram() -> ModuleType | None:
++    return _get_submodule("b12x.sequence.engram")
++
++
+ def get_b12x_paged_attention() -> ModuleType | None:
+     return _get_submodule("b12x.attention.paged")
+ 

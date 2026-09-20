@@ -10,10 +10,10 @@ case "$mode" in
   *) echo "usage: $0 [build|check]" >&2; exit 2 ;;
 esac
 
-vllm_tree=0b2a255f44e816178e8f3a2f0eb6ffbb9aca1576
-b12x_tree=4dbbf9f0eb784f379d0bc38db8195dd65088aaaa
-vllm_head=d6b40631cad4bf406f25093f56436f2b8ef10800
-b12x_head=de8e7fa971eb7ae4c21e634a8931407a0b404568
+vllm_tree=4262bf458dc2ccdae405e39c5b3c5c2f4c62a723
+b12x_tree=a1523b067b4df679f9aa23d543fa324dc00770f0
+vllm_head=7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177
+b12x_head=8099cee92c78dd2472749ca8003053ee73be908d
 
 for project in vllm b12x; do
   source_path="$source_root/$project"

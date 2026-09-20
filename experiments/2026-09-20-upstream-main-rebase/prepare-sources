@@ -56,16 +56,19 @@ prepare \
   vllm \
   https://github.com/vllm-project/vllm.git \
   d05da62e9ccdf8e342b15bf6785d83224cc165af \
-  0b2a255f44e816178e8f3a2f0eb6ffbb9aca1576 \
+  4262bf458dc2ccdae405e39c5b3c5c2f4c62a723 \
   patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch \
   patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch \
-  patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch
+  patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch \
+  patches/vllm/0004-feat-loader-add-owned-and-file-backed-weight-routing.patch \
+  patches/vllm/0005-feat-deepseek-v41-stage-Engram-rows-from-disk.patch
 
 prepare \
   b12x \
   https://github.com/local-inference-lab/b12x.git \
   0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68 \
-  4dbbf9f0eb784f379d0bc38db8195dd65088aaaa \
+  a1523b067b4df679f9aa23d543fa324dc00770f0 \
   patches/b12x/0001-perf-mhc-retain-qualified-3072-token-DS4.1-geometry.patch \
   patches/b12x/0002-feat-rocenante-route-switchless-peers-by-local-HCA.patch \
-  patches/b12x/0003-build-align-CUTLASS-DSL-with-vLLM-main.patch
+  patches/b12x/0003-build-align-CUTLASS-DSL-with-vLLM-main.patch \
+  patches/b12x/0004-fix-vllm-support-upstream-managed-weight-loading.patch

@@ -9,14 +9,18 @@
       "candidate_commits": [
         "277171c959846de8870732e96d23276575e88ae5",
         "fa075bc82948914cb778a33822eea3a5d537202d",
-        "d6b40631cad4bf406f25093f56436f2b8ef10800"
+        "d6b40631cad4bf406f25093f56436f2b8ef10800",
+        "8a82c50a6a3147ed14adb15a90bc7cb4322c0829",
+        "7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177"
       ],
-      "source_tree": "0b2a255f44e816178e8f3a2f0eb6ffbb9aca1576",
+      "source_tree": "4262bf458dc2ccdae405e39c5b3c5c2f4c62a723",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
         "patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch",
-        "patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch"
+        "patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch",
+        "patches/vllm/0004-feat-loader-add-owned-and-file-backed-weight-routing.patch",
+        "patches/vllm/0005-feat-deepseek-v41-stage-Engram-rows-from-disk.patch"
       ]
     },
     {
@@ -26,14 +30,16 @@
       "candidate_commits": [
         "348145ea8b6adaea7c32b1b87898ff59b5d43380",
         "803d7d795d05be3902a30e82743a817a2c26d53f",
-        "de8e7fa971eb7ae4c21e634a8931407a0b404568"
+        "de8e7fa971eb7ae4c21e634a8931407a0b404568",
+        "8099cee92c78dd2472749ca8003053ee73be908d"
       ],
-      "source_tree": "4dbbf9f0eb784f379d0bc38db8195dd65088aaaa",
+      "source_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/b12x/0001-perf-mhc-retain-qualified-3072-token-DS4.1-geometry.patch",
         "patches/b12x/0002-feat-rocenante-route-switchless-peers-by-local-HCA.patch",
-        "patches/b12x/0003-build-align-CUTLASS-DSL-with-vLLM-main.patch"
+        "patches/b12x/0003-build-align-CUTLASS-DSL-with-vLLM-main.patch",
+        "patches/b12x/0004-fix-vllm-support-upstream-managed-weight-loading.patch"
       ]
     }
   ],
@@ -46,7 +52,7 @@
   "deployment_status": "not-deployed",
   "integration_status": {
     "status": "source-integration-complete-pending-target-qualification",
-    "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections while B12X owns only sparse MLA kernels",
+    "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"

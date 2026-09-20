@@ -5,7 +5,7 @@
 | Component | Revision | Declared dependency |
 |---|---|---|
 | vLLM | `d05da62e9ccdf8e342b15bf6785d83224cc165af` | `torch==2.13.0`, `nvidia-cutlass-dsl[cu13]==4.7.1`, optional `b12x==1.3.0` |
-| B12X | `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68` plus carry `de8e7fa971eb7ae4c21e634a8931407a0b404568` | all CUTLASS DSL packages `==4.7.1` |
+| B12X | `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68` plus carry through `8099cee92c78dd2472749ca8003053ee73be908d` | all CUTLASS DSL packages `==4.7.1` |
 
 The dependency sets are now co-installable as declared. The official vLLM
 nightly nevertheless deliberately ships NCCL 2.30.7 while Torch metadata names
@@ -24,6 +24,14 @@ The source-integration blocker is also resolved. The candidate adds a
 fail-closed B12X choice to the native DS4.1 model and a RoCEnante communicator
 using current prepared plans. These are consumers of current upstream model
 and B12X interfaces, not copies of the older downstream model stack.
+
+The second build probe found that current B12X loading still assumed interfaces
+from its downstream vLLM fork. The candidate now supplies only the generic
+owned/file-backed routing primitives in vLLM and a matching B12X adapter for
+coherent managed weights on GB10. Device/GDS loading fails closed because its
+coordinated transfer hook is not upstream. Disk Engram consumes file ranges
+directly and never allocates the roughly 63 GiB-per-rank table as resident model
+memory.
 
 ## Valid routes
 
@@ -61,8 +69,8 @@ fallback because it deliberately trails the selected upstream revision.
 
 ## Qualification order
 
-1. Build the isolated image and compile every selected kernel on SM121 before
-   any service switch.
+1. Build the isolated image and pass its loader/Engram import and contract gates
+   on SM121 before any service switch.
 2. Prove the B12X selection, V4.1 cache ABI, native 24-head TP3 boundary, and
    RoCEnante dispatch in startup logs and focused probes.
 3. During a maintenance window, compare the promoted runtime, upstream-native

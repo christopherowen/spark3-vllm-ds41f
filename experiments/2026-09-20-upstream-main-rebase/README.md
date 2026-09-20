@@ -20,9 +20,11 @@ patches to the divergent DS4.1 release snapshots.
 - B12X base: `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68`.
 - vLLM carries: quality-preserving 64/8 to 72/9 virtual attention geometry for
   TP3, a native-weight DS4.1 B12X sparse-MLA adapter, and a current-interface
-  RoCEnante collective adapter.
+  RoCEnante collective adapter; generic loader-owned checkpoint routing; and
+  an upstream-model disk Engram boundary that stages only requested native rows.
 - B12X carries: the qualified 3072-token mHC policy, per-peer/HCA RoCEnante
-  routing for the switchless ring, and explicit CUTLASS DSL 4.7.1 alignment.
+  routing for the switchless ring, explicit CUTLASS DSL 4.7.1 alignment, and a
+  fail-closed managed-memory loader adapter for current upstream vLLM.
 
 The candidate deliberately adopts upstream DS4.1 model support, heterogeneous
 KV allocator, Engram implementation, generic B12X 1.3 integration, bounded
@@ -31,14 +33,16 @@ changes.
 
 The missing consumer interfaces are now ported without copying the downstream
 model fork. The upstream model still owns CED, the indexer, cache allocation,
-the compressor, and output projection. B12X owns the sparse attention kernel
-and caller-owned scratch. RoCEnante handles eligible small TP collectives while
-NCCL remains the deliberate fallback above the configured size limits.
+the compressor, hashing, and output projection. B12X owns the sparse attention
+kernel, caller-owned scratch, ordinary-weight direct I/O, and bounded Engram row
+staging. RoCEnante handles eligible small TP collectives while NCCL remains the
+deliberate fallback above the configured size limits.
 
-This is a source-complete but not yet target-qualified serving candidate. Its
-image has not been built while the current service is using nearly all unified
-memory on each Spark. Building and runtime qualification wait for a maintenance
-window; the live service has not been modified.
+An earlier source-complete image was built, imported, and copied to all ranks,
+but was not launched after its import probe exposed missing loader interfaces.
+The current candidate includes those interfaces and disk-backed Engram; it must
+be rebuilt and qualified on the now-idle cluster. The promoted service remains
+stopped and preserved as the rollback target.
 
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
@@ -73,12 +77,13 @@ source trees. It does not stop, restart, or deploy the service.
 
 ## Compatibility gate
 
-Source preparation uncovered and resolved two source-level integration
-boundaries. B12X now declares the same CUTLASS DSL `4.7.1` toolchain as vLLM,
-and the DS4.1 B12X attention and RoCEnante consumers use current vLLM and B12X
-prepared-plan interfaces. No candidate image suppresses dependency conflicts,
-downgrades the vLLM environment, or mixes Python with native extensions from a
-different vLLM revision.
+Source preparation uncovered and resolved four source-level integration
+boundaries. B12X now declares the same CUTLASS DSL `4.7.1` toolchain as vLLM;
+DS4.1 B12X attention and RoCEnante use current prepared-plan interfaces; the
+upstream loader can route owned and file-backed tensors; and the upstream DS4.1
+model can retain Engram on immutable checkpoint storage. No candidate image
+suppresses dependency conflicts, downgrades the vLLM environment, or mixes
+Python with native extensions from a different vLLM revision.
 
 [compatibility.md](compatibility.md) records the exact matrix and remaining
 SM121 qualification gates. The source is ready to build, but it is not a
@@ -86,8 +91,8 @@ deployable serving image until those target tests pass.
 
 ## Quality and safety gates
 
-- Do not build on, restart, stop, or replace the live vLLM service while it has
-  active work.
+- Keep the stopped promoted containers intact until the candidate passes its
+  gates, so rollback remains a coordinated start of known state.
 - Native checkpoint weights and arithmetic must remain unchanged.
 - TP3 virtual groups must contribute exactly zero at the output projection.
 - A candidate image must use a base image whose native extension ABI was built

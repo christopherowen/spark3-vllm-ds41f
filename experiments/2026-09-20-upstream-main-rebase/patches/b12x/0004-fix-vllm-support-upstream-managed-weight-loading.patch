@@ -1,0 +1,176 @@
+From 8099cee92c78dd2472749ca8003053ee73be908d Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Sun, 20 Sep 2026 17:45:42 +0200
+Subject: [PATCH] fix(vllm): support upstream managed-weight loading
+
+Upstream base: 0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68 plus carries
+through de8e7fa971eb7ae4c21e634a8931407a0b404568.
+Rationale: B12X master assumes loader coordination and progress interfaces that
+are not present in canonical vLLM; GB10 coherent managed allocation needs only
+the generic owned-transfer boundary.
+Quality: serialized tensor values and destination dtypes are unchanged; unsupported
+device/GDS mode fails closed instead of silently taking an unsafe route.
+Tests: ruff and py_compile passed; SM121 full-model load and memory audit remain.
+Upstream status: local compatibility carry intended for B12X contribution.
+
+---
+ b12x/integration/vllm/loader.py | 91 +++++----------------------------
+ 1 file changed, 14 insertions(+), 77 deletions(-)
+
+diff --git a/b12x/integration/vllm/loader.py b/b12x/integration/vllm/loader.py
+index 7631910c..1b9563e0 100644
+--- a/b12x/integration/vllm/loader.py
++++ b/b12x/integration/vllm/loader.py
+@@ -3,11 +3,9 @@
+ from __future__ import annotations
+ 
+ import dataclasses
+-from contextlib import ExitStack
+ import heapq
+ import json
+ import math
+-import sys
+ import time
+ from pathlib import Path
+ 
+@@ -15,7 +13,6 @@ import torch
+ from vllm.logger import init_logger
+ from vllm.model_executor.model_loader.default_loader import DefaultModelLoader
+ from vllm.model_executor.model_loader.weight_utils import (
+-    enable_tqdm,
+     file_source_tensor,
+     safetensors_file_sources,
+ )
+@@ -23,7 +20,6 @@ from vllm.model_executor.model_loader.weight_utils import (
+ from b12x.loader import storage_stats
+ from b12x.loader._checkpoint import DirectWeightSession
+ from b12x.loader._pool import owns_storage, owns_tensor, weight_allocation, weight_pool
+-from b12x.loader._progress import CheckpointDisplay
+ 
+ logger = init_logger("vllm.model_executor.model_loader.b12x")
+ 
+@@ -48,7 +44,6 @@ class B12xModelLoader(DefaultModelLoader):
+             )
+         )
+         self._session = None
+-        self._progress = None
+ 
+     def load_model(self, vllm_config, model_config, prefix=""):
+         from vllm.model_executor.weight_transfer import weight_transfer
+@@ -62,17 +57,18 @@ class B12xModelLoader(DefaultModelLoader):
+             raise ValueError("the b12x loader requires a CUDA device")
+         index = torch.cuda.current_device() if device.index is None else device.index
+         allocation = weight_allocation(index)
+-        shared_read_group = None
+-        if allocation == "device":
+-            from vllm.distributed.parallel_state import get_tp_group
+-            from b12x.loader._shared_checkpoint import SharedReadGroup
+-
+-            shared_read_group = SharedReadGroup(get_tp_group().cpu_group, index)
++        if allocation != "managed":
++            raise RuntimeError(
++                "the upstream-vLLM compatibility path requires coherent managed "
++                "weights; device/GDS loading requires the downstream coordinated "
++                "transfer hook"
++            )
+         with (
+             weight_pool(allocation=allocation, device=index) as allocator,
+             DirectWeightSession(
+-                index, io_threads=self.io_threads, allocation_scope=allocator,
+-                shared_read_group=shared_read_group,
++                index,
++                io_threads=self.io_threads,
++                allocation_scope=allocator,
+             ) as session,
+             weight_transfer(session, allocator=allocator),
+         ):
+@@ -130,57 +126,9 @@ class B12xModelLoader(DefaultModelLoader):
+         return model
+ 
+     def load_weights(self, model, model_config):
+-        from vllm.utils.system_utils import undecorated_log_stream
+-        from vllm.v1.executor._b12x_output import PreparationOutput
+-
+-        session = self._session
+-        group = session.shared_read_group if session is not None else None
+-        if group is not None:
+-            group.start(session)
+-            # Construction-time rank output must precede the live panel.
+-            group._gather(None)
+-        progress = CheckpointDisplay(
+-            enabled=enable_tqdm(self.load_config.use_tqdm_on_load),
+-            stream=undecorated_log_stream(sys.stderr),
+-        )
+-        with ExitStack() as stack:
+-            output = stack.enter_context(PreparationOutput(
+-                progress.write_output, enabled=progress._enabled and progress._stream.isatty(),
+-            ))
+-            if output.stream is not None:
+-                progress._stream = output.stream
+-            stack.enter_context(progress)
+-            stack.callback(output.stop)
+-            self._progress = progress
+-            if session is not None:
+-                session.progress = progress.phase
+-            if group is not None:
+-                group.progress = progress.phase
+-            try:
+-                super().load_weights(model, model_config)
+-            finally:
+-                self._progress = None
+-                if session is not None:
+-                    session.progress = None
+-                if group is not None:
+-                    group.progress = None
+-
+-    def _log_loading_time(self):
+-        session, progress = self._session, self._progress
+-        if session is not None and progress is not None:
+-            group = session.shared_read_group
+-            if group is not None and not group.epoch:
+-                raise RuntimeError("device checkpoint loading requires vLLM's finish_weight_transfers routing hook")
+-            session.flush()
+-            stats = session.stats(flush=False)
+-            summary = dict(group.summary) if group is not None else dict(
+-                ranks=1, payload_bytes=stats["payload_bytes"],
+-                physical_bytes=stats["physical_bytes"],
+-            )
+-            summary["load_seconds"] = self.counter_after_loading_weights - self.counter_before_loading_weights
+-            progress.complete(summary)
+-            progress.stop()
+-        super()._log_loading_time()
++        super().load_weights(model, model_config)
++        if self._session is not None:
++            self._session.flush()
+ 
+     @staticmethod
+     def _needs_values(entry):
+@@ -258,26 +206,15 @@ class B12xModelLoader(DefaultModelLoader):
+         )
+         if self.counter_before_loading_weights == 0.0:
+             self.counter_before_loading_weights = time.perf_counter()
+-        if self._progress is not None:
+-            self._progress.source(len(files))
+-
+-        def progress_files():
+-            for path in files:
+-                if self._progress is not None:
+-                    self._progress.file(Path(path).name)
+-                yield path
+-                if self._progress is not None:
+-                    self._progress.advance(self._session.payload_bytes)
+-
+         if source.file_weight_filter is not None:
+             yield from self._file_backed_weights_iterator(
+-                progress_files(),
++                files,
+                 source,
+                 Path(folder) / "model.safetensors.index.json",
+             )
+             return
+         yield from self._session.weights(
+-            progress_files(),
++            files,
+             prefixes=source.weight_name_prefixes,
+             prefix=source.prefix,
+             index_path=Path(folder) / "model.safetensors.index.json",
