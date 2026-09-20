@@ -224,6 +224,19 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
         lockfile = source.get("lockfile")
         if lockfile and not (ROOT / lockfile).is_file():
             problems.append(f"{name}: missing dependency lock {lockfile}")
+    watchlist_path = ROOT / "docs/inspiration.md"
+    watchlist = (
+        watchlist_path.read_text(encoding="utf-8") if watchlist_path.is_file() else ""
+    )
+    if not watchlist:
+        problems.append("missing improvement watchlist docs/inspiration.md")
+    for name, reference in upstreams.get("references", {}).items():
+        if reference.get("kind") != "git-watch":
+            problems.append(f"{name}: reference kind must be git-watch")
+        if not reference.get("url") or not reference.get("role"):
+            problems.append(f"{name}: reference URL and role are required")
+        elif reference["url"] not in watchlist:
+            problems.append(f"{name}: reference URL is absent from the watchlist")
     source_manifest = read_json("manifests/sources/2026-09-20-active-source.json")
     for name in ("vllm", "b12x"):
         wanted = source_manifest[name].get("patchset_sha256")

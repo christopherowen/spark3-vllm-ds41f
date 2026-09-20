@@ -73,9 +73,48 @@
     }
   },
   "references": {
+    "mia_sglang_ds41f_sparks": {
+      "kind": "git-watch",
+      "url": "https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-DGX-Sparks",
+      "added_to_watchlist": "2026-09-20",
+      "role": "SGLang comparison for multi-Spark launch, tuning, benchmark methodology, and native-weight performance"
+    },
+    "mia_exl3_ds41f_2x": {
+      "kind": "git-watch",
+      "url": "https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-EXL3-2x-DGX-Sparks",
+      "added_to_watchlist": "2026-09-20",
+      "role": "EXL3 performance and memory reference; quality-changing quantization is not a deployment input"
+    },
+    "mia_dspark_dsv4_2x": {
+      "kind": "git-watch",
+      "url": "https://github.com/MiaAI-Lab/DeepSeek-v4-Flash-DSpark-2x-DGX-Spark",
+      "added_to_watchlist": "2026-09-20",
+      "role": "DSpark speculative-decoding and DGX Spark tuning ideas to evaluate against upstream vLLM"
+    },
+    "jspark3_deepseek": {
+      "kind": "git-watch",
+      "url": "https://github.com/jakejharris/jspark3-deepseek",
+      "reference": "v2.0.1",
+      "added_to_watchlist": "2026-09-20",
+      "role": "three-Spark topology, operations, and benchmark comparison"
+    },
+    "spark_vllm_docker": {
+      "kind": "git-watch",
+      "url": "https://github.com/eugr/spark-vllm-docker",
+      "added_to_watchlist": "2026-09-20",
+      "role": "DGX Spark container packaging and CUDA, NCCL, PyTorch, and vLLM version reconnaissance"
+    },
     "glm_switchless_tp4": {
+      "kind": "git-watch",
       "url": "https://github.com/jnardiello/GLM-5.3-Flash-FP8-4-DGX-Spark-Switchless",
-      "role": "research reference only; not an upstream dependency"
+      "added_to_watchlist": "2026-09-20",
+      "role": "four-node switchless topology and profiling reference; GLM-specific changes are not deployment inputs"
+    },
+    "oomwrap": {
+      "kind": "git-watch",
+      "url": "https://github.com/osolmaz/oomwrap",
+      "added_to_watchlist": "2026-09-20",
+      "role": "memory-pressure supervision ideas for comparison with the repository's systemd memguard"
     }
   }
 }

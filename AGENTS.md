@@ -1,6 +1,6 @@
 # Agent guide
 
-Read `README.md`, `docs/methodology.md`, `docs/upstreams.md`,
+Read `README.md`, `docs/methodology.md`, `docs/upstreams.md`, `docs/inspiration.md`,
 `docker/README.md`, `config/cluster.json`, and the current baseline manifest
 before changing runtime or build state.
 
@@ -13,6 +13,8 @@ before changing runtime or build state.
 - `patches/*/series` owns the ordered local patch stacks.
 - `manifests/baselines/` is immutable evidence. Never rewrite a published baseline.
 - `experiments/` is the only place for unpromoted tuning.
+- `docs/inspiration.md` is a research watchlist, never a source or deployment
+  authority.
 
 Do not treat a running container, shell history, an uncommitted file on a node, or
 an image tag as configuration authority. Inspect them as evidence and reconcile

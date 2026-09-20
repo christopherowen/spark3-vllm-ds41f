@@ -86,7 +86,9 @@ applied upstream fixes live in [upstreams.lock.json](upstreams.lock.json). Local
 changes are kept as ordered patch series rather than edits to copied source
 trees. `upstream` always means the canonical project; `origin` is Christopher's
 fork when one exists; this deployment repository is neither. See
-[docs/upstreams.md](docs/upstreams.md).
+[docs/upstreams.md](docs/upstreams.md). Repositories that are useful for ideas
+but are not build inputs are kept separately in
+[docs/inspiration.md](docs/inspiration.md).
 
 ## Transition status
 

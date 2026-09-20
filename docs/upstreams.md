@@ -72,3 +72,7 @@ this deployment repository as their `origin`.
 The GLM switchless repository is recorded as a research reference, not an
 upstream. Ideas may be reimplemented and measured, but its topology- and
 model-specific patches do not enter our patch stack implicitly.
+
+The complete research-reference watchlist, review questions, and adoption gates
+are maintained in [inspiration.md](inspiration.md). Entries under `references` in
+`upstreams.lock.json` are deliberately excluded from build preparation.
