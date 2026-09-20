@@ -63,7 +63,7 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:ad8a2eb74d80fb6a9efa117e314adf0e8b75058b760d893b30c6a5a24e0d7e75",
-  "deployment_status": "disk Engram parent-to-leaf routing image target-qualified pending distribution and full-model-load retry; promoted rollback retained",
+  "deployment_status": "disk Engram parent-to-leaf routing image distributed with exact identity on all ranks; pending full-model-load retry; promoted rollback retained",
   "integration_status": {
     "status": "all nonresident DS4.1 checkpoint weights are routed from the parent loader to their disk Engram owner; composed parent-to-leaf regression and all 18 focused tests passed on GB10",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
