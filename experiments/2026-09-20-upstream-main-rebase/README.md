@@ -86,6 +86,14 @@ row expansion; the arithmetic, dtype, expanded values, and destination loader
 remain unchanged. The reproduced failure is recorded in
 `runs/launch-b6791daa67f1-mxfp8-scale-transform.json`.
 
+The scale-corrected image passed that transform and reached the TP3 virtual-head
+loader. Its custom group selection still used a raw `copy_` from lazy checkpoint
+metadata. Patch 0010 materializes only the TP-local source groups through the
+same generic transform boundary, caches the duplicated final group, and leaves
+zero-padding groups unread. Native values and the virtual-head arithmetic are
+unchanged. The exact failure is recorded in
+`runs/launch-3d7121b4d687-virtual-head-materialization.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -145,8 +153,10 @@ suppresses dependency conflicts, downgrades the vLLM environment, or mixes
 Python with native extensions from a different vLLM revision.
 
 [compatibility.md](compatibility.md) records the exact matrix and remaining
-SM121 qualification gates. The source and image have passed prelaunch target
-checks, but the candidate is not promotable until full three-rank model-load,
+SM121 qualification gates. The previous image passed prelaunch target checks
+and exposed the next isolated loader boundary during full model load. Patch
+0010 is source-qualified pending its target regression and immutable image
+build. The candidate is not promotable until full three-rank model-load,
 quality, capacity, and performance gates pass.
 
 ## Quality and safety gates

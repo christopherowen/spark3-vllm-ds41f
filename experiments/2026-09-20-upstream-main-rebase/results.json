@@ -1,5 +1,5 @@
 {
-  "status": "startup-memory-admission-adjusted-pending-relaunch",
+  "status": "lazy-virtual-head-materialization-source-qualified-pending-image",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all nine vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities f8407787c332 and a1523b067b4d",
+    "deterministic_source_preparer": "all ten vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 47dcfe31e38b and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -34,7 +34,9 @@
     "lazy_mxfp8_transform_resolution": "the existing generic materialize_weight boundary now owns the checkpoint scale before ModelOpt's unchanged row expansion; focused regression, Ruff, format, py_compile, source diff, and exact patch replay checks pass",
     "lazy_mxfp8_transform_image": "sha256:3d7121b4d687273a8af7c1c6fb9fef589a78b7ec62a823bad2e5c1df1abccb47 has exact source labels and passed the focused ModelOpt regression plus all 8 DS4.1 B12X tests on GB10",
     "fifth_full_launch": "stopped before model loading on dgx1 because 110.44 GiB free was 0.30 GiB below the redundant 0.91 whole-device startup threshold; no compute process or OOM was present and automatic cleanup preserved rollback",
-    "startup_memory_admission_resolution": "lowered gpu_memory_utilization to 0.90 only; explicit KV remains exactly 3221225472 bytes per rank, so model length, concurrency, graph captures, and KV capacity are unchanged"
+    "startup_memory_admission_resolution": "lowered gpu_memory_utilization to 0.90 only; explicit KV remains exactly 3221225472 bytes per rank, so model length, concurrency, graph captures, and KV capacity are unchanged",
+    "sixth_full_launch": "passed startup admission, initialized NCCL 2.30.7 plus RoCEnante, selected the intended native kernels, built the Engram token map, and passed lazy MXFP8 scale expansion; it then failed when the TP3 virtual-head loader copied directly from a lazy meta checkpoint group; no OOM occurred",
+    "lazy_virtual_head_resolution": "virtual-head loaders materialize only selected TP-local source groups through the generic checkpoint transform boundary and cache duplicated groups; zero-padding groups remain unread and model arithmetic is unchanged; Ruff, format, py_compile, and source diff checks pass"
   },
   "summary": {
     "ttft_seconds": null,
@@ -84,7 +86,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "startup-memory-admission-adjusted-pending-three-rank-serving-gates",
+    "status": "lazy-virtual-head-materialization-pending-target-test-image-and-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

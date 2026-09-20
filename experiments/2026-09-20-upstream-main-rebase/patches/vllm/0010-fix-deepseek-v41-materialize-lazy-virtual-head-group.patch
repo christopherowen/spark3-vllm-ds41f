@@ -1,0 +1,96 @@
+From 18088aecd7bd1173217d9db31d0924f8c4beb832 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 01:01:30 +0200
+Subject: [PATCH] fix(deepseek-v41): materialize lazy virtual-head groups
+
+---
+ .../models/test_deepseek_v41_virtual_heads.py | 30 +++++++++++++++++++
+ vllm/models/deepseek_v41/virtual_heads.py     | 10 ++++++-
+ 2 files changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/tests/models/test_deepseek_v41_virtual_heads.py b/tests/models/test_deepseek_v41_virtual_heads.py
+index d64d0c2d12..37e9e07d55 100644
+--- a/tests/models/test_deepseek_v41_virtual_heads.py
++++ b/tests/models/test_deepseek_v41_virtual_heads.py
+@@ -6,6 +6,7 @@ from types import SimpleNamespace
+ import pytest
+ import torch
+ 
++from vllm.model_executor.weight_transfer import weight_transfer
+ from vllm.models.deepseek_v41.virtual_heads import (
+     _E8M0,
+     _fill_zero_group,
+@@ -65,6 +66,35 @@ def test_duplicate_loader_maps_each_tp_rank(tp_rank, expected_groups) -> None:
+     assert torch.equal(parameter, weight[expected_groups])
+ 
+ 
++def test_duplicate_loader_materializes_only_selected_lazy_groups() -> None:
++    parameter = _parameter((3, 2), "output_dim", 0)
++    assert _wrap_parameter(parameter, 0, 8, 9, "duplicate", 2, 3)
++
++    expected = torch.arange(16, dtype=torch.float32).reshape(8, 2)
++    source = torch.empty_like(expected, device="meta")
++
++    class Writer:
++        offsets = []
++
++        def __call__(self, destination, loaded):
++            return False
++
++        def materialize(self, loaded):
++            self.offsets.append(loaded.storage_offset())
++            return expected.as_strided(
++                loaded.shape,
++                loaded.stride(),
++                loaded.storage_offset(),
++            ).clone()
++
++    writer = Writer()
++    with weight_transfer(writer):
++        parameter.weight_loader(parameter, source)
++
++    assert writer.offsets == [12, 14]
++    assert torch.equal(parameter, expected[[6, 7, 7]])
++
++
+ def test_virtual_padding_is_opt_in() -> None:
+     attention = SimpleNamespace(n_groups=9)
+     assert wrap_attention(attention, 3, SimpleNamespace()) == 0
+diff --git a/vllm/models/deepseek_v41/virtual_heads.py b/vllm/models/deepseek_v41/virtual_heads.py
+index e121642217..f360fe73c8 100644
+--- a/vllm/models/deepseek_v41/virtual_heads.py
++++ b/vllm/models/deepseek_v41/virtual_heads.py
+@@ -4,6 +4,8 @@
+ 
+ import torch
+ 
++from vllm.model_executor.weight_transfer import materialize_weight
++
+ _E8M0 = getattr(torch, "float8_e8m0fnu", None)
+ 
+ 
+@@ -57,6 +59,7 @@ def _wrap_parameter(
+ 
+         first_group = tp_rank * local_groups
+         virtual_count = padded_groups - real_groups
++        materialized_groups = {}
+         for local_group in range(local_groups):
+             global_group = first_group + local_group
+             destination = param.data.narrow(dim, local_group * group_width, group_width)
+@@ -69,7 +72,12 @@ def _wrap_parameter(
+                 continue
+             else:
+                 raise ValueError(f"unknown virtual-head padding mode {mode!r}")
+-            source = loaded_weight.narrow(dim, source_group * group_width, group_width)
++            source = materialized_groups.get(source_group)
++            if source is None:
++                source = materialize_weight(
++                    loaded_weight.narrow(dim, source_group * group_width, group_width)
++                )
++                materialized_groups[source_group] = source
+             destination.copy_(source)
+ 
+     try:
+-- 
+2.54.0 (Apple Git-157)
+

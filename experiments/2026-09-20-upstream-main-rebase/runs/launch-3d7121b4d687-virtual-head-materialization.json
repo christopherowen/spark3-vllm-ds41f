@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "failed-during-lazy-virtual-head-group-load",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:0ede60db3a36-8099cee92c78-d180a5f808a5f",
+    "id": "sha256:3d7121b4d687273a8af7c1c6fb9fef589a78b7ec62a823bad2e5c1df1abccb47",
+    "source_revision": "180a5f808a5fff1458de234b795110c8a4bf4296",
+    "launch_revision": "e7e365f936545ef87e45a94ba407521b5cdf3996"
+  },
+  "progress": [
+    "passed 0.90 startup memory admission with explicit 3 GiB KV unchanged",
+    "initialized NCCL 2.30.7 and RoCEnante on all three ranks",
+    "selected B12X MXFP8 linear, FP4 MoE, NVFP4 DS4.1 sparse MLA, and FP8 indexer cache",
+    "built the 129280 to 99092 Engram token map",
+    "passed the prior lazy MXFP8 scale materialization boundary"
+  ],
+  "failure": {
+    "file": "vllm/models/deepseek_v41/virtual_heads.py",
+    "operation": "destination.copy_(source)",
+    "message": "NotImplementedError: Cannot copy out of meta tensor; no data!",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "18088aecd7bd1173217d9db31d0924f8c4beb832",
+    "source_tree": "47dcfe31e38bfa0f7a8438902dda85773c341470",
+    "behavior": "materialize only selected TP-local source groups, cache repeated source groups, and do not read virtual zero groups",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate containers were automatically removed; stopped promoted containers remain present on all three nodes"
+}

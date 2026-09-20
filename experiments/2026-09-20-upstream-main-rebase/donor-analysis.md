@@ -65,6 +65,13 @@ Candidate commit `0ede60db3a362f7679419e40bfb3c94756e92ee7` calls the existing
 row expansion and keeps B12X's immutable lazy source fail-closed for undeclared
 transformations.
 
+The TP3 virtual-head loader has the same loader-neutral requirement for its
+custom group selection. Candidate commit
+`18088aecd7bd1173217d9db31d0924f8c4beb832` materializes only the source groups
+owned by the local TP rank, retains one owned copy per distinct group, and does
+not read groups whose destination is defined as zero. This preserves the native
+virtual-head mapping without falling back to eager checkpoint loading.
+
 ## Two-stage qualification
 
 ### Stage A: upstream-native
@@ -96,6 +103,8 @@ that can be proposed upstream independently after target validation.
 - vLLM: explicit loader allocation for DS4.1 custom checkpoint parameters,
   independently from the generic loader transport.
 - vLLM: materialize lazy MXFP8 scale tensors before ModelOpt row expansion.
+- vLLM: materialize selected lazy TP3 virtual-head groups without reading the
+  full unsharded projection.
 - B12X: the 3072-token mHC tuning point only after it is reprofiled on current
   kernels and CUTLASS DSL.
 

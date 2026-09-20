@@ -15,9 +15,10 @@
         "38d69a82fdd0ea76f8a92c15476bba8cc74184f4",
         "0fe6eed4b7b3a8bcc807d56cdd8a24021d13ea68",
         "e08ab6356e93f9cfc2087683b441c52997b5300e",
-        "0ede60db3a362f7679419e40bfb3c94756e92ee7"
+        "0ede60db3a362f7679419e40bfb3c94756e92ee7",
+        "18088aecd7bd1173217d9db31d0924f8c4beb832"
       ],
-      "source_tree": "f8407787c33222bdc16acf9d3fe7695d380d1548",
+      "source_tree": "47dcfe31e38bfa0f7a8438902dda85773c341470",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -28,7 +29,8 @@
         "patches/vllm/0006-fix-vocab-align-padding-to-tensor-parallel-size.patch",
         "patches/vllm/0007-fix-deepseek-v41-avoid-B12X-warmup-module-cycle.patch",
         "patches/vllm/0008-fix-deepseek-v41-route-custom-weights-through-loader.patch",
-        "patches/vllm/0009-fix-modelopt-materialize-lazy-MXFP8-scales-before-ex.patch"
+        "patches/vllm/0009-fix-modelopt-materialize-lazy-MXFP8-scales-before-ex.patch",
+        "patches/vllm/0010-fix-deepseek-v41-materialize-lazy-virtual-head-group.patch"
       ]
     },
     {
@@ -56,10 +58,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:3d7121b4d687273a8af7c1c6fb9fef589a78b7ec62a823bad2e5c1df1abccb47",
-  "deployment_status": "lazy MXFP8 transform image qualified pending distribution and full-model-load retry; promoted rollback retained",
+  "image_digest": null,
+  "deployment_status": "lazy virtual-head materialization source qualified pending immutable image build; promoted rollback retained",
   "integration_status": {
-    "status": "lazy MXFP8 scale transform image built and target tests passed; pending full-model-load retry",
+    "status": "lazy virtual-head source-group materialization added after full-model-load diagnosis; pending target regression and image build",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
