@@ -1,5 +1,5 @@
 {
-  "status": "target-qualification-in-progress",
+  "status": "prelaunch-qualified-pending-cluster-run",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -8,7 +8,7 @@
     "vllm_ds41_b12x_adapter": "ruff, format, py_compile, and diff checks passed for sparse MLA, managed loading, and disk Engram; target runtime tests pending",
     "vllm_rocenante_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
     "local_focused_pytest": "not run: cached Mac test environment lacks tblib, msgspec, and regex",
-    "docker_build_check": "image ea3a7e056cb1 preserved NCCL 2.30.7, added no pip-check findings, passed GB10 imports and 8 focused vLLM tests, and passed a real managed direct-I/O copy. B12X Engram tests then proved its wheel lacked compile-time liburing support (6 passed, 2 failed); the image was not launched. The recipe now installs liburing development inputs and requires the native ple_reader symbol before export; corrected rebuild pending",
+    "docker_build_check": "the rejected ea3a7e056cb1 build exposed missing compile-time liburing support before launch. Corrected image sha256:8649ec7238e36351b079ccf1fd170189c39a8e5d8f81c7e291a1f0910287018e passed GB10 imports, 8 focused vLLM tests, exact managed direct-I/O, 8 B12X Engram tests with production capabilities, native liburing linkage, and real serve-config construction",
     "vllm_virtual_head_unit_tests": "7 passed with Torch 2.13.0 using an isolated module import",
     "b12x_mhc_policy_tests": "2 passed",
     "b12x_roce_topology_tests": "7 passed with Torch 2.13.0 using isolated CPU-safe module imports",
@@ -17,7 +17,9 @@
     "diff_check": "passed",
     "deterministic_source_preparer": "all five vLLM and four B12X patches replayed from the exact base objects and matched recorded Git tree identities 4262bf458dc2 and a1523b067b4d",
     "repository_doctor": "configuration OK",
-    "live_read_only_doctor": "configuration OK; live cluster matches"
+    "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
+    "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
+    "candidate_distribution": "identical image ID on dgx1, dgx2, and dgx3; uncompressed parallel Docker streams traversed the two ConnectX-7 internal rails in approximately 82 seconds"
   },
   "summary": {
     "ttft_seconds": null,
@@ -67,10 +69,9 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "source-complete-pending-rebuild-and-sm121-qualification",
+    "status": "prelaunch-image-qualified-pending-three-rank-serving-gates",
     "remaining_gates": [
-      "rebuild the content-addressed ARM64 image with the loader and disk Engram carries",
-      "compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
+      "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
     ],
     "candidate_behavior": "upstream DS4.1 semantics with B12X sparse MLA, coherent ordinary-weight loading, and native Engram rows staged from disk; eligible small TP collectives use RoCEnante and larger collectives use NCCL",

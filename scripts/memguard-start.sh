@@ -2,9 +2,27 @@
 set -euo pipefail
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-name=$(jq -er '.container.name' "$repo_root/config/cluster.json")
-guard_gib=$(jq -er '.host.memguard_gib' "$repo_root/config/cluster.json")
-interval=$(jq -er '.host.memguard_interval_seconds' "$repo_root/config/cluster.json")
+config_relative=${1:-config/cluster.json}
+if [[ "$config_relative" = /* ]]; then
+  echo "cluster config must be relative to the repository root" >&2
+  exit 1
+fi
+config_path=$(realpath "$repo_root/$config_relative")
+case "$config_path" in
+  "$repo_root"/*) ;;
+  *)
+    echo "cluster config must remain inside the repository" >&2
+    exit 1
+    ;;
+esac
+if [[ ! -f "$config_path" ]]; then
+  echo "cluster config does not exist: $config_relative" >&2
+  exit 1
+fi
+
+name=$(jq -er '.container.name' "$config_path")
+guard_gib=$(jq -er '.host.memguard_gib' "$config_path")
+interval=$(jq -er '.host.memguard_interval_seconds' "$config_path")
 unit="${name}-memguard.service"
 
 if [[ "$(docker inspect --format '{{.State.Running}}' "$name" 2>/dev/null || true)" != "true" ]]; then

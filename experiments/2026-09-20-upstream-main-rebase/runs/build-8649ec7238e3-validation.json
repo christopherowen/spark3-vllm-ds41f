@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "status": "passed-prelaunch-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:7ace024dfddb-8099cee92c78-d2b82a9accdd8",
+    "id": "sha256:8649ec7238e36351b079ccf1fd170189c39a8e5d8f81c7e291a1f0910287018e",
+    "size_bytes": 23239958848,
+    "deployment_revision": "2b82a9accdd8705bfd7422873650afd9cfc10ef0",
+    "vllm_patch_head": "7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177",
+    "vllm_tree": "4262bf458dc2ccdae405e39c5b3c5c2f4c62a723",
+    "b12x_patch_head": "8099cee92c78dd2472749ca8003053ee73be908d",
+    "b12x_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0"
+  },
+  "checks": {
+    "gpu_import": "passed on NVIDIA GB10",
+    "focused_vllm_tests": "8 passed, 386 deselected",
+    "managed_direct_io": "exact byte-for-byte safetensors copy into allocator-owned CUDA destination passed",
+    "b12x_engram_tests": "8 passed with IPC_LOCK, unlimited memlock, and the production seccomp capability set",
+    "native_reader_linkage": "B12X native helper linked against liburing and exported the required ple_reader interface",
+    "serve_configuration": "real vLLM parser and AsyncEngineArgs engine-config construction passed against the mounted model; resolved max_model_len=160000, max_num_seqs=8, kv_cache_memory_bytes=3221225472, and disk Engram",
+    "plugin_scope": "VLLM_PLUGINS=b12x_loader loads the required native checkpoint loader without the unrelated downstream-only FP6 plugin",
+    "image_identity": "dgx1, dgx2, and dgx3 all reported the exact image ID sha256:8649ec7238e36351b079ccf1fd170189c39a8e5d8f81c7e291a1f0910287018e",
+    "rollback_state": "promoted containers remain stopped and present on all three nodes; candidate containers were absent"
+  },
+  "distribution": {
+    "source": "dgx3",
+    "targets": {
+      "dgx1": "192.168.2.1",
+      "dgx2": "192.168.4.1"
+    },
+    "method": "parallel uncompressed docker save/load streams over the two ConnectX-7 internal rails",
+    "elapsed_seconds_approximate": 82,
+    "reason": "the image is largely incompressible and available network throughput exceeds CPU compression throughput"
+  },
+  "excluded_check": {
+    "name": "whole downstream B12X test file",
+    "reason": "it imports newer GLM and private-fork vLLM APIs that are not part of the pinned upstream vLLM candidate; focused loader, Engram, topology, and integration boundaries are the applicable gates"
+  },
+  "remaining": [
+    "full three-rank model load and selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}

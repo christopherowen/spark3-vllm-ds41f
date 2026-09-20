@@ -38,11 +38,13 @@ kernel, caller-owned scratch, ordinary-weight direct I/O, and bounded Engram row
 staging. RoCEnante handles eligible small TP collectives while NCCL remains the
 deliberate fallback above the configured size limits.
 
-An earlier source-complete image was built, imported, and copied to all ranks,
-but was not launched after its import probe exposed missing loader interfaces.
-The current candidate includes those interfaces and disk-backed Engram; it must
-be rebuilt and qualified on the now-idle cluster. The promoted service remains
-stopped and preserved as the rollback target.
+An earlier source-complete image was rejected before launch when its target
+probe exposed missing build-time `liburing` support. The corrected candidate
+includes the managed-loader interfaces and disk-backed Engram, passes focused
+GB10 runtime qualification, and has been copied byte-for-byte to all ranks over
+the ConnectX-7 internal links. The promoted service remains stopped and
+preserved as the rollback target while the corrected image proceeds through
+full model-load and serving qualification.
 
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
@@ -73,7 +75,22 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
-source trees. It does not stop, restart, or deploy the service.
+source trees. It does not stop, restart, or deploy the service. The exact
+prelaunch-qualified image and checks are recorded in
+`runs/build-8649ec7238e3-validation.json`.
+
+The experiment has its own deterministic cluster configuration. It can be
+inspected without changing the promoted configuration:
+
+```sh
+bin/spark3 \
+  --cluster-config experiments/2026-09-20-upstream-main-rebase/cluster.json \
+  cluster start
+```
+
+The configuration allowlists only the required `b12x_loader` vLLM plugin. The
+separate B12X FP6 plugin depends on downstream-only interfaces and is not used
+by this native FP4/FP8 model.
 
 ## Compatibility gate
 
@@ -86,8 +103,9 @@ suppresses dependency conflicts, downgrades the vLLM environment, or mixes
 Python with native extensions from a different vLLM revision.
 
 [compatibility.md](compatibility.md) records the exact matrix and remaining
-SM121 qualification gates. The source is ready to build, but it is not a
-deployable serving image until those target tests pass.
+SM121 qualification gates. The source and image have passed prelaunch target
+checks, but the candidate is not promotable until full three-rank model-load,
+quality, capacity, and performance gates pass.
 
 ## Quality and safety gates
 

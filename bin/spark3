@@ -15,6 +15,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CLUSTER_CONFIG = "config/cluster.json"
 SOURCE_TREES = {
     "vllm": ROOT / ".work/upstreams/vllm",
     "b12x": ROOT / ".work/upstreams/b12x",
@@ -35,9 +36,27 @@ def read_json(relative: str) -> dict:
         return json.load(handle)
 
 
-def configuration() -> tuple[dict, dict, dict]:
+def cluster_config_path(args: argparse.Namespace | None = None) -> tuple[Path, str]:
+    raw = getattr(args, "cluster_config", DEFAULT_CLUSTER_CONFIG)
+    relative = Path(raw)
+    if relative.is_absolute():
+        raise SystemExit("--cluster-config must be relative to the repository root")
+    resolved = (ROOT / relative).resolve()
+    try:
+        canonical = resolved.relative_to(ROOT.resolve()).as_posix()
+    except ValueError as error:
+        raise SystemExit("--cluster-config must remain inside the repository") from error
+    if not resolved.is_file():
+        raise SystemExit(f"cluster configuration does not exist: {canonical}")
+    return resolved, canonical
+
+
+def configuration(
+    args: argparse.Namespace | None = None,
+) -> tuple[dict, dict, dict]:
+    cluster_path, _ = cluster_config_path(args)
     return (
-        read_json("config/cluster.json"),
+        json.loads(cluster_path.read_text(encoding="utf-8")),
         read_json("config/nodes.json"),
         read_json("upstreams.lock.json"),
     )
@@ -299,7 +318,7 @@ def live_doctor(cluster: dict, nodes: dict) -> list[str]:
 
 
 def command_doctor(args: argparse.Namespace) -> int:
-    cluster, nodes, upstreams = configuration()
+    cluster, nodes, upstreams = configuration(args)
     problems = local_doctor(cluster, nodes, upstreams)
     if args.live:
         problems.extend(live_doctor(cluster, nodes))
@@ -311,8 +330,8 @@ def command_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_status(_: argparse.Namespace) -> int:
-    cluster, nodes, _ = configuration()
+def command_status(args: argparse.Namespace) -> int:
+    cluster, nodes, _ = configuration(args)
     name = cluster["container"]["name"]
     failed = False
     for node in nodes["nodes"]:
@@ -408,6 +427,7 @@ def remote_runtime_problems(
     revision: str,
     *,
     allow_existing: bool,
+    cluster_config: str,
 ) -> list[str]:
     problems: list[str] = []
     repo = repository_path(cluster)
@@ -432,7 +452,14 @@ def remote_runtime_problems(
             )
         if dirty:
             problems.append(f"{node['name']}: checkout has uncommitted files")
-        doctor = run_ssh(nodes, node, f"{repo}/bin/spark3", "doctor")
+        doctor = run_ssh(
+            nodes,
+            node,
+            f"{repo}/bin/spark3",
+            "--cluster-config",
+            cluster_config,
+            "doctor",
+        )
         if doctor.returncode:
             detail = doctor.stdout.strip() or doctor.stderr.strip()
             problems.append(f"{node['name']}: repository doctor failed: {detail}")
@@ -476,7 +503,8 @@ def remote_runtime_problems(
 
 
 def command_cluster_sync(args: argparse.Namespace) -> int:
-    cluster, nodes, upstreams = configuration()
+    cluster, nodes, upstreams = configuration(args)
+    _, config_relative = cluster_config_path(args)
     revision = repository_revision(args.revision or "HEAD")
     path = repository_path(cluster)
     for node in nodes["nodes"]:
@@ -543,7 +571,14 @@ def command_cluster_sync(args: argparse.Namespace) -> int:
                 detail = checkout.stderr.strip() or checkout.stdout.strip()
                 raise RuntimeError(f"{node['name']}: checkout failed: {detail}")
             changed.append(node)
-            doctor = run_ssh(nodes, node, f"{path}/bin/spark3", "doctor")
+            doctor = run_ssh(
+                nodes,
+                node,
+                f"{path}/bin/spark3",
+                "--cluster-config",
+                config_relative,
+                "doctor",
+            )
             if doctor.returncode:
                 detail = doctor.stdout.strip() or doctor.stderr.strip()
                 raise RuntimeError(f"{node['name']}: doctor failed after checkout: {detail}")
@@ -599,10 +634,10 @@ def wait_for_api(cluster: dict, nodes: dict) -> None:
     raise RuntimeError(f"API did not become ready within {timeout}s")
 
 
-def start_memguards(cluster: dict, nodes: dict) -> None:
+def start_memguards(cluster: dict, nodes: dict, cluster_config: str) -> None:
     script = f"{repository_path(cluster)}/scripts/memguard-start.sh"
     for node in nodes["nodes"]:
-        result = run_ssh(nodes, node, script)
+        result = run_ssh(nodes, node, script, cluster_config)
         if result.returncode:
             detail = result.stderr.strip() or result.stdout.strip()
             raise RuntimeError(f"{node['name']}: cannot arm memguard: {detail}")
@@ -634,7 +669,8 @@ def restore_containers(
 
 
 def command_cluster_start(args: argparse.Namespace) -> int:
-    cluster, nodes, upstreams = configuration()
+    cluster, nodes, upstreams = configuration(args)
+    _, config_relative = cluster_config_path(args)
     name = cluster["container"]["name"]
     order = deployment_order(nodes)
     print("start plan (memory guards remain off until API readiness):")
@@ -651,6 +687,7 @@ def command_cluster_start(args: argparse.Namespace) -> int:
         nodes,
         revision,
         allow_existing=args.replace,
+        cluster_config=config_relative,
     )
     if problems:
         for problem in problems:
@@ -689,7 +726,7 @@ def command_cluster_start(args: argparse.Namespace) -> int:
             started.append(node)
             print(f"{node['name']}: launched {result.stdout.strip()}", flush=True)
         wait_for_api(cluster, nodes)
-        start_memguards(cluster, nodes)
+        start_memguards(cluster, nodes, config_relative)
     except RuntimeError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         print("rolling back containers started by this command", file=sys.stderr)
@@ -697,7 +734,7 @@ def command_cluster_start(args: argparse.Namespace) -> int:
         if backups:
             try:
                 wait_for_api(cluster, nodes)
-                start_memguards(cluster, nodes)
+                start_memguards(cluster, nodes, config_relative)
             except RuntimeError as rollback_error:
                 print(f"WARN: rollback health check failed: {rollback_error}", file=sys.stderr)
         return 1
@@ -713,7 +750,7 @@ def command_cluster_start(args: argparse.Namespace) -> int:
 
 
 def command_cluster_stop(args: argparse.Namespace) -> int:
-    cluster, nodes, _ = configuration()
+    cluster, nodes, _ = configuration(args)
     name = cluster["container"]["name"]
     action = "stop and remove" if args.remove else "stop"
     for node in nodes["nodes"]:
@@ -748,7 +785,7 @@ def command_cluster_stop(args: argparse.Namespace) -> int:
 
 
 def command_render(args: argparse.Namespace) -> int:
-    cluster, nodes, _ = configuration()
+    cluster, nodes, _ = configuration(args)
     node = node_by_name(nodes, args.node)
     print(shlex.join(rendered_docker_command(cluster, node)))
     return 0
@@ -767,7 +804,7 @@ def checked(command: list[str], cwd: Path | None = None) -> None:
 
 
 def command_upstream(args: argparse.Namespace) -> int:
-    _, _, upstreams = configuration()
+    _, _, upstreams = configuration(args)
     sources = upstreams["sources"]
     git_sources = {key: value for key, value in sources.items() if value["kind"] == "git"}
     if args.upstream_command == "list":
@@ -881,9 +918,9 @@ def patchset_sha256(source: dict) -> str:
     return digest.hexdigest()
 
 
-def build_input_problems() -> list[str]:
+def build_input_problems(args: argparse.Namespace | None = None) -> list[str]:
     problems: list[str] = []
-    _, _, upstreams = configuration()
+    _, _, upstreams = configuration(args)
     source_manifest = read_json("manifests/sources/2026-09-20-active-source.json")
     for name, path in BUILD_CONTEXTS.items():
         if not path.is_dir():
@@ -1011,7 +1048,7 @@ def build_input_problems() -> list[str]:
 
 def command_build(args: argparse.Namespace) -> int:
     if args.build_command == "check":
-        problems = build_input_problems()
+        problems = build_input_problems(args)
         if problems:
             for problem in problems:
                 print(f"WARN: {problem}")
@@ -1019,7 +1056,7 @@ def command_build(args: argparse.Namespace) -> int:
         print("build inputs OK")
         return 0
 
-    problems = build_input_problems()
+    problems = build_input_problems(args)
     if problems:
         for problem in problems:
             print(f"WARN: {problem}")
@@ -1029,7 +1066,7 @@ def command_build(args: argparse.Namespace) -> int:
         print("WARN: image rendering requires a clean deployment repository")
         return 1
 
-    _, _, upstreams = configuration()
+    _, _, upstreams = configuration(args)
     vllm = upstreams["sources"]["vllm"]["revision"][:12]
     b12x = upstreams["sources"]["b12x"]["revision"][:12]
     deployment_revision = repository_revision()
@@ -1073,6 +1110,12 @@ def command_build(args: argparse.Namespace) -> int:
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="spark3")
+    root.add_argument(
+        "--cluster-config",
+        default=DEFAULT_CLUSTER_CONFIG,
+        metavar="PATH",
+        help="repository-relative cluster config (default: config/cluster.json)",
+    )
     commands = root.add_subparsers(dest="command", required=True)
     doctor = commands.add_parser("doctor", help="validate repository and optional live state")
     doctor.add_argument("--live", action="store_true")
