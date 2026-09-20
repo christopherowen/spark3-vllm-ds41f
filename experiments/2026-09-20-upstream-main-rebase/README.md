@@ -155,8 +155,8 @@ Python with native extensions from a different vLLM revision.
 [compatibility.md](compatibility.md) records the exact matrix and remaining
 SM121 qualification gates. The previous image passed prelaunch target checks
 and exposed the next isolated loader boundary during full model load. Patch
-0010 is source-qualified pending its target regression and immutable image
-build. The candidate is not promotable until full three-rank model-load,
+0010 and the combined DS4.1 adapter suite now pass on GB10 in the new immutable
+image. The candidate is not promotable until full three-rank model-load,
 quality, capacity, and performance gates pass.
 
 ## Quality and safety gates
