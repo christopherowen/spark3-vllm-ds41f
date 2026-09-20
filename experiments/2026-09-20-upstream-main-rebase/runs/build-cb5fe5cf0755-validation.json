@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "status": "passed-prelaunch-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:0fe6eed4b7b3-8099cee92c78-da7a221f11b30",
+    "id": "sha256:cb5fe5cf07559886785529f14c5885b4d851c688810cb6deb702f4e62557cb62",
+    "size_bytes": 23239997169,
+    "deployment_revision": "a7a221f11b30cc3d98f4f03f9bba3bf13222378b",
+    "vllm_patch_head": "0fe6eed4b7b3a8bcc807d56cdd8a24021d13ea68",
+    "vllm_tree": "1b0bdd16150101ce3b817d06a1720e28789441ac",
+    "b12x_patch_head": "8099cee92c78dd2472749ca8003053ee73be908d",
+    "b12x_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0"
+  },
+  "checks": {
+    "source_replay": "seven vLLM and four B12X patches replayed from exact bases to the recorded Git trees",
+    "deepseek_v41_b12x": "8 focused adapter tests passed on GB10, including finite duplicate-preserving module traversal",
+    "warmup_provider_ownership": "provider identity is unchanged, b12x_warmup_provider is absent from nn.Module._modules, and checkpoint module traversal terminates",
+    "image_labels": "deployment, vLLM, and B12X commit/tree labels match the recorded candidate",
+    "image_identity": "dgx1, dgx2, and dgx3 all reported the exact image ID sha256:cb5fe5cf07559886785529f14c5885b4d851c688810cb6deb702f4e62557cb62",
+    "rollback_state": "promoted containers remain stopped and present on all three nodes; candidate containers are absent"
+  },
+  "distribution": {
+    "source": "dgx3",
+    "targets": {
+      "dgx1": "192.168.2.1",
+      "dgx2": "192.168.4.1 via dgx2-internal"
+    },
+    "method": "two parallel uncompressed docker save/load streams over both ConnectX-7 internal rails",
+    "wall_clock_seconds": 142,
+    "dgx1_elapsed_seconds": 142.324,
+    "dgx2_elapsed_seconds": 141.669
+  },
+  "remaining": [
+    "full three-rank model load and selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}

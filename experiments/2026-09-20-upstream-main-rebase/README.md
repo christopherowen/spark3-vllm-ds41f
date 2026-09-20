@@ -96,11 +96,11 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
-source trees. It does not stop, restart, or deploy the service. The
-vocabulary-corrected TP3 image and its checks are recorded in
-`runs/build-f332c52cb106-validation.json`; the earlier receipt remains as the
-provenance for the pre-vocabulary-fix image. Its full launch exposed the
-module-cycle defect above; the next image adds only that isolated fix.
+source trees. It does not stop, restart, or deploy the service. The current
+module-cycle-corrected image and checks are recorded in
+`runs/build-cb5fe5cf0755-validation.json`. The vocabulary-corrected image
+receipt remains at `runs/build-f332c52cb106-validation.json`; its full launch
+is what exposed the isolated module-cycle defect above.
 
 The experiment has its own deterministic cluster configuration. It can be
 inspected without changing the promoted configuration:
