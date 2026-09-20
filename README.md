@@ -21,6 +21,10 @@ The active baseline was captured on 2026-09-20:
   tokens in the measured 3 GiB-per-rank cache;
 - one concurrent prefill, 8,192 batched tokens, and a 4 GiB host-memory guard.
 
+The subsequently promoted operational guard is 3 GiB and is armed only after
+JIT/autotuning startup completes. The immutable baseline retains the observed
+4 GiB value; `config/cluster.json` owns the current desired value.
+
 The machine-readable desired configuration is [config/cluster.json](config/cluster.json).
 The original live evidence is
 [manifests/baselines/2026-09-20-live.json](manifests/baselines/2026-09-20-live.json).
@@ -46,6 +50,9 @@ bin/spark3 doctor
 bin/spark3 doctor --live
 bin/spark3 status
 bin/spark3 render dgx1
+bin/spark3 cluster sync
+bin/spark3 cluster start --replace
+bin/spark3 cluster stop
 bin/spark3 upstream list
 bin/spark3 upstream prepare vllm
 bin/spark3 upstream prepare b12x
@@ -57,9 +64,17 @@ bin/spark3 build check
 bin/spark3 build render
 ```
 
-`doctor` is read-only. `render` prints the exact Docker command without executing
-it. The initial repository intentionally has no cluster-mutating `up` command;
-that will be added only after the image build and deployment are reproducible.
+`doctor`, `status`, `render`, and every cluster command without `--apply` are
+read-only. `cluster sync` fetches a published commit and detaches every clean node
+checkout at that exact revision; it never copies a working tree or ignored files.
+`cluster start` preflights all three ranks, starts workers before the head, waits
+for API readiness, and only then arms a host-local memory guard on every Spark.
+Keeping the guards off during startup preserves the memory needed for JIT and
+autotuning. Mutating operations require an explicit `--apply`; replacing an
+existing service additionally requires `--replace`.
+
+The compatibility helpers in `scripts/` are thin wrappers around these commands.
+They contain no independent topology, credentials, or launch logic.
 
 ## Upstreams
 
@@ -72,12 +87,13 @@ fork when one exists; this deployment repository is neither. See
 
 ## Transition status
 
-The active runtime can now be rendered and audited. Fresh pinned vLLM and B12X
+The active runtime can now be rendered, deployed, and audited. Fresh pinned vLLM and B12X
 checkouts plus their ordered patch series reproduce every modified live source
 file byte-for-byte. The image reconstruction now pins the official base digest,
 FlashInfer, CUTLASS, and every CuTe DSL wheel, but has not yet been built and
 qualified on a Spark. The current live tag still resolves to node-local image
 IDs. Critical serving source is identical; rank 0 only omits vLLM's unused
 `benchmarks/` package. The next milestone is to qualify
-[docker/Dockerfile](docker/Dockerfile), push one content digest, and deploy that
-exact digest to all three nodes.
+[docker/Dockerfile](docker/Dockerfile), push one content digest, and promote that
+exact digest to all three nodes. The currently captured node-local image remains
+the promoted runtime until that qualification is complete.

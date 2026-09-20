@@ -15,7 +15,7 @@ Captured 2026-09-20 from the three running containers.
 | Full 160K concurrency | 3.11x |
 | DSpark depth | 3 |
 | Container memory limit | 112 GiB |
-| Host memguard threshold | 4 GiB |
+| Host memguard threshold | 3 GiB, armed after JIT/API readiness |
 | Async scheduling | disabled |
 | Reasoning | enabled |
 
@@ -31,9 +31,9 @@ as captured evidence but not as the final deployment method.
 
 - Build and qualify the committed image reconstruction on a Spark.
 - Build once and distribute a single OCI digest to all ranks.
-- Materialize the model configuration and indexer patch under the new deterministic
-  `/home/swank/spark3-vllm-ds41f/` node path.
-- Add coordinated deploy/start/rollback only after dry-run and live-diff validation.
+- Qualify the tracked model configuration and indexer artifacts under the
+  deterministic `/home/swank/projects/spark3-vllm-ds41f/` node path.
+- Exercise the coordinated deployment rollback path during a scheduled restart.
 - Establish a frozen benchmark baseline for this exact concurrency-tuned runtime.
 
 The vLLM and B12X patch stacks have now been applied to fresh pinned checkouts and

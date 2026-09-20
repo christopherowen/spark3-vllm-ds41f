@@ -16,6 +16,8 @@ jobs:
         run: bin/spark3 doctor
       - name: Compile helper
         run: python3 -m py_compile bin/spark3
+      - name: Validate shell helpers
+        run: find scripts -type f -print0 | xargs -0 -n1 bash -n
       - name: Validate JSON and patches
         run: |
           git diff --check

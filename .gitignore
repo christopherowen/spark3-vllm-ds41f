@@ -1,7 +1,13 @@
 .work/
 .env
+.env.*
+!.env.example
 *.local.json
 *.local.env
+*.pem
+*.key
 __pycache__/
 *.pyc
+cache/
+*.log
 results/private/

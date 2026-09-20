@@ -27,14 +27,14 @@
     "mounts": [
       ["{home}/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277", "/models", "ro"],
       ["{home}/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/blobs", "/blobs", "ro"],
-      ["{home}/spark3-vllm-ds41f/state/config.json", "/models/config.json", "ro"],
-      ["{home}/spark3-vllm-ds41f/state/indexer.py", "/opt/ds41-r37/vllm/vllm/v1/attention/backends/mla/indexer.py", "ro"],
-      ["{home}/spark3-vllm-ds41f/cache", "/cache", "rw"]
+      ["{home}/projects/spark3-vllm-ds41f/state/config.json", "/models/config.json", "ro"],
+      ["{home}/projects/spark3-vllm-ds41f/state/indexer.py", "/opt/ds41-r37/vllm/vllm/v1/attention/backends/mla/indexer.py", "ro"],
+      ["{home}/projects/spark3-vllm-ds41f/cache", "/cache", "rw"]
     ]
   },
   "host": {
     "home": "/home/swank",
-    "memguard_gib": 4,
+    "memguard_gib": 3,
     "memguard_interval_seconds": 2
   },
   "environment": {
@@ -139,5 +139,12 @@
   "distributed": {
     "master_addr": "10.0.1.71",
     "master_port": "29554"
+  },
+  "deployment": {
+    "repository": "https://github.com/christopherowen/spark3-vllm-ds41f.git",
+    "branch": "main",
+    "path": "{home}/projects/spark3-vllm-ds41f",
+    "ready_url": "http://127.0.0.1:8000/v1/models",
+    "ready_timeout_seconds": 1800
   }
 }

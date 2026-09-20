@@ -32,6 +32,12 @@ Never start, stop, replace, or restart the three-rank service without explicit
 authorization for that operation. A coordinated runtime change must cover all
 three nodes; mixed rank state is invalid.
 
+Use `bin/spark3 cluster sync`, `start`, and `stop` for node operations. They are
+plans unless `--apply` is supplied. Never deploy with rsync or copy a dirty
+working tree: publish one commit, require clean node checkouts, and detach every
+node at that exact commit. Do not bypass the coordinated start with a one-rank
+launch script.
+
 ## Upstream work
 
 Never make durable changes in exported vLLM or B12X trees. Start from the commit in
@@ -55,6 +61,10 @@ new upstream commit pin rather than carrying both.
 No Hugging Face tokens, GitHub tokens, Tailscale credentials, SSH private keys, or
 other secrets belong here. Site IPs and interface mappings are configuration;
 credentials remain outside Git.
+
+Ignored caches, `.env*`, `*.local.*`, private keys, and credentials must remain
+node-local. Synchronization is Git-based specifically so ignored files are never
+an accidental deployment input.
 
 Use deterministic paths and pinned revisions. Build once and distribute the same
 OCI digest to every rank. Never overwrite a tag in place and assume ranks match.

@@ -24,10 +24,11 @@ scripts/stage-build-contexts
 bin/spark3 build check
 ```
 
-Staging strips Git metadata and Python bytecode before Docker sees the source.
-`build check` then compares a content-and-mode digest of every staged tree with
-its prepared source, preventing a stale or hand-edited context from entering the
-image.
+Staging atomically replaces each context after checking both staged and unstaged
+diffs. It strips Git metadata and Python bytecode before Docker sees the source.
+`build check` rejects source paths not recorded in the source manifest, unknown
+wheels, and any content-or-mode difference between a prepared tree and its staged
+context.
 
 Render a local build or registry push without executing it:
 
@@ -36,7 +37,9 @@ bin/spark3 build render
 bin/spark3 build render --push
 ```
 
-The build is a **reconstruction candidate**, not yet the promoted image. Do not
+The rendered tag includes the deployment commit as well as the vLLM and B12X
+pins, so two repository states cannot silently reuse one tag. The build is a
+**reconstruction candidate**, not yet the promoted image. Do not
 deploy it until it builds on a Spark, passes import/schema checks, serves the
 quality probes, reproduces the baseline benchmark, and has one pushed OCI digest
 used by all three ranks. The captured live service remains authoritative during

@@ -4,6 +4,13 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_root="$repo_root/.work/upstreams"
 context_root="$repo_root/.work/build-contexts"
+temporary=
+cleanup() {
+  if [ -n "$temporary" ]; then
+    rm -rf -- "$temporary"
+  fi
+}
+trap cleanup EXIT HUP INT TERM
 
 for source_name in vllm b12x flashinfer cutlass; do
   source_path="$source_root/$source_name"
@@ -12,9 +19,26 @@ for source_name in vllm b12x flashinfer cutlass; do
     echo "missing prepared source: $source_path" >&2
     exit 1
   fi
-  mkdir -p "$destination"
+  git -C "$source_path" diff --check
+  git -C "$source_path" diff --cached --check
+  mkdir -p "$context_root"
+  temporary=$(mktemp -d "$context_root/.${source_name}.XXXXXX")
+  previous="$context_root/.${source_name}.previous.$$"
   rsync -a --delete \
     --exclude=.git \
     --exclude=__pycache__ \
-    "$source_path/" "$destination/"
+    "$source_path/" "$temporary/"
+  if [ -e "$destination" ]; then
+    mv -- "$destination" "$previous"
+  fi
+  if mv -- "$temporary" "$destination"; then
+    temporary=
+    rm -rf -- "$previous"
+  else
+    rm -rf -- "$temporary"
+    if [ -e "$previous" ]; then
+      mv -- "$previous" "$destination"
+    fi
+    exit 1
+  fi
 done

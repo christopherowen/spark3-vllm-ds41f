@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Read-only cluster control and reproducibility helpers."""
+"""Reproducible cluster control and build helpers."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -89,14 +91,101 @@ def rendered_docker_command(cluster: dict, node: dict) -> list[str]:
     return command
 
 
-def run_ssh(node: str, *command: str) -> subprocess.CompletedProcess[str]:
+def ssh_target(nodes: dict, node: dict) -> str:
+    return f"{nodes['ssh_user']}@{node.get('ssh_host', node['name'])}"
+
+
+def run_ssh(nodes: dict, node: dict, *command: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["ssh", node, shlex.join(command)],
+        [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            ssh_target(nodes, node),
+            shlex.join(command),
+        ],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
     )
+
+
+def remote_shell(nodes: dict, node: dict, script: str) -> subprocess.CompletedProcess[str]:
+    return run_ssh(nodes, node, "bash", "-lc", script)
+
+
+def repository_path(cluster: dict) -> str:
+    return cluster["deployment"]["path"].format(home=cluster["host"]["home"])
+
+
+def repository_revision(revision: str = "HEAD") -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{revision}^{{commit}}"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode:
+        raise SystemExit(result.stderr.strip() or f"cannot resolve {revision!r}")
+    return result.stdout.strip()
+
+
+def repository_dirty() -> str:
+    result = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode:
+        raise SystemExit(result.stderr.strip() or "cannot inspect repository status")
+    return result.stdout.strip()
+
+
+def tracked_secret_problems() -> list[str]:
+    result = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode:
+        return ["cannot enumerate tracked files for secret checks"]
+    paths = [Path(item.decode()) for item in result.stdout.split(b"\0") if item]
+    forbidden_names = {".env", "id_rsa", "id_ed25519", "credentials.json"}
+    forbidden_suffixes = (".pem", ".key", ".local.env", ".local.json")
+    signatures = (
+        b"-----BEGIN " + b"PRIVATE KEY-----",
+        b"-----BEGIN OPENSSH " + b"PRIVATE KEY-----",
+    )
+    token_patterns = (
+        re.compile(rb"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+        re.compile(rb"\bghp_[A-Za-z0-9]{20,}\b"),
+        re.compile(rb"\bhf_[A-Za-z0-9]{20,}\b"),
+        re.compile(rb"\btskey-[A-Za-z0-9-]{20,}\b"),
+    )
+    problems: list[str] = []
+    for relative in paths:
+        if relative.name in forbidden_names or relative.name.endswith(forbidden_suffixes):
+            problems.append(f"tracked secret-like path: {relative}")
+            continue
+        candidate = ROOT / relative
+        if not candidate.is_file() or candidate.stat().st_size > 2 * 1024 * 1024:
+            continue
+        contents = candidate.read_bytes()
+        if any(signature in contents for signature in signatures) or any(
+            pattern.search(contents) for pattern in token_patterns
+        ):
+            problems.append(f"tracked file contains a secret-like signature: {relative}")
+    return problems
 
 
 def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
@@ -109,6 +198,10 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
         problems.append("exactly one node must be the API head")
     if cluster.get("promoted_baseline") != upstreams.get("generated_from_baseline"):
         problems.append("cluster and upstream locks name different baselines")
+    deployment = cluster.get("deployment", {})
+    for key in ("repository", "branch", "path", "ready_url", "ready_timeout_seconds"):
+        if not deployment.get(key):
+            problems.append(f"deployment.{key} is not configured")
     for name, source in upstreams["sources"].items():
         if not source.get("upstream"):
             problems.append(f"{name}: canonical upstream is not recorded")
@@ -137,6 +230,13 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
         actual = patchset_sha256(upstreams["sources"][name])
         if wanted != actual:
             problems.append(f"{name}: patch-set fingerprint differs from source manifest")
+    for relative, wanted in source_manifest.get("deployment_artifacts", {}).items():
+        candidate = ROOT / relative
+        if not candidate.is_file():
+            problems.append(f"missing deployment artifact {relative}")
+        elif sha256(candidate) != wanted:
+            problems.append(f"deployment artifact differs from manifest: {relative}")
+    problems.extend(tracked_secret_problems())
     return problems
 
 
@@ -144,7 +244,7 @@ def live_doctor(cluster: dict, nodes: dict) -> list[str]:
     problems: list[str] = []
     name = cluster["container"]["name"]
     for node in nodes["nodes"]:
-        result = run_ssh(node["name"], "docker", "inspect", name)
+        result = run_ssh(nodes, node, "docker", "inspect", name)
         if result.returncode:
             problems.append(f"{node['name']}: cannot inspect {name}: {result.stderr.strip()}")
             continue
@@ -166,7 +266,8 @@ def live_doctor(cluster: dict, nodes: dict) -> list[str]:
                     f"{node['name']}: {key}={actual_env.get(key)!r}, expected {wanted!r}"
                 )
         label_result = run_ssh(
-            node["name"],
+            nodes,
+            node,
             "docker",
             "image",
             "inspect",
@@ -203,7 +304,8 @@ def command_status(_: argparse.Namespace) -> int:
     failed = False
     for node in nodes["nodes"]:
         result = run_ssh(
-            node["name"],
+            nodes,
+            node,
             "docker",
             "ps",
             "--filter",
@@ -211,9 +313,407 @@ def command_status(_: argparse.Namespace) -> int:
             "--format",
             "{{.Names}}|{{.Image}}|{{.Status}}",
         )
+        guard = run_ssh(
+            nodes,
+            node,
+            "systemctl",
+            "is-active",
+            f"{name}-memguard.service",
+        )
         output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
-        print(f"{node['name']}\t{output or 'not running'}")
+        guard_state = guard.stdout.strip() if guard.returncode == 0 else "inactive"
+        print(f"{node['name']}\t{output or 'not running'}\tmemguard={guard_state}")
         failed |= result.returncode != 0 or not bool(result.stdout.strip())
+    return int(failed)
+
+
+def deployment_order(nodes: dict) -> list[dict]:
+    workers = sorted(
+        (node for node in nodes["nodes"] if not node["head"]),
+        key=lambda node: node["rank"],
+    )
+    heads = [node for node in nodes["nodes"] if node["head"]]
+    return workers + heads
+
+
+def require_local_deployment_state(cluster: dict, nodes: dict, upstreams: dict) -> str:
+    problems = local_doctor(cluster, nodes, upstreams)
+    dirty = repository_dirty()
+    if dirty:
+        problems.append("deployment requires a clean local repository")
+    if problems:
+        for problem in problems:
+            print(f"ERROR: {problem}", file=sys.stderr)
+        raise SystemExit(1)
+    return repository_revision()
+
+
+def normalized_repository_url(url: str) -> str:
+    return url.rstrip("/").removesuffix(".git")
+
+
+def remote_repository_state(
+    cluster: dict, nodes: dict, node: dict
+) -> tuple[str, str, str]:
+    path = shlex.quote(repository_path(cluster))
+    result = remote_shell(
+        nodes,
+        node,
+        f"cd {path} && printf '%s\\n' \"$(git rev-parse HEAD)\" && "
+        "git remote get-url origin && "
+        "git status --porcelain --untracked-files=all",
+    )
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"{node['name']}: cannot inspect checkout: {detail}")
+    lines = result.stdout.splitlines()
+    if len(lines) < 2:
+        raise RuntimeError(f"{node['name']}: checkout returned incomplete identity")
+    return lines[0], lines[1], "\n".join(lines[2:]).strip()
+
+
+def remote_runtime_problems(
+    cluster: dict,
+    nodes: dict,
+    revision: str,
+    *,
+    allow_existing: bool,
+) -> list[str]:
+    problems: list[str] = []
+    repo = repository_path(cluster)
+    name = cluster["container"]["name"]
+    for node in nodes["nodes"]:
+        try:
+            remote_revision, remote_origin, dirty = remote_repository_state(
+                cluster, nodes, node
+            )
+        except RuntimeError as error:
+            problems.append(str(error))
+            continue
+        if remote_revision != revision:
+            problems.append(
+                f"{node['name']}: checkout {remote_revision} differs from deployment {revision}"
+            )
+        if normalized_repository_url(remote_origin) != normalized_repository_url(
+            cluster["deployment"]["repository"]
+        ):
+            problems.append(
+                f"{node['name']}: origin {remote_origin!r} differs from deployment repository"
+            )
+        if dirty:
+            problems.append(f"{node['name']}: checkout has uncommitted files")
+        doctor = run_ssh(nodes, node, f"{repo}/bin/spark3", "doctor")
+        if doctor.returncode:
+            detail = doctor.stdout.strip() or doctor.stderr.strip()
+            problems.append(f"{node['name']}: repository doctor failed: {detail}")
+        for source, _, mode in cluster["container"]["mounts"]:
+            source = source.format(home=cluster["host"]["home"])
+            test = "-w" if mode == "rw" else "-r"
+            exists = run_ssh(nodes, node, "test", test, source)
+            if exists.returncode:
+                problems.append(
+                    f"{node['name']}: {mode} mount source is unavailable: {source}"
+                )
+        image = run_ssh(
+            nodes,
+            node,
+            "docker",
+            "image",
+            "inspect",
+            cluster["container"]["image"],
+        )
+        if image.returncode:
+            problems.append(
+                f"{node['name']}: image is unavailable: {cluster['container']['image']}"
+            )
+        else:
+            labels = json.loads(image.stdout)[0]["Config"].get("Labels") or {}
+            for key, wanted in cluster["container"]["expected_labels"].items():
+                if labels.get(key) != wanted:
+                    problems.append(
+                        f"{node['name']}: image label {key}={labels.get(key)!r}, "
+                        f"expected {wanted!r}"
+                    )
+        existing = run_ssh(nodes, node, "docker", "inspect", name)
+        if existing.returncode == 0 and not allow_existing:
+            problems.append(
+                f"{node['name']}: container {name} already exists; use --replace explicitly"
+            )
+        sudo = run_ssh(nodes, node, "sudo", "-n", "true")
+        if sudo.returncode:
+            problems.append(f"{node['name']}: passwordless sudo is unavailable for memguard")
+    return problems
+
+
+def command_cluster_sync(args: argparse.Namespace) -> int:
+    cluster, nodes, upstreams = configuration()
+    revision = repository_revision(args.revision or "HEAD")
+    path = repository_path(cluster)
+    for node in nodes["nodes"]:
+        print(f"{node['name']}: fetch origin and detach {path} at {revision}")
+    if not args.apply:
+        print("plan only; pass --apply to synchronize")
+        return 0
+
+    local_revision = require_local_deployment_state(cluster, nodes, upstreams)
+    if revision != local_revision and args.revision is None:
+        raise SystemExit("resolved deployment revision changed unexpectedly")
+    branch = cluster["deployment"]["branch"]
+    checked(["git", "fetch", "--quiet", "origin", branch], cwd=ROOT)
+    published = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", revision, f"origin/{branch}"],
+        cwd=ROOT,
+        check=False,
+    )
+    if published.returncode:
+        raise SystemExit(
+            f"refusing to deploy {revision}: it is not published on origin/{branch}"
+        )
+
+    previous: dict[str, str] = {}
+    for node in nodes["nodes"]:
+        try:
+            old_revision, remote_origin, dirty = remote_repository_state(
+                cluster, nodes, node
+            )
+        except RuntimeError as error:
+            raise SystemExit(str(error)) from error
+        if dirty:
+            raise SystemExit(
+                f"{node['name']}: checkout is dirty; preserve or remove its changes explicitly"
+            )
+        if normalized_repository_url(remote_origin) != normalized_repository_url(
+            cluster["deployment"]["repository"]
+        ):
+            raise SystemExit(
+                f"{node['name']}: origin {remote_origin!r} is not the configured repository"
+            )
+        previous[node["name"]] = old_revision
+
+    quoted_path = shlex.quote(path)
+    fetch_script = (
+        f"cd {quoted_path} && git fetch --quiet --prune origin {shlex.quote(branch)} && "
+        f"git cat-file -e {shlex.quote(revision)}^{{commit}}"
+    )
+    for node in nodes["nodes"]:
+        result = remote_shell(nodes, node, fetch_script)
+        if result.returncode:
+            detail = result.stderr.strip() or result.stdout.strip()
+            raise SystemExit(f"{node['name']}: fetch failed: {detail}")
+
+    changed: list[dict] = []
+    try:
+        for node in nodes["nodes"]:
+            checkout = remote_shell(
+                nodes,
+                node,
+                f"cd {quoted_path} && git checkout --quiet --detach {shlex.quote(revision)}",
+            )
+            if checkout.returncode:
+                detail = checkout.stderr.strip() or checkout.stdout.strip()
+                raise RuntimeError(f"{node['name']}: checkout failed: {detail}")
+            changed.append(node)
+            doctor = run_ssh(nodes, node, f"{path}/bin/spark3", "doctor")
+            if doctor.returncode:
+                detail = doctor.stdout.strip() or doctor.stderr.strip()
+                raise RuntimeError(f"{node['name']}: doctor failed after checkout: {detail}")
+    except RuntimeError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        print("rolling changed checkouts back", file=sys.stderr)
+        for node in reversed(changed):
+            remote_shell(
+                nodes,
+                node,
+                f"cd {quoted_path} && git checkout --quiet --detach "
+                f"{shlex.quote(previous[node['name']])}",
+            )
+        return 1
+
+    print(f"all nodes now use deployment commit {revision}")
+    return 0
+
+
+def stop_memguard(cluster: dict, nodes: dict, node: dict) -> subprocess.CompletedProcess[str]:
+    unit = f"{cluster['container']['name']}-memguard.service"
+    return run_ssh(nodes, node, "sudo", "-n", "systemctl", "stop", unit)
+
+
+def memguard_is_active(cluster: dict, nodes: dict, node: dict) -> bool:
+    unit = f"{cluster['container']['name']}-memguard.service"
+    result = run_ssh(nodes, node, "systemctl", "is-active", "--quiet", unit)
+    return result.returncode == 0
+
+
+def wait_for_api(cluster: dict, nodes: dict) -> None:
+    head = next(node for node in nodes["nodes"] if node["head"])
+    url = cluster["deployment"]["ready_url"]
+    timeout = int(cluster["deployment"]["ready_timeout_seconds"])
+    deadline = time.monotonic() + timeout
+    print(f"waiting up to {timeout}s for {head['name']} API readiness", flush=True)
+    while time.monotonic() < deadline:
+        result = run_ssh(
+            nodes,
+            head,
+            "curl",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--max-time",
+            "3",
+            url,
+        )
+        if result.returncode == 0:
+            print("API ready; JIT/autotuning startup has completed", flush=True)
+            return
+        time.sleep(10)
+    raise RuntimeError(f"API did not become ready within {timeout}s")
+
+
+def start_memguards(cluster: dict, nodes: dict) -> None:
+    script = f"{repository_path(cluster)}/scripts/memguard-start.sh"
+    for node in nodes["nodes"]:
+        result = run_ssh(nodes, node, script)
+        if result.returncode:
+            detail = result.stderr.strip() or result.stdout.strip()
+            raise RuntimeError(f"{node['name']}: cannot arm memguard: {detail}")
+        print(f"{node['name']}: {result.stdout.strip()}")
+
+
+def restore_containers(
+    cluster: dict,
+    nodes: dict,
+    backups: dict[str, str],
+    started: list[dict],
+) -> None:
+    name = cluster["container"]["name"]
+    for node in nodes["nodes"]:
+        stop_memguard(cluster, nodes, node)
+    for node in started:
+        run_ssh(nodes, node, "docker", "rm", "--force", name)
+    for node in deployment_order(nodes):
+        backup = backups.get(node["name"])
+        if not backup:
+            continue
+        renamed = run_ssh(nodes, node, "docker", "rename", backup, name)
+        if renamed.returncode:
+            print(f"WARN: {node['name']}: could not restore container name", file=sys.stderr)
+            continue
+        start_result = run_ssh(nodes, node, "docker", "start", name)
+        if start_result.returncode:
+            print(f"WARN: {node['name']}: could not restart previous container", file=sys.stderr)
+
+
+def command_cluster_start(args: argparse.Namespace) -> int:
+    cluster, nodes, upstreams = configuration()
+    name = cluster["container"]["name"]
+    order = deployment_order(nodes)
+    print("start plan (memory guards remain off until API readiness):")
+    for node in order:
+        print(f"  {node['name']}: {shlex.join(rendered_docker_command(cluster, node))}")
+    print("  wait for API/JIT readiness, then arm memguard on every node")
+    if not args.apply:
+        print("plan only; pass --apply to start the cluster")
+        return 0
+
+    revision = require_local_deployment_state(cluster, nodes, upstreams)
+    problems = remote_runtime_problems(
+        cluster,
+        nodes,
+        revision,
+        allow_existing=args.replace,
+    )
+    if problems:
+        for problem in problems:
+            print(f"ERROR: {problem}", file=sys.stderr)
+        return 1
+
+    backup_suffix = f"pre-{int(time.time())}"
+    backups: dict[str, str] = {}
+    started: list[dict] = []
+    try:
+        for node in nodes["nodes"]:
+            stop_memguard(cluster, nodes, node)
+            if memguard_is_active(cluster, nodes, node):
+                raise RuntimeError(
+                    f"{node['name']}: memguard is still active; refusing JIT startup"
+                )
+        if args.replace:
+            for node in nodes["nodes"]:
+                exists = run_ssh(nodes, node, "docker", "inspect", name)
+                if exists.returncode:
+                    continue
+                backup = f"{name}-{backup_suffix}"
+                stopped = run_ssh(nodes, node, "docker", "stop", "--time", "60", name)
+                if stopped.returncode:
+                    raise RuntimeError(f"{node['name']}: could not stop {name}")
+                renamed = run_ssh(nodes, node, "docker", "rename", name, backup)
+                if renamed.returncode:
+                    run_ssh(nodes, node, "docker", "start", name)
+                    raise RuntimeError(f"{node['name']}: could not preserve {name}")
+                backups[node["name"]] = backup
+        for node in order:
+            result = run_ssh(nodes, node, *rendered_docker_command(cluster, node))
+            if result.returncode:
+                detail = result.stderr.strip() or result.stdout.strip()
+                raise RuntimeError(f"{node['name']}: launch failed: {detail}")
+            started.append(node)
+            print(f"{node['name']}: launched {result.stdout.strip()}", flush=True)
+        wait_for_api(cluster, nodes)
+        start_memguards(cluster, nodes)
+    except RuntimeError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        print("rolling back containers started by this command", file=sys.stderr)
+        restore_containers(cluster, nodes, backups, started)
+        if backups:
+            try:
+                wait_for_api(cluster, nodes)
+                start_memguards(cluster, nodes)
+            except RuntimeError as rollback_error:
+                print(f"WARN: rollback health check failed: {rollback_error}", file=sys.stderr)
+        return 1
+
+    for node in nodes["nodes"]:
+        backup = backups.get(node["name"])
+        if backup:
+            result = run_ssh(nodes, node, "docker", "rm", backup)
+            if result.returncode:
+                print(f"WARN: {node['name']}: retained backup container {backup}")
+    print("cluster ready; memory guards are active on all nodes")
+    return 0
+
+
+def command_cluster_stop(args: argparse.Namespace) -> int:
+    cluster, nodes, _ = configuration()
+    name = cluster["container"]["name"]
+    action = "stop and remove" if args.remove else "stop"
+    for node in nodes["nodes"]:
+        print(f"{node['name']}: {action} exact container {name} and stop its memguard")
+    if not args.apply:
+        print("plan only; pass --apply to stop the cluster")
+        return 0
+
+    failed = False
+    for node in nodes["nodes"]:
+        guard = stop_memguard(cluster, nodes, node)
+        if memguard_is_active(cluster, nodes, node):
+            detail = guard.stderr.strip() or "unit remains active"
+            print(f"ERROR: {node['name']}: could not stop memguard: {detail}", file=sys.stderr)
+            failed = True
+            continue
+        exists = run_ssh(nodes, node, "docker", "inspect", name)
+        if exists.returncode:
+            print(f"{node['name']}: {name} is already absent")
+            continue
+        stopped = run_ssh(nodes, node, "docker", "stop", "--time", "60", name)
+        if stopped.returncode:
+            print(f"ERROR: {node['name']}: {stopped.stderr.strip()}", file=sys.stderr)
+            failed = True
+            continue
+        if args.remove:
+            removed = run_ssh(nodes, node, "docker", "rm", name)
+            if removed.returncode:
+                print(f"ERROR: {node['name']}: {removed.stderr.strip()}", file=sys.stderr)
+                failed = True
     return int(failed)
 
 
@@ -354,6 +854,7 @@ def patchset_sha256(source: dict) -> str:
 def build_input_problems() -> list[str]:
     problems: list[str] = []
     _, _, upstreams = configuration()
+    source_manifest = read_json("manifests/sources/2026-09-20-active-source.json")
     for name, path in BUILD_CONTEXTS.items():
         if not path.is_dir():
             problems.append(f"missing {name}: {path}")
@@ -410,18 +911,33 @@ def build_input_problems() -> list[str]:
                 for line in submodules.stdout.splitlines()
             ):
                 problems.append(f"{name}: pinned submodules are not fully initialized")
-        if not source.get("patch_series") and not source.get("applied_upstream_commits"):
-            status = subprocess.run(
-                ["git", "status", "--porcelain", "--untracked-files=all"],
-                cwd=path,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-            )
-            if status.returncode or status.stdout.strip():
-                problems.append(f"{name}: unrecorded source changes are present")
-    source_manifest = read_json("manifests/sources/2026-09-20-active-source.json")
+        changed = subprocess.run(
+            ["git", "diff", "HEAD", "--name-only", "-z"],
+            cwd=path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            cwd=path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if changed.returncode or untracked.returncode:
+            problems.append(f"{name}: cannot enumerate prepared source changes")
+        else:
+            actual_paths = {
+                item.decode()
+                for item in changed.stdout.split(b"\0") + untracked.stdout.split(b"\0")
+                if item
+            }
+            expected_paths = set(source_manifest.get(name, {}).get("verified_files", {}))
+            for relative in sorted(actual_paths - expected_paths):
+                problems.append(f"{name}: unrecorded source change: {relative}")
+            for relative in sorted(expected_paths - actual_paths):
+                problems.append(f"{name}: recorded source change is absent: {relative}")
     for name in ("vllm", "b12x"):
         path = SOURCE_TREES[name]
         if not path.is_dir():
@@ -444,16 +960,20 @@ def build_input_problems() -> list[str]:
         found: set[str] = set()
         for wheel in wheels:
             normalized = wheel.name.replace("-", "_").lower()
+            matched = False
             for package in sorted(expected, key=len, reverse=True):
                 if normalized.startswith(package.lower() + "_"):
                     wanted = expected[package]
                     found.add(package)
+                    matched = True
                     actual = sha256(wheel)
                     if actual != wanted:
                         problems.append(
                             f"{wheel.name}: sha256 {actual} differs from lock {wanted}"
                         )
                     break
+            if not matched:
+                problems.append(f"unlocked wheel is present: {wheel.name}")
         for package in sorted(set(expected) - found):
             problems.append(f"missing locked wheel for {package}")
     return problems
@@ -469,23 +989,24 @@ def command_build(args: argparse.Namespace) -> int:
         print("build inputs OK")
         return 0
 
+    problems = build_input_problems()
+    if problems:
+        for problem in problems:
+            print(f"WARN: {problem}")
+        return 1
+    dirty = repository_dirty()
+    if dirty:
+        print("WARN: image rendering requires a clean deployment repository")
+        return 1
+
     _, _, upstreams = configuration()
     vllm = upstreams["sources"]["vllm"]["revision"][:12]
     b12x = upstreams["sources"]["b12x"]["revision"][:12]
-    revision_result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        check=False,
+    deployment_revision = repository_revision()
+    tag = (
+        "ghcr.io/christopherowen/spark3-vllm-ds41f:"
+        f"vllm-{vllm}-b12x-{b12x}-deploy-{deployment_revision[:12]}"
     )
-    repository_revision = (
-        revision_result.stdout.strip()
-        if revision_result.returncode == 0
-        else "uncommitted"
-    )
-    tag = f"ghcr.io/christopherowen/spark3-vllm-ds41f:vllm-{vllm}-b12x-{b12x}"
     command = [
         "docker",
         "buildx",
@@ -494,7 +1015,7 @@ def command_build(args: argparse.Namespace) -> int:
         "--file=docker/Dockerfile",
         "--target=runtime",
         f"--tag={tag}",
-        f"--build-arg=DEPLOYMENT_COMMIT={repository_revision}",
+        f"--build-arg=DEPLOYMENT_COMMIT={deployment_revision}",
         "--build-arg=VLLM_COMMIT=" + upstreams["sources"]["vllm"]["revision"],
         "--build-arg=B12X_COMMIT=" + upstreams["sources"]["b12x"]["revision"],
         "--build-arg=B12X_UPSTREAM_PATCHES="
@@ -528,6 +1049,38 @@ def parser() -> argparse.ArgumentParser:
     doctor.set_defaults(func=command_doctor)
     status = commands.add_parser("status", help="show the three live containers")
     status.set_defaults(func=command_status)
+    cluster = commands.add_parser(
+        "cluster", help="plan or apply coordinated three-node operations"
+    )
+    cluster_commands = cluster.add_subparsers(dest="cluster_command", required=True)
+    cluster_sync = cluster_commands.add_parser(
+        "sync", help="detach every clean node checkout at one published commit"
+    )
+    cluster_sync.add_argument("--revision", help="published commit; defaults to local HEAD")
+    cluster_sync.add_argument(
+        "--apply", action="store_true", help="perform the planned synchronization"
+    )
+    cluster_sync.set_defaults(func=command_cluster_sync)
+    cluster_start = cluster_commands.add_parser(
+        "start", help="preflight and start workers, head, then memory guards"
+    )
+    cluster_start.add_argument(
+        "--replace", action="store_true", help="replace existing exact containers"
+    )
+    cluster_start.add_argument(
+        "--apply", action="store_true", help="perform the planned coordinated start"
+    )
+    cluster_start.set_defaults(func=command_cluster_start)
+    cluster_stop = cluster_commands.add_parser(
+        "stop", help="stop the exact promoted container on every node"
+    )
+    cluster_stop.add_argument(
+        "--remove", action="store_true", help="remove stopped containers as well"
+    )
+    cluster_stop.add_argument(
+        "--apply", action="store_true", help="perform the planned coordinated stop"
+    )
+    cluster_stop.set_defaults(func=command_cluster_stop)
     render = commands.add_parser("render", help="render, but do not execute, one rank launch")
     render.add_argument("node", choices=("dgx1", "dgx2", "dgx3"))
     render.set_defaults(func=command_render)

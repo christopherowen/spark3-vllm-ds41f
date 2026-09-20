@@ -19,3 +19,8 @@ After an upstream merge, advance the pinned commit, remove any now-redundant
 local patch, rebuild one immutable image, and qualify it as an experiment before
 promotion. Preserve the upstream pull-request link and benchmark receipts in the
 promotion commit.
+
+Operational changes are deployed only from a clean, published commit with
+`bin/spark3 cluster sync --apply`. Do not add credentials, node-local environment
+files, caches, or private benchmark inputs, and do not synchronize a working tree
+with rsync or scp.

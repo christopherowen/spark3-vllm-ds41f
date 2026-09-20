@@ -21,9 +21,10 @@
       "b12x/comm/roce/_proxy.py": "a18f2c2966d4818e47530bd92b79ad3a22221a985dd572d3cee48ac8eb268ef9",
       "b12x/comm/roce/_roce_proxy.c": "1cf5f9dbba9e48ef1d7b4143e6fa379aa8b6a237385896974c8e71ffb83c5a9d",
       "b12x/comm/roce/roce_oneshot.py": "0f06fe79ed61a6bb61234b7a9017d5df6010637d224be870a55063cbae47615e",
-      "b12x/norm/mhc/_policy.py": "e9d87256af5b08bb172bb3f169d4f2779752b9231e588f1ee85425b11479dc46"
+      "b12x/norm/mhc/_policy.py": "e9d87256af5b08bb172bb3f169d4f2779752b9231e588f1ee85425b11479dc46",
+      "tests/quantization/test_e4m3_decode.py": "98010031ba86740633c505a0c0ffb8dddfda5260853a7ccbd65f1718080e0623"
     },
-    "verification": "fresh pinned checkout plus upstream fix and ordered local series matches every modified file in the live image"
+    "verification": "fresh pinned checkout plus upstream fix and ordered local series matches every modified runtime file and its added regression test"
   },
   "runtime_foundation": {
     "vllm_base_image_digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
@@ -37,5 +38,9 @@
     "cutlass_dsl_version": "4.6.2",
     "cutlass_dsl_lockfile": "requirements/cutlass-dsl-aarch64.txt",
     "cutlass_dsl_verification": "all five live wheel files were captured by filename and SHA-256"
+  },
+  "deployment_artifacts": {
+    "state/config.json": "105c0bb119c844fc0d4d10c0665edba73a21c7aee695862ad07a9c78c0145096",
+    "state/indexer.py": "aaccd55ab9aaacddd647717b0917a9cdf13916c0940da236887e90baa84edcf2"
   }
 }
