@@ -86,6 +86,12 @@ commit `d878afb20dc3aa1d8f68a3a2ed94d1158520cc1a` restores that path only when
 Engram is disk-backed. A composed regression enters through the parent loader,
 and an inventory confirms the Engram weight and scale are the only DS4.1
 checkpoint tensors represented by deliberately absent parameters.
+The configured checkpoint advertises the multimodal architecture even in
+language-only mode, so the default loader queries the outer VL model for this
+filter. Follow-up commit `a3964182327ec2b9a06146f1f2a49f1dd942eb51`
+restores the donor's delegation to the inner language model. Its regression
+starts with the raw checkpoint name and passes the immutable descriptor through
+the real outer mapper, inner loader, backbone, and leaf module.
 
 ## Two-stage qualification
 

@@ -1,0 +1,118 @@
+From a3964182327ec2b9a06146f1f2a49f1dd942eb51 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 01:57:39 +0200
+Subject: [PATCH] fix(deepseek-v41): expose disk Engram filter through VL
+ wrapper
+
+---
+ tests/models/test_deepseek_v41_b12x.py      | 67 ++++++++++++++++++++-
+ vllm/models/deepseek_v41/nvidia/vl_model.py |  3 +
+ 2 files changed, 69 insertions(+), 1 deletion(-)
+
+diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
+index c1096e3109..d0a1882ba8 100644
+--- a/tests/models/test_deepseek_v41_b12x.py
++++ b/tests/models/test_deepseek_v41_b12x.py
+@@ -8,8 +8,13 @@ import torch
+ 
+ import vllm.models.deepseek_v41.nvidia.b12x_attention as b12x_attention
+ import vllm.models.deepseek_v41.nvidia.model as nvidia_model
++import vllm.models.deepseek_v41.nvidia.vl_model as vl_model
+ from vllm.model_executor.model_loader.weight_utils import file_source_tensor
+-from vllm.model_executor.weight_transfer import FileTensorSource
++from vllm.model_executor.models.utils import WeightsMapper
++from vllm.model_executor.weight_transfer import (
++    FileTensorSource,
++    get_file_tensor_source,
++)
+ from vllm.models.deepseek_v41.attention import _use_v41_mxfp8_kv_record
+ from vllm.models.deepseek_v41.nvidia.b12x_attention import (
+     DeepseekV41B12xAttention,
+@@ -21,6 +26,9 @@ from vllm.models.deepseek_v41.nvidia.model import (
+     DeepseekV4Model,
+     DeepseekV41LLMForCausalLM,
+ )
++from vllm.models.deepseek_v41.nvidia.vl_model import (
++    DeepseekV41ForCausalLM as DeepseekV41VLForCausalLM,
++)
+ from vllm.platforms.interface import DeviceCapability
+ from vllm.v1.attention.backends.registry import AttentionBackendEnum
+ 
+@@ -228,3 +236,60 @@ def test_disk_engram_descriptor_reaches_leaf_loader(monkeypatch) -> None:
+         ("weight", weight_descriptor),
+         ("weight_scale_inv", scale_descriptor),
+     ]
++
++
++def test_outer_model_preserves_disk_engram_descriptor_to_leaf(monkeypatch) -> None:
++    class RecordingEmbedding(torch.nn.Module):
++        def __init__(self) -> None:
++            super().__init__()
++            self.received: list[tuple[str, torch.Tensor]] = []
++
++        def load_weights(self, weights) -> set[str]:
++            current = list(weights)
++            assert all(
++                get_file_tensor_source(value) is not None for _name, value in current
++            )
++            self.received.extend(current)
++            return {name for name, _value in current}
++
++    backbone = object.__new__(DeepseekV4Model)
++    torch.nn.Module.__init__(backbone)
++    embedding = RecordingEmbedding()
++    layer = torch.nn.Module()
++    layer.engram = torch.nn.Module()
++    layer.engram.embed_tokens = embedding
++    backbone.layers = torch.nn.ModuleList([torch.nn.Identity(), layer])
++    backbone.disk_engram = True
++    backbone.config = SimpleNamespace(num_attention_heads=24)
++    backbone.quant_config = None
++    backbone.use_sequence_parallel = False
++    backbone.get_expert_mapping = lambda: []
++    backbone.finalize_mega_moe_weights = lambda: None
++    backbone.finalize_mhc_broadcast_weights = lambda: None
++    backbone.finalize_mega_attn_weights = lambda: None
++
++    language_model = object.__new__(DeepseekV41LLMForCausalLM)
++    torch.nn.Module.__init__(language_model)
++    language_model.model = backbone
++    language_model.hf_to_vllm_mapper = WeightsMapper()
++
++    outer = object.__new__(DeepseekV41VLForCausalLM)
++    torch.nn.Module.__init__(outer)
++    outer.language_model = language_model
++    outer.hf_to_vllm_mapper = vl_model._make_deepseek_v4_vl_weights_mapper(
++        "fp4", "weight_scale"
++    )
++
++    monkeypatch.setattr(nvidia_model, "get_tensor_model_parallel_world_size", lambda: 3)
++    monkeypatch.setattr(nvidia_model, "get_tensor_model_parallel_rank", lambda: 0)
++    monkeypatch.setattr(nvidia_model, "is_pp_missing_parameter", lambda *_args: False)
++    raw_name = "layers.1.engram.embed.weight"
++    descriptor = file_source_tensor(
++        FileTensorSource("weights.safetensors", 4096, (7, 256), torch.float8_e4m3fn)
++    )
++
++    assert outer.checkpoint_file_weight_filter(raw_name)
++    loaded = outer.load_weights(((raw_name, descriptor),))
++
++    assert "language_model.model.layers.1.engram.embed_tokens.weight" in loaded
++    assert embedding.received == [("weight", descriptor)]
+diff --git a/vllm/models/deepseek_v41/nvidia/vl_model.py b/vllm/models/deepseek_v41/nvidia/vl_model.py
+index 824c907e74..6321fb7ef3 100644
+--- a/vllm/models/deepseek_v41/nvidia/vl_model.py
++++ b/vllm/models/deepseek_v41/nvidia/vl_model.py
+@@ -328,6 +328,9 @@ class DeepseekV41ForCausalLM(nn.Module, SupportsMultiModal, SupportsPP, Supports
+         """Pre-hc_head residual stream buffer for the MTP/DSpark draft model."""
+         return self.language_model.get_mtp_target_hidden_states()
+ 
++    def checkpoint_file_weight_filter(self, name: str) -> bool:
++        return self.language_model.checkpoint_file_weight_filter(name)
++
+     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
+         # Map HF names into this wrapper's namespace up front and sort, so
+         # the "language_model." group reaches the child loader as one
+-- 
+2.54.0 (Apple Git-157)
+

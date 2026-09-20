@@ -1,5 +1,5 @@
 {
-  "status": "disk-engram-parent-routing-image-qualified-pending-launch",
+  "status": "outer-vl-disk-engram-filter-source-qualified-pending-image",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all twelve vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities e8ed4c7f209d and a1523b067b4d",
+    "deterministic_source_preparer": "all thirteen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities d2ca0cf2e6f5 and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -46,7 +46,9 @@
     "eighth_full_launch": "passed all earlier boundaries including ModelOpt virtual-head composition, then failed when the parent DeepSeek loader treated a deliberately nonresident disk Engram descriptor as an ordinary parameter; reproduced twice without OOM or host instability",
     "disk_engram_parent_routing_resolution": "restored the working pre-rebase parent-to-leaf handoff for disk-backed Engram only; both native table descriptors now reach the leaf DiskTable loader without allocating the 47 GiB per-rank table, and the composed parent-loader regression plus all 18 focused DS4.1 tests pass on GB10",
     "disk_engram_parent_routing_image": "sha256:ad8a2eb74d80fb6a9efa117e314adf0e8b75058b760d893b30c6a5a24e0d7e75 has exact deployment, vLLM, and B12X source labels and passed all 18 focused tests from the finished immutable image",
-    "disk_engram_parent_routing_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 94 seconds"
+    "disk_engram_parent_routing_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 94 seconds",
+    "ninth_full_launch": "proved the restored parent-to-leaf route executes, then failed because the real outer multimodal model did not expose the inner language model's file-backed checkpoint filter; B12X therefore read the native table before it reached the disk Engram leaf; no OOM occurred",
+    "outer_vl_disk_engram_filter_resolution": "restored the working VL wrapper delegation and added a full raw-name-to-leaf regression that exercises the outer filter, both mappers, inner parent loader, and immutable descriptor identity; all 19 focused DS4.1 tests pass on GB10"
   },
   "summary": {
     "ttft_seconds": null,
@@ -96,7 +98,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "disk-engram-parent-routing-image-qualified-pending-three-rank-serving-gates",
+    "status": "outer-vl-disk-engram-filter-pending-exact-replay-image-and-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

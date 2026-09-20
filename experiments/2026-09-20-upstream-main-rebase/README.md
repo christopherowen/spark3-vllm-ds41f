@@ -114,6 +114,15 @@ parameter or allocated in memory. A composed regression enters through
 nonresident DS4.1 checkpoint weights. The reproduced failure is recorded in
 `runs/launch-289f83bc7e59-disk-engram-parent-routing.json`.
 
+The parent-route-corrected image proved that handoff executes, then exposed the
+preceding wrapper boundary: even with image support disabled, the checkpoint
+advertises the VL architecture, so the default loader asks the outer model—not
+the inner language model—which raw tensors must remain file-backed. Patch 0013
+restores the working wrapper delegation. Its regression begins with the raw
+checkpoint name and verifies the unchanged file descriptor through the outer
+mapper, inner loader, backbone, and Engram leaf. The exact failure is recorded
+in `runs/launch-ad8a2eb74d80-outer-vl-engram-filter.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -177,10 +186,10 @@ SM121 qualification gates. Patch 0010 and the combined DS4.1 adapter suite
 passed on GB10, and full model loading then exposed its missing composition
 with ModelOpt's scale transform. Patch 0011 and the exact 160-to-5120 MXFP8
 scale regression pass on GB10. Patch 0012 then restores the omitted disk-Engram
-parent-to-leaf handoff and passes the composed loader regression plus all 18
-focused DS4.1 tests on GB10 in the immutable candidate image. The candidate is
-not promotable until full three-rank model-load, quality, capacity, and
-performance gates pass.
+parent-to-leaf handoff. Patch 0013 restores the preceding outer VL filter
+delegation, and the full raw-checkpoint-name-to-leaf regression plus all 19
+focused DS4.1 tests pass on GB10. The candidate is not promotable until full
+three-rank model-load, quality, capacity, and performance gates pass.
 
 ## Quality and safety gates
 

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "failed-before-disk-engram-descriptor-selection",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:d878afb20dc3-8099cee92c78-dcf21295db69c",
+    "id": "sha256:ad8a2eb74d80fb6a9efa117e314adf0e8b75058b760d893b30c6a5a24e0d7e75",
+    "source_revision": "cf21295db69c3cd822367725a3695143a9a8b2b2",
+    "launch_revision": "a63ade481e03e201458690a6a6ec1363d9d2820d"
+  },
+  "progress": [
+    "passed startup admission and all earlier model construction boundaries",
+    "initialized NCCL 2.30.7 and RoCEnante on all three ranks",
+    "selected the intended DS4.1 native kernels and disk Engram path",
+    "entered the restored parent-to-leaf Engram handoff"
+  ],
+  "failure": {
+    "file": "vllm/models/deepseek_v41/nvidia/engram.py",
+    "operation": "get_file_tensor_source(value)",
+    "message": "ValueError: disk Engram requires a file-backed checkpoint table",
+    "cause": "the default loader receives the outer VL model, but the rebase exposed the raw checkpoint filter only on the inner language model; B12X therefore read the table instead of preserving its immutable file descriptor",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "a3964182327ec2b9a06146f1f2a49f1dd942eb51",
+    "source_tree": "d2ca0cf2e6f5fbd79bf14b7158a1fd0452384966",
+    "behavior": "delegate raw checkpoint file-backed selection from the real outer VL model to its language model, preserving the existing exact filter",
+    "validation": "one regression exercises raw selection plus the outer mapper, inner loader, backbone parent route, and leaf descriptor identity; all 19 focused DS4.1 tests passed on GB10; the outer model method surface now matches the working image",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate containers were automatically removed; stopped promoted containers remain present on all three nodes"
+}
