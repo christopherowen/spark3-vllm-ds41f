@@ -95,6 +95,13 @@
       "added_to_watchlist": "2026-09-20",
       "role": "DSpark speculative-decoding and DGX Spark tuning ideas to evaluate against upstream vLLM"
     },
+    "rhys_ds41f_spark8": {
+      "kind": "git-watch",
+      "url": "https://github.com/rhys101/DeepSeek-V4.1-Flash-vLLM-DGX-Spark-8",
+      "observed_revision": "3ac7546756b86af18728485925c783b54023f803",
+      "added_to_watchlist": "2026-09-20",
+      "role": "eight-Spark native-prefill, resident-Engram, RoCE scaling, long-context acceptance, and earlier-vLLM reference; current headline results use SGLang"
+    },
     "jspark3_deepseek": {
       "kind": "git-watch",
       "url": "https://github.com/jakejharris/jspark3-deepseek",
