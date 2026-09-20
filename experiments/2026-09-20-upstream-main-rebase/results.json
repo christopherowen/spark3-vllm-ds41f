@@ -41,7 +41,8 @@
     "lazy_virtual_head_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 95 seconds",
     "seventh_full_launch": "materialized the lazy virtual-head source successfully but exposed that the wrapper bypassed ModelOpt's 32-row MXFP8 scale expansion: a final destination axis of 5120 received the raw 160-row scale group; no OOM occurred",
     "virtual_head_loader_composition_resolution": "each TP-local group is now passed through its original weight loader using a temporary destination view, preserving numerical transforms and preventing a second TP shard; duplicate final groups use one synchronized device copy and virtual zero groups remain unread; the exact raw-160-to-final-5120 ModelOpt regression and all 17 focused DS4.1 tests pass on GB10",
-    "virtual_head_loader_composition_image": "sha256:289f83bc7e59945dbaad43d9c4f1d42162399df732fa84dab5be57f1f65435d1 has exact deployment, vLLM, and B12X source labels and passed all 17 focused tests from the finished immutable image"
+    "virtual_head_loader_composition_image": "sha256:289f83bc7e59945dbaad43d9c4f1d42162399df732fa84dab5be57f1f65435d1 has exact deployment, vLLM, and B12X source labels and passed all 17 focused tests from the finished immutable image",
+    "virtual_head_loader_composition_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 96 seconds"
   },
   "summary": {
     "ttft_seconds": null,

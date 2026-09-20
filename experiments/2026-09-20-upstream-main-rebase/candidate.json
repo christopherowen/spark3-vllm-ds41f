@@ -61,7 +61,7 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:289f83bc7e59945dbaad43d9c4f1d42162399df732fa84dab5be57f1f65435d1",
-  "deployment_status": "virtual-head loader composition image target-qualified pending distribution and full-model-load retry; promoted rollback retained",
+  "deployment_status": "virtual-head loader composition image distributed with exact identity on all ranks; pending full-model-load retry; promoted rollback retained",
   "integration_status": {
     "status": "virtual-head source-group selection composes with the original ModelOpt and TP loader; exact 160-to-5120 MXFP8 regression and all 17 focused tests passed on GB10 in the immutable image",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
