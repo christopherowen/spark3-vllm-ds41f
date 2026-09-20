@@ -56,7 +56,7 @@ prepare \
   vllm \
   https://github.com/vllm-project/vllm.git \
   d05da62e9ccdf8e342b15bf6785d83224cc165af \
-  47dcfe31e38bfa0f7a8438902dda85773c341470 \
+  124dea53c3611e397f021f16ecd393419ee920f7 \
   patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch \
   patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch \
   patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch \
@@ -66,7 +66,8 @@ prepare \
   patches/vllm/0007-fix-deepseek-v41-avoid-B12X-warmup-module-cycle.patch \
   patches/vllm/0008-fix-deepseek-v41-route-custom-weights-through-loader.patch \
   patches/vllm/0009-fix-modelopt-materialize-lazy-MXFP8-scales-before-ex.patch \
-  patches/vllm/0010-fix-deepseek-v41-materialize-lazy-virtual-head-group.patch
+  patches/vllm/0010-fix-deepseek-v41-materialize-lazy-virtual-head-group.patch \
+  patches/vllm/0011-fix-deepseek-v41-compose-virtual-heads-with-weight-l.patch
 
 prepare \
   b12x \

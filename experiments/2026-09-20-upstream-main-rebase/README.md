@@ -94,6 +94,16 @@ zero-padding groups unread. Native values and the virtual-head arithmetic are
 unchanged. The exact failure is recorded in
 `runs/launch-3d7121b4d687-virtual-head-materialization.json`.
 
+The first materialization-corrected image proved that the selected lazy groups
+were readable, then exposed a composition error: the wrapper copied a raw
+160-row scale group directly into its final 5120-row destination and therefore
+bypassed ModelOpt's 32-row expansion. Patch 0011 delegates every selected group
+through its original loader using a temporary final-destination view. This
+retains all ModelOpt transforms, prevents a second TP shard, reuses a completed
+group for virtual duplicates, and still avoids reading virtual zero groups. The
+exact failure is recorded in
+`runs/launch-5e87113c2318-virtual-head-loader-composition.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -153,11 +163,11 @@ suppresses dependency conflicts, downgrades the vLLM environment, or mixes
 Python with native extensions from a different vLLM revision.
 
 [compatibility.md](compatibility.md) records the exact matrix and remaining
-SM121 qualification gates. The previous image passed prelaunch target checks
-and exposed the next isolated loader boundary during full model load. Patch
-0010 and the combined DS4.1 adapter suite now pass on GB10 in the new immutable
-image. The candidate is not promotable until full three-rank model-load,
-quality, capacity, and performance gates pass.
+SM121 qualification gates. Patch 0010 and the combined DS4.1 adapter suite
+passed on GB10, and full model loading then exposed its missing composition
+with ModelOpt's scale transform. Patch 0011 is source-qualified pending its
+target regression and immutable image build. The candidate is not promotable
+until full three-rank model-load, quality, capacity, and performance gates pass.
 
 ## Quality and safety gates
 

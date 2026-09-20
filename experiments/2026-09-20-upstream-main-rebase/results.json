@@ -1,5 +1,5 @@
 {
-  "status": "lazy-virtual-head-materialization-image-qualified-pending-launch",
+  "status": "virtual-head-loader-composition-source-qualified-pending-image",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all ten vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 47dcfe31e38b and a1523b067b4d",
+    "deterministic_source_preparer": "all eleven vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 124dea53c361 and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -38,7 +38,9 @@
     "sixth_full_launch": "passed startup admission, initialized NCCL 2.30.7 plus RoCEnante, selected the intended native kernels, built the Engram token map, and passed lazy MXFP8 scale expansion; it then failed when the TP3 virtual-head loader copied directly from a lazy meta checkpoint group; no OOM occurred",
     "lazy_virtual_head_resolution": "virtual-head loaders materialize only selected TP-local source groups through the generic checkpoint transform boundary and cache duplicated groups; zero-padding groups remain unread and model arithmetic is unchanged; Ruff, format, py_compile, source diff, direct lazy-source regression, and all 16 focused DS4.1 tests pass",
     "lazy_virtual_head_image": "sha256:5e87113c23187dfdd56caa71e2191096b73b1da9ac71d297155b458604e47d04 has exact deployment, vLLM, and B12X source labels and passed 16 focused DS4.1 virtual-head/B12X tests on GB10",
-    "lazy_virtual_head_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 95 seconds"
+    "lazy_virtual_head_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 95 seconds",
+    "seventh_full_launch": "materialized the lazy virtual-head source successfully but exposed that the wrapper bypassed ModelOpt's 32-row MXFP8 scale expansion: a final destination axis of 5120 received the raw 160-row scale group; no OOM occurred",
+    "virtual_head_loader_composition_resolution": "each TP-local group is now passed through its original weight loader using a temporary destination view, preserving numerical transforms and preventing a second TP shard; duplicate final groups use one synchronized device copy and virtual zero groups remain unread; Ruff, format, py_compile, and source diff checks pass"
   },
   "summary": {
     "ttft_seconds": null,
@@ -88,7 +90,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "lazy-virtual-head-materialization-image-qualified-pending-three-rank-serving-gates",
+    "status": "virtual-head-loader-composition-pending-target-test-image-and-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

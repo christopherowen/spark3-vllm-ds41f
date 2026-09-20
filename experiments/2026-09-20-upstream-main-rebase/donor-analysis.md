@@ -71,6 +71,12 @@ custom group selection. Candidate commit
 owned by the local TP rank, retains one owned copy per distinct group, and does
 not read groups whose destination is defined as zero. This preserves the native
 virtual-head mapping without falling back to eager checkpoint loading.
+Target loading then showed that group selection must compose with ModelOpt's
+scale expansion rather than replace the registered loader. Follow-up commit
+`164c5d5bde7869bff5f2004f01f9f8e432d63d59` passes each selected source group
+through that original loader while temporarily exposing only its final local
+destination. The original numerical transform remains authoritative and the
+group is not tensor-parallel sharded a second time.
 
 ## Two-stage qualification
 

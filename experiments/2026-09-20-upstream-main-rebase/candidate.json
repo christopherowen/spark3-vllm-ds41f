@@ -16,9 +16,10 @@
         "0fe6eed4b7b3a8bcc807d56cdd8a24021d13ea68",
         "e08ab6356e93f9cfc2087683b441c52997b5300e",
         "0ede60db3a362f7679419e40bfb3c94756e92ee7",
-        "18088aecd7bd1173217d9db31d0924f8c4beb832"
+        "18088aecd7bd1173217d9db31d0924f8c4beb832",
+        "164c5d5bde7869bff5f2004f01f9f8e432d63d59"
       ],
-      "source_tree": "47dcfe31e38bfa0f7a8438902dda85773c341470",
+      "source_tree": "124dea53c3611e397f021f16ecd393419ee920f7",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -30,7 +31,8 @@
         "patches/vllm/0007-fix-deepseek-v41-avoid-B12X-warmup-module-cycle.patch",
         "patches/vllm/0008-fix-deepseek-v41-route-custom-weights-through-loader.patch",
         "patches/vllm/0009-fix-modelopt-materialize-lazy-MXFP8-scales-before-ex.patch",
-        "patches/vllm/0010-fix-deepseek-v41-materialize-lazy-virtual-head-group.patch"
+        "patches/vllm/0010-fix-deepseek-v41-materialize-lazy-virtual-head-group.patch",
+        "patches/vllm/0011-fix-deepseek-v41-compose-virtual-heads-with-weight-l.patch"
       ]
     },
     {
@@ -58,10 +60,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:5e87113c23187dfdd56caa71e2191096b73b1da9ac71d297155b458604e47d04",
-  "deployment_status": "lazy virtual-head materialization image target-qualified pending distribution and full-model-load retry; promoted rollback retained",
+  "image_digest": null,
+  "deployment_status": "virtual-head loader composition source qualified pending target regression and immutable image build; promoted rollback retained",
   "integration_status": {
-    "status": "lazy virtual-head source-group materialization image built; 16 focused DS4.1 tests passed on GB10; pending distribution and full-model-load retry",
+    "status": "virtual-head source-group selection now composes with the original ModelOpt and TP loader; pending target regression and image build",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

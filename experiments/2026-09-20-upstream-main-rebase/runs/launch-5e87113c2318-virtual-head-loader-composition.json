@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "failed-during-virtual-head-scale-loader-composition",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:18088aecd7bd-8099cee92c78-d484526481938",
+    "id": "sha256:5e87113c23187dfdd56caa71e2191096b73b1da9ac71d297155b458604e47d04",
+    "source_revision": "48452648193830b3afedef55b6ceffa5f8a070fc",
+    "launch_revision": "c8b3059ad1803622b783d49e31584c3e5a59b1f8"
+  },
+  "progress": [
+    "passed startup admission and all earlier model construction boundaries",
+    "initialized NCCL 2.30.7 and RoCEnante on all three ranks",
+    "selected the intended DS4.1 native kernels and built the Engram token map",
+    "read selected virtual-head groups successfully through the lazy checkpoint materialization boundary"
+  ],
+  "failure": {
+    "file": "vllm/models/deepseek_v41/virtual_heads.py",
+    "operation": "destination.copy_(source)",
+    "message": "RuntimeError: The size of tensor a (5120) must match the size of tensor b (160) at non-singleton dimension 0",
+    "cause": "the wrapper copied a raw MXFP8 scale group directly and bypassed the registered ModelOpt 32-row expansion",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "164c5d5bde7869bff5f2004f01f9f8e432d63d59",
+    "source_tree": "124dea53c3611e397f021f16ecd393419ee920f7",
+    "behavior": "route each selected group through the original transform/loader into a temporary TP-local parameter view, then copy completed duplicates after transfer synchronization",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate containers were automatically removed; stopped promoted containers remain present on all three nodes"
+}

@@ -1,0 +1,216 @@
+From 164c5d5bde7869bff5f2004f01f9f8e432d63d59 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 01:21:12 +0200
+Subject: [PATCH] fix(deepseek-v41): compose virtual heads with weight loaders
+
+---
+ .../models/test_deepseek_v41_virtual_heads.py | 57 +++++++++++--
+ vllm/models/deepseek_v41/virtual_heads.py     | 80 ++++++++++++++-----
+ 2 files changed, 110 insertions(+), 27 deletions(-)
+
+diff --git a/tests/models/test_deepseek_v41_virtual_heads.py b/tests/models/test_deepseek_v41_virtual_heads.py
+index 37e9e07d55..e006f4c32b 100644
+--- a/tests/models/test_deepseek_v41_virtual_heads.py
++++ b/tests/models/test_deepseek_v41_virtual_heads.py
+@@ -6,7 +6,11 @@ from types import SimpleNamespace
+ import pytest
+ import torch
+ 
+-from vllm.model_executor.weight_transfer import weight_transfer
++from vllm.model_executor.weight_transfer import (
++    copy_weight,
++    materialize_weight,
++    weight_transfer,
++)
+ from vllm.models.deepseek_v41.virtual_heads import (
+     _E8M0,
+     _fill_zero_group,
+@@ -18,7 +22,7 @@ from vllm.models.deepseek_v41.virtual_heads import (
+ def _parameter(shape: tuple[int, ...], dimension: str, dim: int):
+     parameter = torch.nn.Parameter(torch.empty(shape), requires_grad=False)
+     setattr(parameter, dimension, dim)
+-    parameter.weight_loader = lambda param, weight: param.data.copy_(weight)
++    parameter.weight_loader = lambda param, weight: copy_weight(param.data, weight)
+     return parameter
+ 
+ 
+@@ -66,13 +70,51 @@ def test_duplicate_loader_maps_each_tp_rank(tp_rank, expected_groups) -> None:
+     assert torch.equal(parameter, weight[expected_groups])
+ 
+ 
+-def test_duplicate_loader_materializes_only_selected_lazy_groups() -> None:
++def test_duplicate_loader_routes_only_selected_lazy_groups() -> None:
+     parameter = _parameter((3, 2), "output_dim", 0)
+     assert _wrap_parameter(parameter, 0, 8, 9, "duplicate", 2, 3)
+ 
+     expected = torch.arange(16, dtype=torch.float32).reshape(8, 2)
+     source = torch.empty_like(expected, device="meta")
+ 
++    class Writer:
++        offsets = []
++
++        def __call__(self, destination, loaded):
++            self.offsets.append(loaded.storage_offset())
++            destination.copy_(
++                expected.as_strided(
++                    loaded.shape,
++                    loaded.stride(),
++                    loaded.storage_offset(),
++                )
++            )
++            return True
++
++        def flush(self):
++            pass
++
++    writer = Writer()
++    with weight_transfer(writer):
++        parameter.weight_loader(parameter, source)
++
++    assert writer.offsets == [12, 14]
++    assert torch.equal(parameter, expected[[6, 7, 7]])
++
++
++def test_virtual_loader_composes_with_scale_row_expansion() -> None:
++    parameter = _parameter((5120, 48), "input_dim", 1)
++
++    def scale_loader(param, loaded):
++        loaded = materialize_weight(loaded).repeat_interleave(32, dim=0)
++        copy_weight(param.data, loaded)
++
++    parameter.weight_loader = scale_loader
++    assert _wrap_parameter(parameter, 1, 8, 9, "duplicate", 2, 3)
++
++    expected = torch.arange(160 * 128, dtype=torch.float32).reshape(160, 128)
++    source = torch.empty_like(expected, device="meta")
++
+     class Writer:
+         offsets = []
+ 
+@@ -87,12 +129,17 @@ def test_duplicate_loader_materializes_only_selected_lazy_groups() -> None:
+                 loaded.storage_offset(),
+             ).clone()
+ 
++        def flush(self):
++            pass
++
+     writer = Writer()
+     with weight_transfer(writer):
+         parameter.weight_loader(parameter, source)
+ 
+-    assert writer.offsets == [12, 14]
+-    assert torch.equal(parameter, expected[[6, 7, 7]])
++    selected = torch.cat((expected[:, 96:112], expected[:, 112:128]), dim=1)
++    selected = torch.cat((selected, expected[:, 112:128]), dim=1)
++    assert writer.offsets == [96, 112]
++    assert torch.equal(parameter, selected.repeat_interleave(32, dim=0))
+ 
+ 
+ def test_virtual_padding_is_opt_in() -> None:
+diff --git a/vllm/models/deepseek_v41/virtual_heads.py b/vllm/models/deepseek_v41/virtual_heads.py
+index f360fe73c8..a91e5bb418 100644
+--- a/vllm/models/deepseek_v41/virtual_heads.py
++++ b/vllm/models/deepseek_v41/virtual_heads.py
+@@ -4,7 +4,7 @@
+ 
+ import torch
+ 
+-from vllm.model_executor.weight_transfer import materialize_weight
++from vllm.model_executor.weight_transfer import flush_weight_transfers
+ 
+ _E8M0 = getattr(torch, "float8_e8m0fnu", None)
+ 
+@@ -52,33 +52,69 @@ def _wrap_parameter(
+         if loaded_weight.ndim <= dim or loaded_weight.shape[dim] % real_groups:
+             return original(param, loaded_weight, *args, **kwargs)
+ 
+-        group_width = loaded_weight.shape[dim] // real_groups
++        source_group_width = loaded_weight.shape[dim] // real_groups
+         local_groups = padded_groups // tp_size
+-        if param.data.shape[dim] != local_groups * group_width:
++        if param.data.shape[dim] % local_groups:
+             return original(param, loaded_weight, *args, **kwargs)
++        destination_group_width = param.data.shape[dim] // local_groups
+ 
+         first_group = tp_rank * local_groups
+         virtual_count = padded_groups - real_groups
+-        materialized_groups = {}
+-        for local_group in range(local_groups):
+-            global_group = first_group + local_group
+-            destination = param.data.narrow(dim, local_group * group_width, group_width)
+-            if global_group < real_groups:
+-                source_group = global_group
+-            elif mode == "duplicate":
+-                source_group = global_group - virtual_count
+-            elif mode == "zero":
+-                _fill_zero_group(destination)
+-                continue
+-            else:
+-                raise ValueError(f"unknown virtual-head padding mode {mode!r}")
+-            source = materialized_groups.get(source_group)
+-            if source is None:
+-                source = materialize_weight(
+-                    loaded_weight.narrow(dim, source_group * group_width, group_width)
++        parameter_data = param.data
++        had_sharded = hasattr(param, "is_sharded_weight")
++        previous_sharded = getattr(param, "is_sharded_weight", None)
++        had_tp_rank = hasattr(param, "tp_rank")
++        previous_tp_rank = getattr(param, "tp_rank", None)
++        loaded_groups = {}
++        duplicate_copies = []
++        try:
++            # The wrapper has already selected this rank's group. Tell both
++            # legacy and v2 linear loaders not to shard it a second time.
++            param.is_sharded_weight = True
++            if had_tp_rank:
++                param.tp_rank = 0
++            for local_group in range(local_groups):
++                global_group = first_group + local_group
++                destination = parameter_data.narrow(
++                    dim,
++                    local_group * destination_group_width,
++                    destination_group_width,
++                )
++                if global_group < real_groups:
++                    source_group = global_group
++                elif mode == "duplicate":
++                    source_group = global_group - virtual_count
++                elif mode == "zero":
++                    _fill_zero_group(destination)
++                    continue
++                else:
++                    raise ValueError(f"unknown virtual-head padding mode {mode!r}")
++
++                if source_group in loaded_groups:
++                    duplicate_copies.append((destination, loaded_groups[source_group]))
++                    continue
++
++                source = loaded_weight.narrow(
++                    dim,
++                    source_group * source_group_width,
++                    source_group_width,
+                 )
+-                materialized_groups[source_group] = source
+-            destination.copy_(source)
++                param.data = destination
++                original(param, source, *args, **kwargs)
++                loaded_groups[source_group] = destination
++        finally:
++            param.data = parameter_data
++            if had_tp_rank:
++                param.tp_rank = previous_tp_rank
++            if had_sharded:
++                param.is_sharded_weight = previous_sharded
++            else:
++                del param.is_sharded_weight
++
++        if duplicate_copies:
++            flush_weight_transfers()
++            for destination, source in duplicate_copies:
++                destination.copy_(source)
+ 
+     try:
+         parameter.weight_loader = loader
+-- 
+2.54.0 (Apple Git-157)
+
