@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "status": "failed-during-lazy-mxfp8-scale-transformation",
+  "image_id": "sha256:b6791daa67f15b66e6cc251f3d482168c1c4116febecca6a7ada650d5ba336a5",
+  "image_deployment_revision": "349eee857b34f581990d4a236dfdc78bf5507659",
+  "launch_deployment_revision": "150ea6007693657fadcd6673d82b0e90173d992d",
+  "observed": {
+    "stage": "checkpoint loading after DS4.1 construction, distributed initialization, custom destination allocation, kernel selection, and disk Engram token-map construction",
+    "error": "NotImplementedError: checkpoint routing performed an unsupported data transformation",
+    "source": "ModelOpt KMxfp8Static repeated lazy checkpoint scale rows before materializing their values",
+    "stack": "KMxfp8Static.scaled_loader -> repeat_interleave -> merged-column TP loader -> copy_weight -> B12X DirectWeightSession",
+    "distributed_state": "NCCL 2.30.7 initialized on all ranks; TP selected B12X_ROCENANTE then PYNCCL, while EP selected PYNCCL",
+    "oom_killed": false,
+    "reproducibility": "reproduced twice on all three ranks; the second run used live per-rank log followers and captured the causal traceback",
+    "candidate_cleanup": "launcher removed failed candidate containers from all three nodes",
+    "rollback_state": "stopped promoted containers remained intact on all three nodes"
+  },
+  "resolution": {
+    "method": "call the generic materialize_weight boundary before ModelOpt's existing MXFP8 row expansion",
+    "behavior_invariant": "scale dtype, repeat count, expanded values, TP slicing, and destination-copy behavior are unchanged",
+    "fail_closed_invariant": "B12X still rejects lazy checkpoint arithmetic that has not explicitly materialized source values",
+    "scope": "one loader-neutral ModelOpt transformation and one focused regression"
+  }
+}

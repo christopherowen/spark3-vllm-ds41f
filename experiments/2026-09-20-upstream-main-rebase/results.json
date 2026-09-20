@@ -1,5 +1,5 @@
 {
-  "status": "custom-weight-allocation-image-qualified-pending-full-launch",
+  "status": "lazy-mxfp8-transform-fix-source-qualified-pending-image-rebuild",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all eight vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 0cb16918073b and a1523b067b4d",
+    "deterministic_source_preparer": "all nine vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities f8407787c332 and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -29,7 +29,9 @@
     "module_cycle_image_distribution": "parallel uncompressed Docker streams used both ConnectX-7 internal rails; dgx1 and dgx2 completed in 142 seconds wall-clock",
     "third_full_launch": "passed both prior boundaries, initialized NCCL 2.30.7 and RoCEnante, selected all native model kernels and disk Engram, then failed on the first custom checkpoint destination because its storage was outside the loader-owned pool; no OOM occurred",
     "custom_weight_allocation_resolution": "all DS4.1 checkpoint-owned custom tensors now use the explicit loader allocation policy; runtime buffers remain outside it; Ruff, format, py_compile, and source diff checks pass",
-    "custom_weight_allocation_image": "sha256:b6791daa67f15b66e6cc251f3d482168c1c4116febecca6a7ada650d5ba336a5 has exact source labels and passed all 8 focused DS4.1 B12X tests on GB10"
+    "custom_weight_allocation_image": "sha256:b6791daa67f15b66e6cc251f3d482168c1c4116febecca6a7ada650d5ba336a5 has exact source labels and passed all 8 focused DS4.1 B12X tests on GB10",
+    "fourth_full_launch": "passed custom destination allocation, built the disk Engram token map, then failed when ModelOpt attempted repeat_interleave directly on a lazy MXFP8 scale tensor; reproduced twice on all ranks with no OOM",
+    "lazy_mxfp8_transform_resolution": "the existing generic materialize_weight boundary now owns the checkpoint scale before ModelOpt's unchanged row expansion; focused regression added, with Ruff, format, py_compile, source diff, and exact patch replay checks passing; target pytest pending the image rebuild"
   },
   "summary": {
     "ttft_seconds": null,
@@ -79,7 +81,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "custom-weight-allocation-image-qualified-pending-three-rank-serving-gates",
+    "status": "lazy-mxfp8-transform-fix-source-qualified-pending-rebuild-and-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

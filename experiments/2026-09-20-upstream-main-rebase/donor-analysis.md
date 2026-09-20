@@ -58,6 +58,13 @@ ports the allocation consumers without moving runtime buffers into the weight
 pool. This split is intentional: the generic transport remains independently
 upstreamable, while model owners can review their explicit weight factories.
 
+The next load boundary is loader-neutral rather than DS4.1-specific. ModelOpt's
+MXFP8 scale loader numerically repeats checkpoint rows when `block_rows > 1`.
+Candidate commit `0ede60db3a362f7679419e40bfb3c94756e92ee7` calls the existing
+`materialize_weight` interface before that transform. It preserves the exact
+row expansion and keeps B12X's immutable lazy source fail-closed for undeclared
+transformations.
+
 ## Two-stage qualification
 
 ### Stage A: upstream-native
@@ -88,6 +95,7 @@ that can be proposed upstream independently after target validation.
 - vLLM: RoCEnante collective integration, separately from the B12X transport.
 - vLLM: explicit loader allocation for DS4.1 custom checkpoint parameters,
   independently from the generic loader transport.
+- vLLM: materialize lazy MXFP8 scale tensors before ModelOpt row expansion.
 - B12X: the 3072-token mHC tuning point only after it is reprofiled on current
   kernels and CUTLASS DSL.
 

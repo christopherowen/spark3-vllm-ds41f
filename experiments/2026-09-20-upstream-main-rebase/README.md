@@ -78,6 +78,14 @@ DSpark, and vision weights. It deliberately does not wrap runtime buffers,
 scratch, caches, staging, or outputs. The exact failure and allocation inventory
 are recorded in `runs/launch-cb5fe5cf0755-weight-allocation.json`.
 
+The allocation-corrected image then reached ModelOpt's first numerical MXFP8
+scale transformation. Lazy checkpoint tensors intentionally cannot execute
+`repeat_interleave`, so B12X rejected the undeclared transformation. Patch 0009
+uses the generic `materialize_weight` boundary immediately before the existing
+row expansion; the arithmetic, dtype, expanded values, and destination loader
+remain unchanged. The reproduced failure is recorded in
+`runs/launch-b6791daa67f1-mxfp8-scale-transform.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -109,9 +117,10 @@ The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
 source trees. It does not stop, restart, or deploy the service. The current
 custom-weight-allocation-corrected image and checks are recorded in
-`runs/build-b6791daa67f1-validation.json`. The module-cycle-corrected image
-receipt remains at `runs/build-cb5fe5cf0755-validation.json`; its full launch
-is what exposed the isolated allocation defect above.
+`runs/build-b6791daa67f1-validation.json`; its full launch exposed the isolated
+lazy MXFP8 scale transformation above. The current source adds patch 0009 and
+is pending its image rebuild. The module-cycle-corrected receipt remains at
+`runs/build-cb5fe5cf0755-validation.json`.
 
 The experiment has its own deterministic cluster configuration. It can be
 inspected without changing the promoted configuration:

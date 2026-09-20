@@ -25,11 +25,13 @@
       "dgx2": "192.168.4.1 via dgx2-internal"
     },
     "method": "two parallel uncompressed docker save/load streams over both ConnectX-7 internal rails",
-    "status": "pending"
+    "status": "completed",
+    "wall_clock_seconds": 121,
+    "image_identity": "all three nodes reported sha256:b6791daa67f15b66e6cc251f3d482168c1c4116febecca6a7ada650d5ba336a5"
   },
   "remaining": [
-    "distribute and verify the exact image ID on all three ranks",
-    "full three-rank model load and selected-kernel JIT qualification",
+    "resolve the lazy MXFP8 scale transformation exposed by full model loading",
+    "complete three-rank model load and selected-kernel JIT qualification",
     "deterministic native-weight output parity",
     "4x128K capacity and normal 8-way Strix workload",
     "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
