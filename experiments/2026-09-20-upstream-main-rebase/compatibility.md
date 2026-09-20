@@ -5,25 +5,26 @@
 | Component | Revision | Declared dependency |
 |---|---|---|
 | vLLM | `d05da62e9ccdf8e342b15bf6785d83224cc165af` | `torch==2.13.0`, `nvidia-cutlass-dsl[cu13]==4.7.1`, optional `b12x==1.3.0` |
-| B12X | `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68` | all CUTLASS DSL packages `==4.6.2` |
+| B12X | `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68` plus carry `de8e7fa971eb7ae4c21e634a8931407a0b404568` | all CUTLASS DSL packages `==4.7.1` |
 
-The dependency sets are not currently co-installable as declared. This is a
-qualification blocker, not a resolver inconvenience: B12X compiles and caches
-kernels through CUTLASS DSL, so changing its exact toolchain can change build
-correctness, cache behavior, memory use, and performance.
+The dependency sets are now co-installable as declared. The experiment image
+uses normal dependency resolution followed by `pip check`; it does not use
+`--no-deps` to conceal a conflict. The migration still requires target
+qualification because B12X compiles and caches kernels through CUTLASS DSL, so
+the toolchain change can affect build correctness, cache behavior, memory use,
+and performance.
 
-There is also a source-integration blocker. Canonical vLLM at the prepared
-revision has a generic B12X paged-attention backend, but its native DS4.1 model
-selects only FlashInfer, FlashMLA, or Mega attention. It has no RoCEnante
-collective implementation. The B12X source carries in this experiment cannot
-affect DS4.1 serving until those two consumer adapters are ported and tested.
+The source-integration blocker is also resolved. The candidate adds a
+fail-closed B12X choice to the native DS4.1 model and a RoCEnante communicator
+using current prepared plans. These are consumers of current upstream model
+and B12X interfaces, not copies of the older downstream model stack.
 
 ## Valid routes
 
-### Route A: qualify B12X on CUTLASS DSL 4.7.1
+### Selected route: qualify B12X on CUTLASS DSL 4.7.1
 
-This keeps the exact ARM64 vLLM nightly and is the preferred route if B12X can
-be migrated cleanly. The migration must be a separate B12X commit with:
+This keeps the exact ARM64 vLLM nightly. The migration is a separate B12X
+commit and must pass:
 
 1. dependency and generated-lock updates;
 2. import, compile, and cache-key tests;
@@ -34,7 +35,7 @@ be migrated cleanly. The migration must be a separate B12X commit with:
 Only after those gates pass should the B12X dependency change be proposed
 upstream.
 
-### Route B: use an exact vLLM/CUTLASS DSL 4.6.2 source build
+### Rejected fallback: use an exact vLLM/CUTLASS DSL 4.6.2 source build
 
 The parent of vLLM's 4.7.1 bump is
 `31759ccb6d560e150849273b47e15680a0120169`. This route is valid only if its
@@ -52,16 +53,11 @@ fallback because it deliberately trails the selected upstream revision.
 
 ## Qualification order
 
-1. Build and smoke-test the upstream-native vLLM revision without replacing
-   the live service. This validates the model, virtual-head carry, and new KV
-   allocator independently of B12X. Explicitly select the native FlashInfer
-   DS4.1 backend; do not call this a B12X result.
-2. Port the R38 DS4.1 B12X and RoCEnante behavior onto current vLLM interfaces
-   as separate commits, with selection tests that fail if either silently falls
-   back. Do not cherry-pick the old model stack.
-3. Complete Route A in an isolated image and compile all kernels before any
-   service switch.
-4. During a maintenance window, compare the promoted runtime, upstream-native
+1. Build the isolated image and compile every selected kernel on SM121 before
+   any service switch.
+2. Prove the B12X selection, V4.1 cache ABI, native 24-head TP3 boundary, and
+   RoCEnante dispatch in startup logs and focused probes.
+3. During a maintenance window, compare the promoted runtime, upstream-native
    image, and B12X image with identical launch configuration and prompts.
-5. Promote only the best quality-preserving candidate, then update the upstream
+4. Promote only the best quality-preserving candidate, then update the upstream
    locks and baseline receipt.

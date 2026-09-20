@@ -18,27 +18,31 @@ patches to the divergent DS4.1 release snapshots.
 
 - vLLM base: `d05da62e9ccdf8e342b15bf6785d83224cc165af`.
 - B12X base: `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68`.
-- vLLM carry: quality-preserving 64/8 to 72/9 virtual attention geometry for
-  TP3.
-- B12X carries: the qualified 3072-token mHC policy and per-peer/HCA
-  RoCEnante routing for the switchless ring.
+- vLLM carries: quality-preserving 64/8 to 72/9 virtual attention geometry for
+  TP3, a native-weight DS4.1 B12X sparse-MLA adapter, and a current-interface
+  RoCEnante collective adapter.
+- B12X carries: the qualified 3072-token mHC policy, per-peer/HCA RoCEnante
+  routing for the switchless ring, and explicit CUTLASS DSL 4.7.1 alignment.
 
 The candidate deliberately adopts upstream DS4.1 model support, heterogeneous
 KV allocator, Engram implementation, generic B12X 1.3 integration, bounded
 index reads, and TP3 24-head sparse-MLA partition without local copies of those
 changes.
 
-This is not yet a performance-complete serving candidate. Canonical vLLM main
-does not currently connect the DS4.1 model's sparse-MLA path to B12X, and it
-does not contain the vLLM-side RoCEnante collective adapter. With no further
-port, an SM121 DS4.1 launch selects the upstream FlashInfer attention path and
-keeps large collectives on NCCL even if the launch still spells
-`--attention-backend B12X`. The prepared B12X source commits are therefore not
-reachable from this vLLM source yet.
+The missing consumer interfaces are now ported without copying the downstream
+model fork. The upstream model still owns CED, the indexer, cache allocation,
+the compressor, and output projection. B12X owns the sparse attention kernel
+and caller-owned scratch. RoCEnante handles eligible small TP collectives while
+NCCL remains the deliberate fallback above the configured size limits.
+
+This is a source-complete but not yet target-qualified serving candidate. Its
+image has not been built while the current service is using nearly all unified
+memory on each Spark. Building and runtime qualification wait for a maintenance
+window; the live service has not been modified.
 
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
-implementation and describes how to negative-port only the missing interfaces
+implementation and records how the missing behavior was negative-ported
 without replacing current upstream subsystems.
 
 ## Reproduce the rebased source trees
@@ -55,20 +59,30 @@ carry commits, and refuses the result unless each final Git tree matches the
 recorded identity in `candidate.json`. It does not update promoted locks, build
 an image, contact a Spark, or modify the running service.
 
+Once a Spark is free, build the exact ARM64 candidate from those verified
+trees:
+
+```sh
+experiments/2026-09-20-upstream-main-rebase/build-candidate check
+experiments/2026-09-20-upstream-main-rebase/build-candidate
+```
+
+The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
+B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
+source trees. It does not stop, restart, or deploy the service.
+
 ## Compatibility gate
 
-Source preparation uncovered two real integration boundaries. First, vLLM
-`d05da62e9ccdf8e342b15bf6785d83224cc165af` requires CUTLASS DSL `4.7.1`,
-while B12X `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68` pins every CUTLASS DSL
-package to `4.6.2`. Second, the DS4.1 B12X attention and RoCEnante consumer
-adapters still need to be ported to current vLLM interfaces. No candidate image
-should suppress the dependency conflict with
-`--no-deps`, downgrade the vLLM environment, or mix Python from one vLLM
-revision with native extensions from another.
+Source preparation uncovered and resolved two source-level integration
+boundaries. B12X now declares the same CUTLASS DSL `4.7.1` toolchain as vLLM,
+and the DS4.1 B12X attention and RoCEnante consumers use current vLLM and B12X
+prepared-plan interfaces. No candidate image suppresses dependency conflicts,
+downgrades the vLLM environment, or mixes Python with native extensions from a
+different vLLM revision.
 
-[compatibility.md](compatibility.md) records the exact matrix and the honest
-qualification routes. Until both integration boundaries pass, the commits here
-are prepared source carries, not a deployable serving image.
+[compatibility.md](compatibility.md) records the exact matrix and remaining
+SM121 qualification gates. The source is ready to build, but it is not a
+deployable serving image until those target tests pass.
 
 ## Quality and safety gates
 
@@ -101,8 +115,8 @@ promoted baseline and this candidate.
 ## Acceptance criteria
 
 - Exact native-weight output parity on fixed prompts and tokens.
-- At least eight complete 160K KV windows with the configured 3 GiB cache, or
-  a documented allocator accounting explanation for any shortfall.
+- At least four simultaneous 128K windows with the configured cache, plus the
+  normal eight-request Strix workload without admission failures.
 - No statistically meaningful regression in single-stream decode TPS,
   aggregate eight-stream TPS, warm/cold TTFT, or minimum available host memory.
 - No request failures, OOMs, silent truncation, or RoCE/NCCL collective errors.

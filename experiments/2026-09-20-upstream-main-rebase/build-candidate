@@ -1,0 +1,58 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+experiment_root="$repo_root/experiments/2026-09-20-upstream-main-rebase"
+source_root=${SOURCE_ROOT:-"$repo_root/.work/experiments/2026-09-20-upstream-main-rebase"}
+mode=${1:-build}
+case "$mode" in
+  build|check) ;;
+  *) echo "usage: $0 [build|check]" >&2; exit 2 ;;
+esac
+
+vllm_tree=0b2a255f44e816178e8f3a2f0eb6ffbb9aca1576
+b12x_tree=4dbbf9f0eb784f379d0bc38db8195dd65088aaaa
+vllm_head=d6b40631cad4bf406f25093f56436f2b8ef10800
+b12x_head=de8e7fa971eb7ae4c21e634a8931407a0b404568
+
+for project in vllm b12x; do
+  source_path="$source_root/$project"
+  if [ ! -d "$source_path/.git" ]; then
+    echo "missing prepared source: $source_path" >&2
+    echo "run $experiment_root/prepare-sources first" >&2
+    exit 1
+  fi
+  git -C "$source_path" diff --quiet
+  git -C "$source_path" diff --cached --quiet
+done
+
+actual_vllm_tree=$(git -C "$source_root/vllm" rev-parse HEAD^{tree})
+actual_b12x_tree=$(git -C "$source_root/b12x" rev-parse HEAD^{tree})
+if [ "$actual_vllm_tree" != "$vllm_tree" ]; then
+  echo "vLLM tree mismatch: expected $vllm_tree, got $actual_vllm_tree" >&2
+  exit 1
+fi
+if [ "$actual_b12x_tree" != "$b12x_tree" ]; then
+  echo "B12X tree mismatch: expected $b12x_tree, got $actual_b12x_tree" >&2
+  exit 1
+fi
+
+if [ "$mode" = check ]; then
+  echo "candidate source trees match recorded identities"
+  exit 0
+fi
+
+deployment_commit=$(git -C "$repo_root" rev-parse HEAD)
+vllm_short=$(printf '%s' "$vllm_head" | cut -c1-12)
+b12x_short=$(printf '%s' "$b12x_head" | cut -c1-12)
+tag=${CANDIDATE_TAG:-"vllm-ds41f-upstream-main:$vllm_short-$b12x_short"}
+
+exec docker buildx build \
+  --platform linux/arm64 \
+  --load \
+  --build-context "vllm-source=$source_root/vllm" \
+  --build-context "b12x-source=$source_root/b12x" \
+  --build-arg "DEPLOYMENT_COMMIT=$deployment_commit" \
+  --tag "$tag" \
+  --file "$experiment_root/Dockerfile" \
+  "$experiment_root"

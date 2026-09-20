@@ -5,13 +5,17 @@
     "vllm_ruff": "passed",
     "vllm_format": "passed",
     "vllm_py_compile": "passed",
+    "vllm_ds41_b12x_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
+    "vllm_rocenante_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
+    "local_focused_pytest": "not run: cached Mac test environment lacks tblib, msgspec, and regex",
+    "docker_build_check": "not run: local Docker daemon is unavailable; target build remains pending",
     "vllm_virtual_head_unit_tests": "7 passed with Torch 2.13.0 using an isolated module import",
     "b12x_mhc_policy_tests": "2 passed",
     "b12x_roce_topology_tests": "7 passed with Torch 2.13.0 using isolated CPU-safe module imports",
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "passed for both source trees against recorded Git tree identities",
+    "deterministic_source_preparer": "exported series replayed from both exact local base objects and matched recorded Git tree identities; remote fetch attempt timed out before clone",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "configuration OK; live cluster matches"
   },
@@ -41,13 +45,13 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "blocked",
-    "reasons": [
-      "canonical vLLM has no current-interface DS4.1 B12X sparse-MLA adapter",
-      "canonical vLLM has no current-interface RoCEnante collective adapter",
-      "vLLM pins CUTLASS DSL 4.7.1 while B12X pins 4.6.2"
+    "status": "source-complete-pending-sm121-qualification",
+    "remaining_gates": [
+      "build the content-addressed ARM64 image when a Spark is free",
+      "compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
+      "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
     ],
-    "current_upstream_native_behavior": "FlashInfer sparse MLA plus NCCL; the prepared B12X carries are not reachable",
+    "candidate_behavior": "upstream DS4.1 semantics with B12X sparse MLA; eligible small TP collectives use RoCEnante and larger collectives use NCCL",
     "shortcut_rejected": "no dependency suppression, in-place downgrade, or mixed-revision native extensions"
   }
 }

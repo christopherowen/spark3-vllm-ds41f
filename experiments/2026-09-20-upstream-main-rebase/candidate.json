@@ -6,10 +6,18 @@
       "project": "vllm",
       "tracking_ref": "refs/heads/main",
       "upstream_base": "d05da62e9ccdf8e342b15bf6785d83224cc165af",
-      "candidate_commit": "277171c959846de8870732e96d23276575e88ae5",
-      "source_tree": "b5a7e4030186c4347062106b1e1985a220dba19f",
+      "candidate_commits": [
+        "277171c959846de8870732e96d23276575e88ae5",
+        "fa075bc82948914cb778a33822eea3a5d537202d",
+        "d6b40631cad4bf406f25093f56436f2b8ef10800"
+      ],
+      "source_tree": "0b2a255f44e816178e8f3a2f0eb6ffbb9aca1576",
       "branch": "spark3/ds41f-tp3",
-      "patch": "patches/vllm/0001-quality-preserving-ds41-tp3-padding.patch"
+      "patches": [
+        "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
+        "patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch",
+        "patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch"
+      ]
     },
     {
       "project": "b12x",
@@ -17,37 +25,36 @@
       "upstream_base": "0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68",
       "candidate_commits": [
         "348145ea8b6adaea7c32b1b87898ff59b5d43380",
-        "803d7d795d05be3902a30e82743a817a2c26d53f"
+        "803d7d795d05be3902a30e82743a817a2c26d53f",
+        "de8e7fa971eb7ae4c21e634a8931407a0b404568"
       ],
-      "source_tree": "f01d0aff9ecf5d4cc048610e5484b1beb63918cb",
+      "source_tree": "4dbbf9f0eb784f379d0bc38db8195dd65088aaaa",
       "branch": "spark3/ds41f-tp3",
       "patches": [
-        "patches/b12x/0001-retain-qualified-3072-token-mhc-geometry.patch",
-        "patches/b12x/0002-route-switchless-peers-by-local-hca.patch"
+        "patches/b12x/0001-perf-mhc-retain-qualified-3072-token-DS4.1-geometry.patch",
+        "patches/b12x/0002-feat-rocenante-route-switchless-peers-by-local-HCA.patch",
+        "patches/b12x/0003-build-align-CUTLASS-DSL-with-vLLM-main.patch"
       ]
     }
   ],
   "base_image": {
     "reference": "docker.io/vllm/vllm-openai:nightly-d05da62e9ccdf8e342b15bf6785d83224cc165af",
-    "index_digest": "sha256:f29125cfaed1b5763ae5378088258c30c9fb2eac7904210c282842a68910f7a8",
-    "arm64_manifest_digest": "sha256:54c6532e846cc2a10685cc685b8f0180cbd136280f86e00247ba0bffba4717d1"
+    "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
+    "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "not-built",
   "deployment_status": "not-deployed",
   "integration_status": {
-    "status": "source-carries-prepared-performance-overlay-incomplete",
-    "upstream_native_path": "DS4.1 uses the current upstream FlashInfer sparse-MLA path on SM121",
-    "missing_vllm_consumers": [
-      "current-interface DS4.1 B12X sparse-MLA attention adapter",
-      "current-interface RoCEnante collective adapter"
-    ],
-    "b12x_source_commits_reachable_from_vllm": false,
+    "status": "source-integration-complete-pending-target-qualification",
+    "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections while B12X owns only sparse MLA kernels",
+    "missing_vllm_consumers": [],
+    "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "blocked-pending-explicit-toolchain-qualification",
+    "status": "aligned-pending-sm121-runtime-qualification",
     "vllm_cutlass_dsl": "4.7.1",
-    "b12x_cutlass_dsl": "4.6.2",
+    "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
   }
 }

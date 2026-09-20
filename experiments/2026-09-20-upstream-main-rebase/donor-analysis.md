@@ -40,12 +40,12 @@ hard again.
 
 ### RoCEnante
 
-The prepared B12X per-peer/HCA commit only supplies transport behavior. A
-separate vLLM commit must connect that transport to the current collective
-interfaces, bound the message sizes for which it wins, retain NCCL for larger
-collectives until measurements justify otherwise, and expose health/fallback
-state. Selection tests must prove which transport handled each collective;
-environment variables alone are not evidence.
+The prepared B12X per-peer/HCA commit only supplies transport behavior. The
+separate vLLM carry `d6b40631cad4bf406f25093f56436f2b8ef10800` connects it to
+current collective interfaces, bounds the message sizes for which it wins, and
+retains NCCL for larger collectives. Target logs and probes must still prove
+which transport handled each collective; environment variables alone are not
+evidence.
 
 ## Two-stage qualification
 
@@ -59,9 +59,9 @@ That is a prediction to validate, not a benchmark result.
 
 ### Stage B: performance overlay
 
-Add the current-interface B12X DS4.1 adapter, RoCEnante adapter, the two B12X
-carries, and one qualified CUTLASS DSL version. Compare this image against both
-Stage A and the promoted runtime with identical weights, prompts, cache budget,
+Use the prepared current-interface B12X DS4.1 adapter, RoCEnante adapter, three
+B12X carries, and CUTLASS DSL 4.7.1. Compare this image against both Stage A and
+the promoted runtime with identical weights, prompts, cache budget,
 concurrency, and graph shapes.
 
 This split makes attribution possible: Stage A measures upstream architecture;

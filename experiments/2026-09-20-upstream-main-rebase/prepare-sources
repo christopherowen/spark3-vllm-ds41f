@@ -53,13 +53,16 @@ prepare \
   vllm \
   https://github.com/vllm-project/vllm.git \
   d05da62e9ccdf8e342b15bf6785d83224cc165af \
-  b5a7e4030186c4347062106b1e1985a220dba19f \
-  patches/vllm/0001-quality-preserving-ds41-tp3-padding.patch
+  0b2a255f44e816178e8f3a2f0eb6ffbb9aca1576 \
+  patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch \
+  patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch \
+  patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch
 
 prepare \
   b12x \
   https://github.com/local-inference-lab/b12x.git \
   0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68 \
-  f01d0aff9ecf5d4cc048610e5484b1beb63918cb \
-  patches/b12x/0001-retain-qualified-3072-token-mhc-geometry.patch \
-  patches/b12x/0002-route-switchless-peers-by-local-hca.patch
+  4dbbf9f0eb784f379d0bc38db8195dd65088aaaa \
+  patches/b12x/0001-perf-mhc-retain-qualified-3072-token-DS4.1-geometry.patch \
+  patches/b12x/0002-feat-rocenante-route-switchless-peers-by-local-HCA.patch \
+  patches/b12x/0003-build-align-CUTLASS-DSL-with-vLLM-main.patch

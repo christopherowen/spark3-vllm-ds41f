@@ -1,7 +1,7 @@
 From 803d7d795d05be3902a30e82743a817a2c26d53f Mon Sep 17 00:00:00 2001
 From: Christopher Owen <root@your.mom>
 Date: Sun, 20 Sep 2026 14:32:47 +0200
-Subject: [PATCH] feat(rocenante): route switchless peers by local HCA
+Subject: [PATCH 2/3] feat(rocenante): route switchless peers by local HCA
 
 Allow each peer edge to select its reachable local ConnectX HCA while preserving the existing clique mode. Validate the complete rank topology before starting the proxy and keep stripe geometry rank-invariant.
 
@@ -743,6 +743,3 @@ index 00000000..4c509b89
 +            peer_hca_names={1: ("mlx5_0",), 2: ("mlx5_2",)},
 +            gid_index=3,
 +        )
--- 
-2.54.0 (Apple Git-157)
-
