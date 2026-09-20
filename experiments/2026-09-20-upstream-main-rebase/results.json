@@ -1,5 +1,5 @@
 {
-  "status": "lazy-mxfp8-transform-fix-source-qualified-pending-image-rebuild",
+  "status": "lazy-mxfp8-transform-image-qualified-pending-full-launch",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -31,7 +31,8 @@
     "custom_weight_allocation_resolution": "all DS4.1 checkpoint-owned custom tensors now use the explicit loader allocation policy; runtime buffers remain outside it; Ruff, format, py_compile, and source diff checks pass",
     "custom_weight_allocation_image": "sha256:b6791daa67f15b66e6cc251f3d482168c1c4116febecca6a7ada650d5ba336a5 has exact source labels and passed all 8 focused DS4.1 B12X tests on GB10",
     "fourth_full_launch": "passed custom destination allocation, built the disk Engram token map, then failed when ModelOpt attempted repeat_interleave directly on a lazy MXFP8 scale tensor; reproduced twice on all ranks with no OOM",
-    "lazy_mxfp8_transform_resolution": "the existing generic materialize_weight boundary now owns the checkpoint scale before ModelOpt's unchanged row expansion; focused regression added, with Ruff, format, py_compile, source diff, and exact patch replay checks passing; target pytest pending the image rebuild"
+    "lazy_mxfp8_transform_resolution": "the existing generic materialize_weight boundary now owns the checkpoint scale before ModelOpt's unchanged row expansion; focused regression, Ruff, format, py_compile, source diff, and exact patch replay checks pass",
+    "lazy_mxfp8_transform_image": "sha256:3d7121b4d687273a8af7c1c6fb9fef589a78b7ec62a823bad2e5c1df1abccb47 has exact source labels and passed the focused ModelOpt regression plus all 8 DS4.1 B12X tests on GB10"
   },
   "summary": {
     "ttft_seconds": null,
@@ -81,7 +82,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "lazy-mxfp8-transform-fix-source-qualified-pending-rebuild-and-three-rank-serving-gates",
+    "status": "lazy-mxfp8-transform-image-qualified-pending-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

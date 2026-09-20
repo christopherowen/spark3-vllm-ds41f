@@ -116,11 +116,10 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
 source trees. It does not stop, restart, or deploy the service. The current
-custom-weight-allocation-corrected image and checks are recorded in
-`runs/build-b6791daa67f1-validation.json`; its full launch exposed the isolated
-lazy MXFP8 scale transformation above. The current source adds patch 0009 and
-is pending its image rebuild. The module-cycle-corrected receipt remains at
-`runs/build-cb5fe5cf0755-validation.json`.
+lazy-MXFP8-transform-corrected image and checks are recorded in
+`runs/build-3d7121b4d687-validation.json`. The custom-allocation-corrected image
+receipt remains at `runs/build-b6791daa67f1-validation.json`; its full launch
+exposed the isolated scale transformation above.
 
 The experiment has its own deterministic cluster configuration. It can be
 inspected without changing the promoted configuration:
