@@ -43,9 +43,10 @@ if [ "$mode" = check ]; then
 fi
 
 deployment_commit=$(git -C "$repo_root" rev-parse HEAD)
+deployment_short=$(printf '%s' "$deployment_commit" | cut -c1-12)
 vllm_short=$(printf '%s' "$vllm_head" | cut -c1-12)
 b12x_short=$(printf '%s' "$b12x_head" | cut -c1-12)
-tag=${CANDIDATE_TAG:-"vllm-ds41f-upstream-main:$vllm_short-$b12x_short"}
+tag=${CANDIDATE_TAG:-"vllm-ds41f-upstream-main:$vllm_short-$b12x_short-d$deployment_short"}
 
 exec docker buildx build \
   --platform linux/arm64 \

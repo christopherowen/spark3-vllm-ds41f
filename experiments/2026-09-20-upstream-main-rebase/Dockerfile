@@ -31,6 +31,14 @@ USER root
 COPY --from=vllm-source . /opt/spark3/candidate/vllm/
 COPY --from=b12x-source . /opt/spark3/candidate/b12x/
 
+# B12X detects io_uring support while building its native loader. The runtime
+# library alone is insufficient: compile the wheel with the development header
+# and pkg-config metadata, then discard only apt's package indexes.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      liburing-dev liburing2 pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
 # The base image was built from the exact vLLM base above. Preserve install-only
 # generated Python modules and matching native extensions that are absent from
 # the Git tree, without overwriting any reviewable candidate source file.
@@ -52,6 +60,7 @@ RUN set -eux; \
       /opt/spark3/candidate/b12x
 RUN python3 - <<'PY'
 import importlib.metadata as metadata
+import subprocess
 
 from packaging.requirements import Requirement
 
@@ -81,7 +90,11 @@ import b12x.attention.compressed_sparse_mla  # noqa: F401
 import b12x.comm.roce  # noqa: F401
 import b12x.integration.vllm.loader  # noqa: F401
 import b12x.sequence.engram  # noqa: F401
+from b12x.loader._native import load
 import vllm.models.deepseek_v41.nvidia.b12x_attention  # noqa: F401
 import vllm.models.deepseek_v41.nvidia.engram  # noqa: F401
+native = load()
+linked = subprocess.check_output(["ldd", native.__file__], text=True)
+assert "liburing.so" in linked, "B12X was built without io_uring row staging"
 print("candidate source imports and CUTLASS dependency gate passed")
 PY

@@ -8,7 +8,7 @@
     "vllm_ds41_b12x_adapter": "ruff, format, py_compile, and diff checks passed for sparse MLA, managed loading, and disk Engram; target runtime tests pending",
     "vllm_rocenante_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
     "local_focused_pytest": "not run: cached Mac test environment lacks tblib, msgspec, and regex",
-    "docker_build_check": "the first complete image preserved NCCL 2.30.7, added no pip-check findings, passed GPU imports, and was copied to all ranks; CLI initialization then exposed downstream-only B12X loader contracts before launch. The source now carries minimal owned/file-backed loader routing and disk Engram integration; the superseding image is not built yet",
+    "docker_build_check": "image ea3a7e056cb1 preserved NCCL 2.30.7, added no pip-check findings, passed GB10 imports and 8 focused vLLM tests, and passed a real managed direct-I/O copy. B12X Engram tests then proved its wheel lacked compile-time liburing support (6 passed, 2 failed); the image was not launched. The recipe now installs liburing development inputs and requires the native ple_reader symbol before export; corrected rebuild pending",
     "vllm_virtual_head_unit_tests": "7 passed with Torch 2.13.0 using an isolated module import",
     "b12x_mhc_policy_tests": "2 passed",
     "b12x_roce_topology_tests": "7 passed with Torch 2.13.0 using isolated CPU-safe module imports",

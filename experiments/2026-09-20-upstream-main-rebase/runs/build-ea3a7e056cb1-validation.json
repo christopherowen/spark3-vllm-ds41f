@@ -1,0 +1,29 @@
+{
+  "image_id": "sha256:ea3a7e056cb1c08ebe2bfba555c6b134c1cf5b2a48e9d8fd15b71b335516d6f3",
+  "image_tag": "vllm-ds41f-upstream-main:7ace024dfddb-8099cee92c78",
+  "deployment_commit": "0e347c7633a689c66f90236ad0fb6823daee2d1b",
+  "node": "dgx3",
+  "checks": [
+    {
+      "name": "gb10-import-and-allocation",
+      "status": "passed",
+      "result": "NVIDIA GB10; B12X selected managed allocation; current vLLM/B12X loader and Engram imports passed"
+    },
+    {
+      "name": "focused-vllm-tests",
+      "status": "passed",
+      "result": "8 passed, 386 deselected"
+    },
+    {
+      "name": "managed-direct-io-copy",
+      "status": "passed",
+      "result": "immutable safetensors range copied into an allocator-owned CUDA destination with exact values"
+    },
+    {
+      "name": "b12x-engram-tests",
+      "status": "failed",
+      "result": "6 passed, 2 failed: io_uring PLE support unavailable because the B12X wheel was compiled without liburing development headers"
+    }
+  ],
+  "conclusion": "reject this image before launch; rebuild from a recipe that provides liburing development inputs and gates the native row reader"
+}
