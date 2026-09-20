@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "status": "failed-before-model-load-startup-memory-admission",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:0ede60db3a36-8099cee92c78-d180a5f808a5f",
+    "id": "sha256:3d7121b4d687273a8af7c1c6fb9fef589a78b7ec62a823bad2e5c1df1abccb47",
+    "source_revision": "180a5f808a5fff1458de234b795110c8a4bf4296",
+    "launch_revision": "03673e7e75454f0e49ce8d8bd0215280e21b8845"
+  },
+  "observation": {
+    "rank": "dgx1",
+    "free_memory_gib": 110.44,
+    "total_memory_gib": 121.69,
+    "gpu_memory_utilization": 0.91,
+    "requested_memory_gib": 110.74,
+    "shortfall_gib": 0.30,
+    "compute_processes": 0,
+    "oom": false,
+    "model_loading_started": false
+  },
+  "cause": "upstream request_memory applies gpu_memory_utilization as an early whole-device admission threshold even when explicit kv_cache_memory_bytes later bypasses utilization-based KV sizing",
+  "resolution": {
+    "gpu_memory_utilization": 0.90,
+    "kv_cache_memory_bytes_per_rank": 3221225472,
+    "capacity_change": "none",
+    "other_launch_changes": "none"
+  },
+  "rollback": "failed candidate containers were automatically removed; stopped promoted containers remain present on all three nodes"
+}

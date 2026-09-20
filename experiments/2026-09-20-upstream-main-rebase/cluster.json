@@ -144,7 +144,7 @@
     "--max-num-seqs",
     "8",
     "--gpu-memory-utilization",
-    "0.91",
+    "0.90",
     "--max-num-batched-tokens",
     "8192",
     "--kv-cache-memory-bytes",
