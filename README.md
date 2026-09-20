@@ -67,6 +67,9 @@ bin/spark3 build render
 `doctor`, `status`, `render`, and every cluster command without `--apply` are
 read-only. `cluster sync` fetches a published commit and detaches every clean node
 checkout at that exact revision; it never copies a working tree or ignored files.
+The only cleanliness exception is a repository-local writable runtime mount
+declared in `cluster.json` (currently `cache/`), which is preserved in place and
+never enters Git.
 `cluster start` preflights all three ranks, starts workers before the head, waits
 for API readiness, and only then arms a host-local memory guard on every Spark.
 Keeping the guards off during startup preserves the memory needed for JIT and

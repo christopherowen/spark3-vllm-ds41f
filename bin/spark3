@@ -352,6 +352,23 @@ def normalized_repository_url(url: str) -> str:
     return url.rstrip("/").removesuffix(".git")
 
 
+def remote_status_command(cluster: dict) -> str:
+    repo = Path(repository_path(cluster))
+    pathspecs = ["."]
+    for source, _, mode in cluster["container"]["mounts"]:
+        if mode != "rw":
+            continue
+        source_path = Path(source.format(home=cluster["host"]["home"]))
+        try:
+            relative = source_path.relative_to(repo)
+        except ValueError:
+            continue
+        pathspecs.append(f":(exclude){relative.as_posix()}")
+    return shlex.join(
+        ["git", "status", "--porcelain", "--untracked-files=all", "--", *pathspecs]
+    )
+
+
 def remote_repository_state(
     cluster: dict, nodes: dict, node: dict
 ) -> tuple[str, str, str]:
@@ -361,7 +378,7 @@ def remote_repository_state(
         node,
         f"cd {path} && printf '%s\\n' \"$(git rev-parse HEAD)\" && "
         "git remote get-url origin && "
-        "git status --porcelain --untracked-files=all",
+        f"{remote_status_command(cluster)}",
     )
     if result.returncode:
         detail = result.stderr.strip() or result.stdout.strip()
