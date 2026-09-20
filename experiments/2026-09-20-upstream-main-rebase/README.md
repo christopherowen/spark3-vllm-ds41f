@@ -67,6 +67,17 @@ from `_modules` and that `named_modules(remove_duplicate=False)` terminates.
 The exact failure is recorded in
 `runs/launch-f332c52cb106-module-cycle.json`.
 
+The module-cycle-corrected image then initialized the complete three-rank
+distributed topology and reached the first real checkpoint copy. B12X correctly
+rejected `layers.0.attn.attn_sink` because that checkpoint destination had not
+been allocated through the loader-owned pool. The rebased path had carried the
+generic allocate/copy/flush interface but missed the model-specific allocation
+sites already established for the working DS4 path. Patch 0008 applies that
+explicit boundary comprehensively to DS4.1 attention, mHC, Engram, MoE routing,
+DSpark, and vision weights. It deliberately does not wrap runtime buffers,
+scratch, caches, staging, or outputs. The exact failure and allocation inventory
+are recorded in `runs/launch-cb5fe5cf0755-weight-allocation.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -100,7 +111,9 @@ source trees. It does not stop, restart, or deploy the service. The current
 module-cycle-corrected image and checks are recorded in
 `runs/build-cb5fe5cf0755-validation.json`. The vocabulary-corrected image
 receipt remains at `runs/build-f332c52cb106-validation.json`; its full launch
-is what exposed the isolated module-cycle defect above.
+is what exposed the isolated module-cycle defect above. The current source adds
+the custom-weight allocation fix exposed by the `cb5fe5cf0755` launch and is
+pending its image rebuild.
 
 The experiment has its own deterministic cluster configuration. It can be
 inspected without changing the promoted configuration:

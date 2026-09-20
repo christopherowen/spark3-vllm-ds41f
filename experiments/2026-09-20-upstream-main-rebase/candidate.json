@@ -13,9 +13,10 @@
         "8a82c50a6a3147ed14adb15a90bc7cb4322c0829",
         "7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177",
         "38d69a82fdd0ea76f8a92c15476bba8cc74184f4",
-        "0fe6eed4b7b3a8bcc807d56cdd8a24021d13ea68"
+        "0fe6eed4b7b3a8bcc807d56cdd8a24021d13ea68",
+        "e08ab6356e93f9cfc2087683b441c52997b5300e"
       ],
-      "source_tree": "1b0bdd16150101ce3b817d06a1720e28789441ac",
+      "source_tree": "0cb16918073b2557bd71d9c00044e7fc03afb6cb",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -24,7 +25,8 @@
         "patches/vllm/0004-feat-loader-add-owned-and-file-backed-weight-routing.patch",
         "patches/vllm/0005-feat-deepseek-v41-stage-Engram-rows-from-disk.patch",
         "patches/vllm/0006-fix-vocab-align-padding-to-tensor-parallel-size.patch",
-        "patches/vllm/0007-fix-deepseek-v41-avoid-B12X-warmup-module-cycle.patch"
+        "patches/vllm/0007-fix-deepseek-v41-avoid-B12X-warmup-module-cycle.patch",
+        "patches/vllm/0008-fix-deepseek-v41-route-custom-weights-through-loader.patch"
       ]
     },
     {
@@ -53,9 +55,9 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:cb5fe5cf07559886785529f14c5885b4d851c688810cb6deb702f4e62557cb62",
-  "deployment_status": "module-cycle-corrected image qualified and identical on all ranks; promoted rollback retained",
+  "deployment_status": "custom-weight allocation fix source-qualified pending image rebuild; promoted rollback retained",
   "integration_status": {
-    "status": "source-and-prelaunch-integration-complete-pending-full-model-load-retry",
+    "status": "custom-weight allocation source fix complete pending image rebuild and full-model-load retry",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

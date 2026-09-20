@@ -1,5 +1,5 @@
 {
-  "status": "module-cycle-corrected-image-qualified-pending-cluster-run",
+  "status": "custom-weight-allocation-fix-source-qualified-pending-image-rebuild",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all seven vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 1b0bdd161501 and a1523b067b4d",
+    "deterministic_source_preparer": "all eight vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 0cb16918073b and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -26,7 +26,9 @@
     "second_full_launch": "passed TP3 construction and reached checkpoint-loader discovery, then failed because the B12X attention adapter registered itself as its own child module; no OOM occurred and automatic cleanup preserved rollback",
     "module_cycle_resolution": "the provider remains the same object but is retained with object.__setattr__, not nn.Module ownership; finite named_modules traversal and all 8 focused B12X adapter tests pass on GB10",
     "module_cycle_corrected_image": "sha256:cb5fe5cf07559886785529f14c5885b4d851c688810cb6deb702f4e62557cb62 passed all 8 focused DS4.1 B12X tests on GB10; exact source labels and image ID verified on every rank",
-    "module_cycle_image_distribution": "parallel uncompressed Docker streams used both ConnectX-7 internal rails; dgx1 and dgx2 completed in 142 seconds wall-clock"
+    "module_cycle_image_distribution": "parallel uncompressed Docker streams used both ConnectX-7 internal rails; dgx1 and dgx2 completed in 142 seconds wall-clock",
+    "third_full_launch": "passed both prior boundaries, initialized NCCL 2.30.7 and RoCEnante, selected all native model kernels and disk Engram, then failed on the first custom checkpoint destination because its storage was outside the loader-owned pool; no OOM occurred",
+    "custom_weight_allocation_resolution": "all DS4.1 checkpoint-owned custom tensors now use the explicit loader allocation policy; runtime buffers remain outside it; Ruff, format, py_compile, and source diff checks pass"
   },
   "summary": {
     "ttft_seconds": null,
@@ -76,7 +78,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "module-cycle-corrected-image-qualified-pending-three-rank-serving-gates",
+    "status": "custom-weight-allocation-fix-source-qualified-pending-rebuild-and-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

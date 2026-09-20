@@ -47,6 +47,17 @@ retains NCCL for larger collectives. Target logs and probes must still prove
 which transport handled each collective; environment variables alone are not
 evidence.
 
+### Loader-owned custom parameters
+
+The generic allocation/copy/flush boundary is insufficient unless every
+checkpoint-owned parameter created directly by a model opts into it. The
+working donor established this pattern for DS4 in commit `6daf00361e`, but the
+newer DS4.1 model adds its own attention, mHC, Engram, vision, and DSpark
+parameters. Candidate commit `e08ab6356e93f9cfc2087683b441c52997b5300e`
+ports the allocation consumers without moving runtime buffers into the weight
+pool. This split is intentional: the generic transport remains independently
+upstreamable, while model owners can review their explicit weight factories.
+
 ## Two-stage qualification
 
 ### Stage A: upstream-native
@@ -75,6 +86,8 @@ that can be proposed upstream independently after target validation.
 - B12X: switchless per-peer/HCA RoCEnante routing, after three-node fault and
   throughput tests.
 - vLLM: RoCEnante collective integration, separately from the B12X transport.
+- vLLM: explicit loader allocation for DS4.1 custom checkpoint parameters,
+  independently from the generic loader transport.
 - B12X: the 3072-token mHC tuning point only after it is reprofiled on current
   kernels and CUTLASS DSL.
 

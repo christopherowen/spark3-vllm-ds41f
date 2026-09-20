@@ -48,6 +48,16 @@ registered the object as its own child. The candidate now uses
 graph. A regression covers `_modules` ownership and duplicate-preserving module
 traversal.
 
+That corrected graph reached checkpoint I/O and exposed the remaining half of
+the loader contract. Generic layers already call `allocate_weights`, but the
+new DS4.1 model owns several checkpoint parameters directly. The B12X writer
+therefore rejected the first sink tensor rather than silently copying into
+ordinary CUDA storage. The candidate now routes every applicable custom
+checkpoint destination—attention sinks, mHC tensors, Engram q/k and optional
+resident tables, MoE gate biases, DSpark's Markov embedding, and vision marker
+and norm weights—through the same explicit allocation function. Runtime state
+remains unwrapped and is still audited after load for accidental pool ownership.
+
 ## Valid routes
 
 ### Selected route: qualify B12X on CUTLASS DSL 4.7.1

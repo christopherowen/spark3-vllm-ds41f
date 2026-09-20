@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "failed-during-first-checkpoint-destination-copy",
+  "image_id": "sha256:cb5fe5cf07559886785529f14c5885b4d851c688810cb6deb702f4e62557cb62",
+  "deployment_revision": "982979e7c315e84e2f54ac549d7253e15681a9cc",
+  "observed": {
+    "stage": "checkpoint loading after complete TP3 model construction and distributed initialization",
+    "error": "ValueError: checkpoint destination was not allocated as a weight: layers.0.attn.attn_sink",
+    "source": "the rebased model carried loader-owned copy and flush hooks but omitted explicit loader allocation for DeepSeek V4.1 custom parameters",
+    "distributed_state": "NCCL 2.30.7 initialized on all ranks; TP selected B12X_ROCENANTE then PYNCCL, while EP selected PYNCCL",
+    "model_state": "native FP4 experts, MXFP8 linear kernels, NVFP4 DS MLA cache, FP8 indexer cache, and disk Engram all selected before the failure",
+    "oom_killed": false,
+    "reproducibility": "reproduced twice on all three ranks; the second run used live log followers and captured the first causal traceback",
+    "candidate_cleanup": "launcher removed failed candidate containers from all three nodes",
+    "rollback_state": "stopped promoted containers remained intact on all three nodes"
+  },
+  "resolution": {
+    "method": "route only checkpoint-owned custom tensors through allocate_weights while retaining runtime buffers on the ordinary allocator",
+    "covered_destinations": [
+      "DeepSeek V4.1 attention sinks",
+      "per-layer hyper-connection tensors",
+      "Engram table and q/k tensors",
+      "DeepSeek MoE routing biases",
+      "DSpark Markov embedding",
+      "vision marker and RMSNorm weights"
+    ],
+    "behavior_invariant": "tensor shapes, dtypes, values, and checkpoint transforms are unchanged; only final storage ownership follows the active loader policy",
+    "provenance": "extends the explicit allocation pattern from local-inference-lab vLLM commit 6daf00361e to the newer DeepSeek V4.1 model path",
+    "runtime_buffer_invariant": "scratch, cache, staging, and output tensors do not use allocate_weights and remain on PyTorch's ordinary allocator"
+  }
+}

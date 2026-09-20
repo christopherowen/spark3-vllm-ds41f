@@ -1,0 +1,265 @@
+From e08ab6356e93f9cfc2087683b441c52997b5300e Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 00:23:43 +0200
+Subject: [PATCH] fix(deepseek-v41): route custom weights through loader
+ allocation
+
+
+diff --git a/vllm/model_executor/models/qwen3_dspark.py b/vllm/model_executor/models/qwen3_dspark.py
+index 7318d225f8..1c1423876c 100644
+--- a/vllm/model_executor/models/qwen3_dspark.py
++++ b/vllm/model_executor/models/qwen3_dspark.py
+@@ -32,6 +32,7 @@ from vllm.model_executor.layers.quantization.utils.nvfp4_emulation_utils import
+ from vllm.model_executor.layers.vocab_parallel_embedding import (
+     ParallelLMHead,
+ )
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.platforms import current_platform
+ 
+ from .qwen3_dflash import DFlashQwen3ForCausalLM, DFlashQwen3Model
+@@ -68,7 +69,7 @@ class DSparkMarkovHead(nn.Module):
+         retain_weight_for_gather: bool = False,
+     ) -> None:
+         super().__init__()
+-        self.markov_w1 = nn.Embedding(vocab_size, markov_rank)
++        self.markov_w1 = allocate_weights(nn.Embedding, vocab_size, markov_rank)
+         self.markov_w2 = ParallelLMHead(
+             draft_vocab_size,
+             markov_rank,
+diff --git a/vllm/models/deepseek_v4/common/vision.py b/vllm/models/deepseek_v4/common/vision.py
+index 4c633da6c5..b5d63d8c63 100644
+--- a/vllm/models/deepseek_v4/common/vision.py
++++ b/vllm/models/deepseek_v4/common/vision.py
+@@ -38,6 +38,7 @@ from vllm.model_executor.models.vision import (
+     get_load_balance_assignment,
+     is_vit_use_data_parallel,
+ )
++from vllm.model_executor.weight_transfer import allocate_weights
+ 
+ 
+ @lru_cache(8)
+@@ -62,7 +63,9 @@ class DeepseekV4RMSNorm(nn.Module):
+     def __init__(self, dim: int, eps: float = 1e-6):
+         super().__init__()
+         self.eps = eps
+-        self.weight = nn.Parameter(torch.ones(dim, dtype=torch.float32))
++        self.weight = nn.Parameter(
++            allocate_weights(torch.ones, dim, dtype=torch.float32)
++        )
+ 
+     def forward(self, x: torch.Tensor) -> torch.Tensor:
+         dtype = x.dtype
+diff --git a/vllm/models/deepseek_v4/nvidia/model.py b/vllm/models/deepseek_v4/nvidia/model.py
+index 39d3c87bc6..16bc2358ab 100644
+--- a/vllm/models/deepseek_v4/nvidia/model.py
++++ b/vllm/models/deepseek_v4/nvidia/model.py
+@@ -70,6 +70,7 @@ from vllm.model_executor.models.utils import (
+     spec_decode_needs_target_embed,
+ )
+ from vllm.model_executor.utils import set_weight_attrs
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.models.common.ops.sequence_parallel import (
+     sp_all_gather,
+     sp_padding_mask,
+@@ -868,7 +869,8 @@ class DeepseekV4MoE(nn.Module):
+             # Use randint instead of empty to avoid garbage values causing
+             # invalid memory access in dummy mode (--load-format="dummy")
+             self.gate.tid2eid = nn.Parameter(
+-                torch.randint(
++                allocate_weights(
++                    torch.randint,
+                     0,
+                     self.n_routed_experts,
+                     (config.vocab_size, self.n_activated_experts),
+@@ -882,7 +884,9 @@ class DeepseekV4MoE(nn.Module):
+             # Vision checkpoints ship a gate bias on hash layers too (it is
+             # unused for routing there; image tokens use bias_vl instead).
+             self.gate.e_score_correction_bias = nn.Parameter(
+-                torch.empty(self.n_routed_experts, dtype=torch.float32),
++                allocate_weights(
++                    torch.empty, self.n_routed_experts, dtype=torch.float32
++                ),
+                 requires_grad=False,
+             )
+ 
+@@ -891,7 +895,9 @@ class DeepseekV4MoE(nn.Module):
+             # instead of e_score_correction_bias / the hash table. Created on
+             # every MoE layer, hash layers included.
+             self.gate.bias_vl = nn.Parameter(
+-                torch.empty(self.n_routed_experts, dtype=torch.float32),
++                allocate_weights(
++                    torch.empty, self.n_routed_experts, dtype=torch.float32
++                ),
+                 requires_grad=False,
+             )
+ 
+diff --git a/vllm/models/deepseek_v41/attention.py b/vllm/models/deepseek_v41/attention.py
+index f8e653bbf1..d4bbcb1212 100644
+--- a/vllm/models/deepseek_v41/attention.py
++++ b/vllm/models/deepseek_v41/attention.py
+@@ -50,6 +50,7 @@ from vllm.model_executor.layers.attention_layer_base import AttentionLayerBase
+ from vllm.model_executor.layers.layernorm import RMSNorm
+ from vllm.model_executor.layers.quantization import QuantizationConfig
+ from vllm.model_executor.models.utils import extract_layer_index
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.models.deepseek_v41.common.rope import build_deepseek_v4_rope
+ from vllm.models.deepseek_v41.compressor import DeepseekCompressor
+ from vllm.models.deepseek_v41.virtual_heads import wrap_attention
+@@ -366,7 +367,9 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+         # Sink padded to the same head count, initialized to -inf (no sink
+         # effect). Weight loading fills the first n_local_heads slots.
+         self.attn_sink = nn.Parameter(
+-            torch.full((self.padded_heads,), -float("inf"), dtype=torch.float32),
++            allocate_weights(
++                torch.full, (self.padded_heads,), -float("inf"), dtype=torch.float32
++            ),
+             requires_grad=False,
+         )
+ 
+diff --git a/vllm/models/deepseek_v41/common/engram.py b/vllm/models/deepseek_v41/common/engram.py
+index c415bbaa6e..6697ffff57 100644
+--- a/vllm/models/deepseek_v41/common/engram.py
++++ b/vllm/models/deepseek_v41/common/engram.py
+@@ -50,6 +50,7 @@ from vllm.logger import init_logger
+ from vllm.model_executor.layers.linear import ReplicatedLinear
+ from vllm.model_executor.layers.quantization import QuantizationConfig
+ from vllm.model_executor.utils import set_weight_attrs
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.triton_utils import tl, triton
+ 
+ logger = init_logger(__name__)
+@@ -694,9 +695,17 @@ class ParallelEngramEmbedding(nn.Module):
+ 
+     def _allocate_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
+         return (
+-            torch.empty(self.part_num_embeddings, self.dim, dtype=torch.float8_e4m3fn),
+-            torch.empty(
+-                self.part_num_embeddings, self.dim // self.block_size, dtype=torch.uint8
++            allocate_weights(
++                torch.empty,
++                self.part_num_embeddings,
++                self.dim,
++                dtype=torch.float8_e4m3fn,
++            ),
++            allocate_weights(
++                torch.empty,
++                self.part_num_embeddings,
++                self.dim // self.block_size,
++                dtype=torch.uint8,
+             ),
+         )
+ 
+@@ -932,11 +941,11 @@ class Engram(nn.Module):
+             prefix=f"{prefix}.wkv",
+         )
+         self.q_weight = nn.Parameter(
+-            torch.empty(self.hc_mult, self.dim, dtype=torch.bfloat16),
++            allocate_weights(torch.empty, self.hc_mult, self.dim, dtype=torch.bfloat16),
+             requires_grad=False,
+         )
+         self.k_weight = nn.Parameter(
+-            torch.empty(self.hc_mult, self.dim, dtype=torch.bfloat16),
++            allocate_weights(torch.empty, self.hc_mult, self.dim, dtype=torch.bfloat16),
+             requires_grad=False,
+         )
+ 
+diff --git a/vllm/models/deepseek_v41/nvidia/model.py b/vllm/models/deepseek_v41/nvidia/model.py
+index 2c1a173203..64df5f670d 100644
+--- a/vllm/models/deepseek_v41/nvidia/model.py
++++ b/vllm/models/deepseek_v41/nvidia/model.py
+@@ -52,6 +52,7 @@ from vllm.model_executor.models.utils import (
+     maybe_prefix,
+ )
+ from vllm.model_executor.weight_transfer import (
++    allocate_weights,
+     copy_weight,
+     flush_weight_transfers,
+     materialize_weight,
+@@ -297,7 +298,8 @@ class DeepseekV4DecoderLayer(nn.Module):
+         mix_hc = (2 + self.hc_mult) * self.hc_mult
+         hc_dim = self.hc_mult * self.hidden_size
+         self.hc_attn_fn = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 (mix_hc, hc_dim),
+                 dtype=torch.float32,
+             ),
+@@ -305,35 +307,40 @@ class DeepseekV4DecoderLayer(nn.Module):
+         )
+         self.hc_attn_fn_broadcast: torch.Tensor | None = None
+         self.hc_ffn_fn = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 (mix_hc, hc_dim),
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_attn_base = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 mix_hc,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_ffn_base = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 mix_hc,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_attn_scale = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 3,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_ffn_scale = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 3,
+                 dtype=torch.float32,
+             ),
+diff --git a/vllm/models/deepseek_v41/nvidia/vl_model.py b/vllm/models/deepseek_v41/nvidia/vl_model.py
+index bfbcaa89a1..824c907e74 100644
+--- a/vllm/models/deepseek_v41/nvidia/vl_model.py
++++ b/vllm/models/deepseek_v41/nvidia/vl_model.py
+@@ -35,6 +35,7 @@ from vllm.model_executor.models.utils import (
+     maybe_prefix,
+ )
+ from vllm.model_executor.models.vision import is_vit_use_data_parallel
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.models.deepseek_v4.common.vision import (
+     DeepseekV4Aligner,
+     DeepseekV4ViT,
+@@ -150,13 +151,13 @@ class DeepseekV41ForCausalLM(nn.Module, SupportsMultiModal, SupportsPP, Supports
+             self.vision = DeepseekV4ViT(config)
+             self.aligner = DeepseekV4Aligner(config)
+             self.image_start = nn.Parameter(
+-                torch.empty(config.hidden_size, dtype=torch.float32)
++                allocate_weights(torch.empty, config.hidden_size, dtype=torch.float32)
+             )
+             self.image_end = nn.Parameter(
+-                torch.empty(config.hidden_size, dtype=torch.float32)
++                allocate_weights(torch.empty, config.hidden_size, dtype=torch.float32)
+             )
+             self.image_newline = nn.Parameter(
+-                torch.empty(config.hidden_size, dtype=torch.float32)
++                allocate_weights(torch.empty, config.hidden_size, dtype=torch.float32)
+             )
+             self.vision.to(dtype=model_config.dtype)
+             self.aligner.to(dtype=model_config.dtype)
+-- 
+2.54.0 (Apple Git-157)
+
