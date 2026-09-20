@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "failed-during-disk-engram-parent-routing",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:164c5d5bde78-8099cee92c78-d2fa6c2c1fbdf",
+    "id": "sha256:289f83bc7e59945dbaad43d9c4f1d42162399df732fa84dab5be57f1f65435d1",
+    "source_revision": "2fa6c2c1fbdff248f9b919b9b0db3f46146dc1ee",
+    "launch_revision": "39f18d7e414a737dca811cb5ee7935dd358a4cc1"
+  },
+  "progress": [
+    "passed startup admission and all earlier model construction boundaries",
+    "initialized NCCL 2.30.7 and RoCEnante on all three ranks",
+    "selected the intended DS4.1 native kernels and disk Engram path",
+    "passed lazy ModelOpt scale expansion and virtual-head loader composition"
+  ],
+  "failure": {
+    "file": "vllm/models/deepseek_v41/nvidia/model.py",
+    "operation": "params_dict[name]",
+    "message": "KeyError: 'layers.1.engram.embed_tokens.weight'",
+    "cause": "the rebase ported the raw checkpoint filter and leaf disk-table loader but omitted the working parent loader's explicit handoff for a deliberately nonresident Engram parameter",
+    "reproduced": 2,
+    "oom": false
+  },
+  "resolution": {
+    "commit": "d878afb20dc3aa1d8f68a3a2ed94d1158520cc1a",
+    "source_tree": "e8ed4c7f209d5d2003f2c634c30299f5b3fc1894",
+    "behavior": "delegate both disk Engram descriptors from DeepseekV4Model.load_weights to their exact leaf module, retaining immutable file ranges and avoiding resident table allocation",
+    "validation": "the composed parent-loader regression and all 18 focused DS4.1 tests passed on GB10; all DS4.1 None parameters and file-backed filters were inventoried",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate containers were automatically removed; stopped promoted containers remain present on all three nodes"
+}

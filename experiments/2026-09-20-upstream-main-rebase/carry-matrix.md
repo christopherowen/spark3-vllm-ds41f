@@ -18,7 +18,7 @@
 | CUTLASS DSL toolchain | vLLM pins 4.7.1; B12X upstream pins 4.6.2 | B12X carry `de8e7fa971eb7ae4c21e634a8931407a0b404568` aligns all declared packages to 4.7.1 | Candidate for B12X after SM121 compile and performance qualification |
 | Indexer workspace factor override | Similar upstream PRs exist and conflict | Do not carry yet | Re-evaluate after main-native measurements |
 | Bounded parallel prefill scheduler | Only on the divergent release branch | Do not mix into the base rebase | Separate experiment after base qualification |
-| Disk-backed Engram table | Not supported by vLLM main DS4.1 Engram; the two native tables are about 189 GiB globally | Carry exact upstream hashing plus B12X bounded row staging as isolated `7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177`; tables remain immutable checkpoint data and row values retain native FP8/E8M0 arithmetic | Candidate for vLLM/B12X after exact-output, disk-I/O, TTFT, and concurrency qualification |
+| Disk-backed Engram table | Not supported by vLLM main DS4.1 Engram; the two native tables are about 189 GiB globally | Carry exact upstream hashing plus B12X bounded row staging as isolated `7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177`, with the working parent-to-leaf descriptor handoff restored by `d878afb20dc3aa1d8f68a3a2ed94d1158520cc1a`; tables remain immutable checkpoint data and row values retain native FP8/E8M0 arithmetic | Candidate for vLLM/B12X after exact-output, disk-I/O, TTFT, and concurrency qualification |
 | CUDA graph and DS4.1 hot-path release commits | Main has newer, independently refactored implementations | Drop by default | Reintroduce only from profiler evidence |
 
 ## Why this is a rebase rather than another patch stack

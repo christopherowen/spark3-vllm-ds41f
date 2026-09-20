@@ -1,0 +1,100 @@
+From d878afb20dc3aa1d8f68a3a2ed94d1158520cc1a Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 01:42:52 +0200
+Subject: [PATCH] fix(deepseek-v41): route disk Engram descriptors to leaf
+
+---
+ tests/models/test_deepseek_v41_b12x.py   | 51 +++++++++++++++++++++++-
+ vllm/models/deepseek_v41/nvidia/model.py | 10 +++++
+ 2 files changed, 60 insertions(+), 1 deletion(-)
+
+diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
+index 58cd5452e0..c1096e3109 100644
+--- a/tests/models/test_deepseek_v41_b12x.py
++++ b/tests/models/test_deepseek_v41_b12x.py
+@@ -17,7 +17,10 @@ from vllm.models.deepseek_v41.nvidia.b12x_attention import (
+     _flatten_cache,
+ )
+ from vllm.models.deepseek_v41.nvidia.engram import ParallelEngramEmbedding
+-from vllm.models.deepseek_v41.nvidia.model import DeepseekV41LLMForCausalLM
++from vllm.models.deepseek_v41.nvidia.model import (
++    DeepseekV4Model,
++    DeepseekV41LLMForCausalLM,
++)
+ from vllm.platforms.interface import DeviceCapability
+ from vllm.v1.attention.backends.registry import AttentionBackendEnum
+ 
+@@ -179,3 +182,49 @@ def test_disk_engram_checkpoint_filter_is_exact() -> None:
+     assert model.checkpoint_file_weight_filter("layers.14.engram.embed.scale")
+     assert not model.checkpoint_file_weight_filter("layers.1.engram.wkv.weight")
+     assert not model.checkpoint_file_weight_filter("model.layers.1.engram.embed.weight")
++
++
++def test_disk_engram_descriptor_reaches_leaf_loader(monkeypatch) -> None:
++    class RecordingEmbedding(torch.nn.Module):
++        def __init__(self) -> None:
++            super().__init__()
++            self.received: list[tuple[str, object]] = []
++
++        def load_weights(self, weights) -> set[str]:
++            current = list(weights)
++            self.received.extend(current)
++            return {name for name, _value in current}
++
++    model = object.__new__(DeepseekV4Model)
++    torch.nn.Module.__init__(model)
++    embedding = RecordingEmbedding()
++    layer = torch.nn.Module()
++    layer.engram = torch.nn.Module()
++    layer.engram.embed_tokens = embedding
++    model.layers = torch.nn.ModuleList([torch.nn.Identity(), layer])
++    model.disk_engram = True
++    model.config = SimpleNamespace(num_attention_heads=24)
++    model.quant_config = None
++    model.use_sequence_parallel = False
++    model.get_expert_mapping = lambda: []
++    monkeypatch.setattr(nvidia_model, "get_tensor_model_parallel_world_size", lambda: 3)
++    monkeypatch.setattr(nvidia_model, "get_tensor_model_parallel_rank", lambda: 0)
++    monkeypatch.setattr(nvidia_model, "is_pp_missing_parameter", lambda *_args: False)
++    weight_descriptor = object()
++    scale_descriptor = object()
++
++    loaded = model.load_weights(
++        (
++            ("layers.1.engram.embed_tokens.weight", weight_descriptor),
++            ("layers.1.engram.embed_tokens.weight_scale_inv", scale_descriptor),
++        )
++    )
++
++    assert loaded == {
++        "layers.1.engram.embed_tokens.weight",
++        "layers.1.engram.embed_tokens.weight_scale_inv",
++    }
++    assert embedding.received == [
++        ("weight", weight_descriptor),
++        ("weight_scale_inv", scale_descriptor),
++    ]
+diff --git a/vllm/models/deepseek_v41/nvidia/model.py b/vllm/models/deepseek_v41/nvidia/model.py
+index 64df5f670d..1dc9842087 100644
+--- a/vllm/models/deepseek_v41/nvidia/model.py
++++ b/vllm/models/deepseek_v41/nvidia/model.py
+@@ -908,6 +908,16 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                 # Vision weights are loaded by the outer multimodal wrapper.
+                 logger.warning_once("Skipping non-text weight: %s", name)
+                 continue
++            if self.disk_engram and ".engram.embed_tokens." in name:
++                if is_pp_missing_parameter(name, self):
++                    continue
++                module_name, _, leaf = name.rpartition(".")
++                embedding = self.get_submodule(module_name)
++                loaded_params.update(
++                    f"{module_name}.{loaded}"
++                    for loaded in embedding.load_weights(((leaf, loaded_weight),))
++                )
++                continue
+             if pad_shared_expert and ".shared_experts." in name:
+                 loaded_weight = self._pad_shared_expert_weight(
+                     self.quant_config, name, loaded_weight
+-- 
+2.54.0 (Apple Git-157)
+

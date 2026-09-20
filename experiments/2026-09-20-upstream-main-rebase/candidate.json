@@ -17,9 +17,10 @@
         "e08ab6356e93f9cfc2087683b441c52997b5300e",
         "0ede60db3a362f7679419e40bfb3c94756e92ee7",
         "18088aecd7bd1173217d9db31d0924f8c4beb832",
-        "164c5d5bde7869bff5f2004f01f9f8e432d63d59"
+        "164c5d5bde7869bff5f2004f01f9f8e432d63d59",
+        "d878afb20dc3aa1d8f68a3a2ed94d1158520cc1a"
       ],
-      "source_tree": "124dea53c3611e397f021f16ecd393419ee920f7",
+      "source_tree": "e8ed4c7f209d5d2003f2c634c30299f5b3fc1894",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -32,7 +33,8 @@
         "patches/vllm/0008-fix-deepseek-v41-route-custom-weights-through-loader.patch",
         "patches/vllm/0009-fix-modelopt-materialize-lazy-MXFP8-scales-before-ex.patch",
         "patches/vllm/0010-fix-deepseek-v41-materialize-lazy-virtual-head-group.patch",
-        "patches/vllm/0011-fix-deepseek-v41-compose-virtual-heads-with-weight-l.patch"
+        "patches/vllm/0011-fix-deepseek-v41-compose-virtual-heads-with-weight-l.patch",
+        "patches/vllm/0012-fix-deepseek-v41-route-disk-Engram-descriptors-to-le.patch"
       ]
     },
     {
@@ -60,10 +62,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:289f83bc7e59945dbaad43d9c4f1d42162399df732fa84dab5be57f1f65435d1",
-  "deployment_status": "virtual-head loader composition image distributed with exact identity on all ranks; pending full-model-load retry; promoted rollback retained",
+  "image_digest": null,
+  "deployment_status": "disk Engram parent-to-leaf routing source qualified with exact replay; pending immutable image build; promoted rollback retained",
   "integration_status": {
-    "status": "virtual-head source-group selection composes with the original ModelOpt and TP loader; exact 160-to-5120 MXFP8 regression and all 17 focused tests passed on GB10 in the immutable image",
+    "status": "all nonresident DS4.1 checkpoint weights are routed from the parent loader to their disk Engram owner; composed parent-to-leaf regression and all 18 focused tests passed on GB10",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

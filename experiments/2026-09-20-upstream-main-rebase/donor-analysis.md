@@ -78,6 +78,15 @@ through that original loader while temporarily exposing only its final local
 destination. The original numerical transform remains authoritative and the
 group is not tensor-parallel sharded a second time.
 
+Disk-backed Engram also needs the parent-loader handoff already present in the
+working donor. The initial port carried the raw checkpoint filter and leaf
+`DiskTable` loader but omitted the branch in `DeepseekV4Model.load_weights`
+that resolves `engram.embed_tokens` and delegates its descriptors. Candidate
+commit `d878afb20dc3aa1d8f68a3a2ed94d1158520cc1a` restores that path only when
+Engram is disk-backed. A composed regression enters through the parent loader,
+and an inventory confirms the Engram weight and scale are the only DS4.1
+checkpoint tensors represented by deliberately absent parameters.
+
 ## Two-stage qualification
 
 ### Stage A: upstream-native

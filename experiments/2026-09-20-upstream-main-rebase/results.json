@@ -1,5 +1,5 @@
 {
-  "status": "virtual-head-loader-composition-image-qualified-pending-launch",
+  "status": "disk-engram-parent-routing-source-qualified-pending-image",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all eleven vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 124dea53c361 and a1523b067b4d",
+    "deterministic_source_preparer": "all twelve vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities e8ed4c7f209d and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -42,7 +42,9 @@
     "seventh_full_launch": "materialized the lazy virtual-head source successfully but exposed that the wrapper bypassed ModelOpt's 32-row MXFP8 scale expansion: a final destination axis of 5120 received the raw 160-row scale group; no OOM occurred",
     "virtual_head_loader_composition_resolution": "each TP-local group is now passed through its original weight loader using a temporary destination view, preserving numerical transforms and preventing a second TP shard; duplicate final groups use one synchronized device copy and virtual zero groups remain unread; the exact raw-160-to-final-5120 ModelOpt regression and all 17 focused DS4.1 tests pass on GB10",
     "virtual_head_loader_composition_image": "sha256:289f83bc7e59945dbaad43d9c4f1d42162399df732fa84dab5be57f1f65435d1 has exact deployment, vLLM, and B12X source labels and passed all 17 focused tests from the finished immutable image",
-    "virtual_head_loader_composition_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 96 seconds"
+    "virtual_head_loader_composition_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 96 seconds",
+    "eighth_full_launch": "passed all earlier boundaries including ModelOpt virtual-head composition, then failed when the parent DeepSeek loader treated a deliberately nonresident disk Engram descriptor as an ordinary parameter; reproduced twice without OOM or host instability",
+    "disk_engram_parent_routing_resolution": "restored the working pre-rebase parent-to-leaf handoff for disk-backed Engram only; both native table descriptors now reach the leaf DiskTable loader without allocating the 47 GiB per-rank table, and the composed parent-loader regression plus all 18 focused DS4.1 tests pass on GB10"
   },
   "summary": {
     "ttft_seconds": null,
@@ -92,7 +94,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "virtual-head-loader-composition-image-qualified-pending-three-rank-serving-gates",
+    "status": "disk-engram-parent-routing-pending-exact-replay-image-and-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

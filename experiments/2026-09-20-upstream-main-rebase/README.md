@@ -104,6 +104,16 @@ group for virtual duplicates, and still avoids reading virtual zero groups. The
 exact failure is recorded in
 `runs/launch-5e87113c2318-virtual-head-loader-composition.json`.
 
+The composition-corrected image then passed that boundary and reached the two
+nonresident disk-Engram checkpoint descriptors. The rebase had ported both the
+file-backed checkpoint filter and leaf `DiskTable` loader but omitted the
+working branch's parent-to-leaf handoff. Patch 0012 restores that proven route
+for disk-backed Engram only, so neither native table is mistaken for a resident
+parameter or allocated in memory. A composed regression enters through
+`DeepseekV4Model.load_weights`, and an inventory proves these are the only
+nonresident DS4.1 checkpoint weights. The reproduced failure is recorded in
+`runs/launch-289f83bc7e59-disk-engram-parent-routing.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -166,9 +176,10 @@ Python with native extensions from a different vLLM revision.
 SM121 qualification gates. Patch 0010 and the combined DS4.1 adapter suite
 passed on GB10, and full model loading then exposed its missing composition
 with ModelOpt's scale transform. Patch 0011 and the exact 160-to-5120 MXFP8
-scale regression now pass on GB10 in the immutable candidate image. The
-candidate is not promotable until full three-rank model-load, quality,
-capacity, and performance gates pass.
+scale regression pass on GB10. Patch 0012 then restores the omitted disk-Engram
+parent-to-leaf handoff and passes the composed loader regression plus all 18
+focused DS4.1 tests on GB10. The candidate is not promotable until full
+three-rank model-load, quality, capacity, and performance gates pass.
 
 ## Quality and safety gates
 
