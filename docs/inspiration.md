@@ -22,6 +22,15 @@ weights into the promoted deployment. Machine-readable URLs live under
 Pinned revisions and contribution remotes are documented in
 [upstreams.md](upstreams.md). This watchlist never overrides those pins.
 
+## Official DeepSeek V4.1 references
+
+| Source | Use it for | Adoption boundary |
+|---|---|---|
+| [DeepSeek V4.1 Flash release note](https://www.deepseek.com/en/news/deepseek-v4-1-flash/) | Official release identity, 552B CED architecture summary, 8B-prefill/16B-decode activation split, multimodal status, and the claimed one-quarter HBM/eighth persistent-cache footprint relative to V4 Flash. | Treat release claims as architecture expectations, not evidence that this three-Spark deployment realizes them. Measure effective cache bytes per token and workload results locally. |
+| [DeepSeek V4.1 Flash technical report](https://arxiv.org/abs/2609.19969) ([model-repository PDF](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/dba1be0a40aa45a94ad051997016db3960a90277/DeepSeek_V41_Tech_Report.pdf)) | Primary source for CED, CSA2 Full/Reindex/Reuse geometry, FP4 global KV, SWA Bounded Replay, Engram, mHC, DSpark, multimodal behavior, context limits, and evaluation settings. | Architecture and quality invariants come from the paper. Its accelerator-scale results are not TP3 DGX Spark targets, and serving shortcuts must not change the native checkpoint's arithmetic without an explicit quality profile. |
+| [vLLM DeepSeek V4.1 Flash recipe](https://github.com/vllm-project/recipes/blob/main/models/deepseek-ai/DeepSeek-V4.1-Flash.yaml) | Upstream-supported model flags, reasoning/tool parsers, DSpark configuration, text-only versus vision tradeoffs, memory notes, and current validation status. | It is a moving operational reference for larger datacenter accelerators, not a drop-in Spark launch. Reconcile every flag with the pinned vLLM revision and TP3/SM121 constraints before testing. |
+| [deepseek-ai/FlashMLA](https://github.com/deepseek-ai/FlashMLA) | Official V4.1 prefill/decode kernels, FP8/FP4 cache semantics, fused paths, and performance baselines for sparse MLA. | Use it to check semantics and identify upstream kernel opportunities. The promoted SM121 path may use FlashInfer or B12X, so do not replace it merely because an official kernel exists for another architecture. |
+
 ## Reference implementations
 
 | Repository | Review it for | Adoption boundary |
@@ -33,6 +42,13 @@ Pinned revisions and contribution remotes are documented in
 | [eugr/spark-vllm-docker](https://github.com/eugr/spark-vllm-docker) | Container construction and newer combinations of CUDA, NCCL, PyTorch, FlashInfer, and vLLM on DGX Spark. | Version novelty alone is not a promotion reason. Rebuild from pinned canonical sources and qualify correctness, memory, TTFT, and TPS together. |
 | [jnardiello/GLM-5.3-Flash-FP8-4-DGX-Spark-Switchless](https://github.com/jnardiello/GLM-5.3-Flash-FP8-4-DGX-Spark-Switchless) | Switchless multi-rail topology, rank/interface mapping, launch discipline, collective profiling, and four-Spark operational lessons. | Separate generally useful topology ideas from GLM-, TP4-, and four-node-specific assumptions before testing on DS4.1 TP3. |
 | [osolmaz/oomwrap](https://github.com/osolmaz/oomwrap) | Process-level memory-pressure supervision and failure handling. | Compare its semantics with `scripts/memguard.sh`; adopt it only if it demonstrably improves protection without interfering with JIT startup or adding opaque policy. |
+
+## End-to-end and quality methodology
+
+| Source | Review it for | Adoption boundary |
+|---|---|---|
+| [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | Official agent-harness behavior, DeepSeek provider integration, DSML tool calls, reasoning controls, multimodal request handling, and realistic long-horizon compatibility smoke tests. | It is an application harness, not an inference benchmark or serving implementation. Add pinned scenarios as a separate end-to-end workload; do not use its elapsed time to attribute vLLM kernel performance. |
+| [Unsloth DeepSeek V4 guide](https://unsloth.ai/docs/models/deepseek-v4) | Tensor identity checks, KL-divergence, top-token agreement, and quantization quality reporting methodology. | The page targets the earlier 284B V4-Flash-0731 GGUF/llama.cpp stack, not the 552B V4.1 native checkpoint. Do not import its weights, memory figures, launch flags, chat template, or DSpark results. Use the official V4.1 paper, model artifact, and vLLM recipe above for this deployment. |
 
 ## Questions to revisit
 
@@ -53,6 +69,14 @@ Use this list when reviewing new commits, issues, and pull requests:
 7. Are newer CUDA, NCCL, PyTorch, FlashInfer, CUTLASS, or vLLM combinations
    materially better on SM121, rather than merely newer?
 8. Can image support return without compromising the promoted text baseline?
+9. Does measured global KV storage approach the report's 890-byte-per-token
+   architectural figure once fixed SWA, alignment, allocator groups, and runtime
+   metadata are accounted for separately?
+10. Do reasoning, DSML tool calls, and multimodal requests remain compatible in
+    a pinned DeepSeek Harness scenario, independently of the server microbenchmarks?
+11. Do candidate output distributions preserve the native baseline under
+    deterministic token agreement and KL-divergence checks, not just a handful
+    of exact prompts?
 
 ## From idea to promotion
 
@@ -79,3 +103,4 @@ For every candidate idea:
 | Date | Scope | Result |
 |---|---|---|
 | 2026-09-20 | Initial watchlist from the DS4.1 three-Spark investigation | Classified canonical upstreams and seven reference repositories; no new runtime change was promoted. |
+| 2026-09-20 | Official V4.1 sources, vLLM recipe, DeepSeek Harness, FlashMLA, and Unsloth V4 guide | Added the release note and technical report as model authorities; added the vLLM recipe and FlashMLA as implementation references; classified DeepSeek Harness as an end-to-end workload and Unsloth's earlier-model page as quality methodology only. |

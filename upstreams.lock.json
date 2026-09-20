@@ -69,6 +69,10 @@
       "upstream": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash",
       "repository": "deepseek-ai/DeepSeek-V4.1-Flash",
       "revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+      "release_note": "https://www.deepseek.com/en/news/deepseek-v4-1-flash/",
+      "technical_report": "https://arxiv.org/abs/2609.19969",
+      "technical_report_artifact": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/dba1be0a40aa45a94ad051997016db3960a90277/DeepSeek_V41_Tech_Report.pdf",
+      "technical_report_sha256": "ba68e2e40408125ae6d2f63a9a241b61c73910691c74ec1a2a7023c851eac08d",
       "role": "unchanged native FP8/FP4 weights and tokenizer"
     }
   },
@@ -115,6 +119,27 @@
       "url": "https://github.com/osolmaz/oomwrap",
       "added_to_watchlist": "2026-09-20",
       "role": "memory-pressure supervision ideas for comparison with the repository's systemd memguard"
+    },
+    "deepseek_harness": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/deepseek-harness",
+      "observed_revision": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+      "added_to_watchlist": "2026-09-20",
+      "role": "official end-to-end agent, tool-call, reasoning, and multimodal compatibility workload; not a serving microbenchmark"
+    },
+    "deepseek_flashmla": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/FlashMLA",
+      "observed_revision": "ba89a3466e9470ad08ab39738d4e7bb66989e1e7",
+      "added_to_watchlist": "2026-09-20",
+      "role": "official DeepSeek V4.1 attention-kernel semantics and performance reference"
+    },
+    "vllm_recipes": {
+      "kind": "git-watch",
+      "url": "https://github.com/vllm-project/recipes",
+      "observed_revision": "7918dcde8a706ef09bc4a708186012661abe2077",
+      "added_to_watchlist": "2026-09-20",
+      "role": "upstream DeepSeek V4.1 serving recipe and current model-feature guidance"
     }
   }
 }
