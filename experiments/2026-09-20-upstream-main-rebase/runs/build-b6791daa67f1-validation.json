@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "status": "passed-prelaunch-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:e08ab6356e93-8099cee92c78-d349eee857b34",
+    "id": "sha256:b6791daa67f15b66e6cc251f3d482168c1c4116febecca6a7ada650d5ba336a5",
+    "size_bytes": 23240098521,
+    "deployment_revision": "349eee857b34f581990d4a236dfdc78bf5507659",
+    "vllm_patch_head": "e08ab6356e93f9cfc2087683b441c52997b5300e",
+    "vllm_tree": "0cb16918073b2557bd71d9c00044e7fc03afb6cb",
+    "b12x_patch_head": "8099cee92c78dd2472749ca8003053ee73be908d",
+    "b12x_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0"
+  },
+  "checks": {
+    "source_replay": "eight vLLM and four B12X patches replayed from exact bases to the recorded Git trees",
+    "deepseek_v41_b12x": "8 focused adapter tests passed on GB10",
+    "custom_weight_ownership": "DS4.1 checkpoint destinations use loader-owned allocation while runtime buffers, scratch, caches, staging, and outputs remain ordinary allocations",
+    "image_labels": "deployment, vLLM, and B12X commit/tree labels match the recorded candidate",
+    "rollback_state": "promoted containers remain stopped and present on all three nodes; candidate containers are absent"
+  },
+  "distribution": {
+    "source": "dgx3",
+    "targets": {
+      "dgx1": "192.168.2.1",
+      "dgx2": "192.168.4.1 via dgx2-internal"
+    },
+    "method": "two parallel uncompressed docker save/load streams over both ConnectX-7 internal rails",
+    "status": "pending"
+  },
+  "remaining": [
+    "distribute and verify the exact image ID on all three ranks",
+    "full three-rank model load and selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}

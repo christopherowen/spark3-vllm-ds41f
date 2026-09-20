@@ -54,10 +54,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:cb5fe5cf07559886785529f14c5885b4d851c688810cb6deb702f4e62557cb62",
-  "deployment_status": "custom-weight allocation fix source-qualified pending image rebuild; promoted rollback retained",
+  "image_digest": "sha256:b6791daa67f15b66e6cc251f3d482168c1c4116febecca6a7ada650d5ba336a5",
+  "deployment_status": "custom-weight allocation image qualified pending distribution and full-model-load retry; promoted rollback retained",
   "integration_status": {
-    "status": "custom-weight allocation source fix complete pending image rebuild and full-model-load retry",
+    "status": "custom-weight allocation image built and focused target tests passed; pending full-model-load retry",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

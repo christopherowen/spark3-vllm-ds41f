@@ -1,5 +1,5 @@
 {
-  "status": "custom-weight-allocation-fix-source-qualified-pending-image-rebuild",
+  "status": "custom-weight-allocation-image-qualified-pending-full-launch",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -28,7 +28,8 @@
     "module_cycle_corrected_image": "sha256:cb5fe5cf07559886785529f14c5885b4d851c688810cb6deb702f4e62557cb62 passed all 8 focused DS4.1 B12X tests on GB10; exact source labels and image ID verified on every rank",
     "module_cycle_image_distribution": "parallel uncompressed Docker streams used both ConnectX-7 internal rails; dgx1 and dgx2 completed in 142 seconds wall-clock",
     "third_full_launch": "passed both prior boundaries, initialized NCCL 2.30.7 and RoCEnante, selected all native model kernels and disk Engram, then failed on the first custom checkpoint destination because its storage was outside the loader-owned pool; no OOM occurred",
-    "custom_weight_allocation_resolution": "all DS4.1 checkpoint-owned custom tensors now use the explicit loader allocation policy; runtime buffers remain outside it; Ruff, format, py_compile, and source diff checks pass"
+    "custom_weight_allocation_resolution": "all DS4.1 checkpoint-owned custom tensors now use the explicit loader allocation policy; runtime buffers remain outside it; Ruff, format, py_compile, and source diff checks pass",
+    "custom_weight_allocation_image": "sha256:b6791daa67f15b66e6cc251f3d482168c1c4116febecca6a7ada650d5ba336a5 has exact source labels and passed all 8 focused DS4.1 B12X tests on GB10"
   },
   "summary": {
     "ttft_seconds": null,
@@ -78,7 +79,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "custom-weight-allocation-fix-source-qualified-pending-rebuild-and-three-rank-serving-gates",
+    "status": "custom-weight-allocation-image-qualified-pending-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

@@ -108,12 +108,10 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
 source trees. It does not stop, restart, or deploy the service. The current
-module-cycle-corrected image and checks are recorded in
-`runs/build-cb5fe5cf0755-validation.json`. The vocabulary-corrected image
-receipt remains at `runs/build-f332c52cb106-validation.json`; its full launch
-is what exposed the isolated module-cycle defect above. The current source adds
-the custom-weight allocation fix exposed by the `cb5fe5cf0755` launch and is
-pending its image rebuild.
+custom-weight-allocation-corrected image and checks are recorded in
+`runs/build-b6791daa67f1-validation.json`. The module-cycle-corrected image
+receipt remains at `runs/build-cb5fe5cf0755-validation.json`; its full launch
+is what exposed the isolated allocation defect above.
 
 The experiment has its own deterministic cluster configuration. It can be
 inspected without changing the promoted configuration:
