@@ -25,5 +25,12 @@
       "result": "6 passed, 2 failed: io_uring PLE support unavailable because the B12X wheel was compiled without liburing development headers"
     }
   ],
+  "follow_up_build_attempts": [
+    {
+      "deployment_commit": "0c087c323101091dde8850fc08b2d1e6ca43b13b",
+      "status": "failed-before-export",
+      "result": "the new native liburing link gate referenced subprocess without importing it in that Dockerfile stage; no image was produced"
+    }
+  ],
   "conclusion": "reject this image before launch; rebuild from a recipe that provides liburing development inputs and gates the native row reader"
 }

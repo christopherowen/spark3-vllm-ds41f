@@ -60,7 +60,6 @@ RUN set -eux; \
       /opt/spark3/candidate/b12x
 RUN python3 - <<'PY'
 import importlib.metadata as metadata
-import subprocess
 
 from packaging.requirements import Requirement
 
@@ -84,6 +83,7 @@ ENV PYTHONPATH=/opt/spark3/candidate/vllm:/opt/spark3/candidate/b12x
 
 RUN python3 - <<'PY'
 import importlib.metadata as metadata
+import subprocess
 
 assert metadata.version("nvidia-cutlass-dsl") == "4.7.1"
 import b12x.attention.compressed_sparse_mla  # noqa: F401
