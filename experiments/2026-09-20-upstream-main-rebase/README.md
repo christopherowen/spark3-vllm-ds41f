@@ -21,7 +21,8 @@ patches to the divergent DS4.1 release snapshots.
 - vLLM carries: quality-preserving 64/8 to 72/9 virtual attention geometry for
   TP3, a native-weight DS4.1 B12X sparse-MLA adapter, and a current-interface
   RoCEnante collective adapter; generic loader-owned checkpoint routing; and
-  an upstream-model disk Engram boundary that stages only requested native rows.
+  an upstream-model disk Engram boundary that stages only requested native rows;
+  plus TP-aware vocabulary padding for non-power-of-two tensor parallel sizes.
 - B12X carries: the qualified 3072-token mHC policy, per-peer/HCA RoCEnante
   routing for the switchless ring, explicit CUTLASS DSL 4.7.1 alignment, and a
   fail-closed managed-memory loader adapter for current upstream vLLM.
@@ -45,6 +46,14 @@ GB10 runtime qualification, and has been copied byte-for-byte to all ranks over
 the ConnectX-7 internal links. The promoted service remains stopped and
 preserved as the rollback target while the corrected image proceeds through
 full model-load and serving qualification.
+
+The first full TP3 construction attempt then exposed one additional generic
+upstream boundary before weight loading: the 129,280-token vocabulary was
+padded to 64-row storage alignment but not to the TP3 world size. The isolated
+fix pads storage to `lcm(64, TP size)`—129,408 rows for TP3—while preserving the
+original token rows and logits. The extra 128 rows are inert padding. The exact
+failure and invariant are recorded in
+`runs/launch-8649ec7238e3-tp3-vocab.json`.
 
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38

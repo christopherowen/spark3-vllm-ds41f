@@ -33,6 +33,12 @@ coordinated transfer hook is not upstream. Disk Engram consumes file ranges
 directly and never allocates the roughly 63 GiB-per-rank table as resident model
 memory.
 
+The first complete TP3 model-construction attempt also showed that upstream
+`VocabParallelEmbedding`'s fixed 64-row padding is not always divisible by
+non-power-of-two TP sizes. The candidate now retains 64-row alignment while
+padding to its least common multiple with TP size. For DS4.1 TP3 this adds only
+inert rows beyond the native vocabulary and leaves token selection unchanged.
+
 ## Valid routes
 
 ### Selected route: qualify B12X on CUTLASS DSL 4.7.1

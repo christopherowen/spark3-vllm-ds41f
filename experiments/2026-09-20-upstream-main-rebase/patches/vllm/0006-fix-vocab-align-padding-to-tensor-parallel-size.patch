@@ -1,0 +1,68 @@
+From 38d69a82fdd0ea76f8a92c15476bba8cc74184f4 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Sun, 20 Sep 2026 18:28:03 +0200
+Subject: [PATCH] fix(vocab): align padding to tensor parallel size
+
+---
+ .../kernels/core/test_vocab_parallel_embedding.py | 15 +++++++++++++++
+ .../layers/vocab_parallel_embedding.py            |  5 ++++-
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/tests/kernels/core/test_vocab_parallel_embedding.py b/tests/kernels/core/test_vocab_parallel_embedding.py
+index b0038c084e..89add9f942 100644
+--- a/tests/kernels/core/test_vocab_parallel_embedding.py
++++ b/tests/kernels/core/test_vocab_parallel_embedding.py
+@@ -13,6 +13,7 @@ import pytest
+ import torch
+ 
+ from vllm import _custom_ops as ops
++from vllm.model_executor.layers import vocab_parallel_embedding as vocab_embedding
+ from vllm.model_executor.layers.vocab_parallel_embedding import (
+     VocabParallelEmbedding,
+     get_masked_input_and_mask,
+@@ -27,6 +28,20 @@ requires_cuda = pytest.mark.skipif(
+ )
+ 
+ 
++@pytest.mark.parametrize("tp_size", [1, 2, 3, 5, 8])
++def test_padding_alignment_includes_tp_size(monkeypatch, tp_size):
++    monkeypatch.setattr(vocab_embedding, "get_tensor_model_parallel_rank", lambda: 0)
++    monkeypatch.setattr(
++        vocab_embedding, "get_tensor_model_parallel_world_size", lambda: tp_size
++    )
++
++    embedding = VocabParallelEmbedding(129280, 8)
++
++    assert embedding.org_vocab_size_padded % 64 == 0
++    assert embedding.org_vocab_size_padded % tp_size == 0
++    assert embedding.num_embeddings_padded % tp_size == 0
++
++
+ def _shard_indices(vocab_size, org_vocab_size, tp_rank, tp_size, pad=64):
+     return VocabParallelEmbedding._get_indices(
+         pad_vocab_size(vocab_size, pad),
+diff --git a/vllm/model_executor/layers/vocab_parallel_embedding.py b/vllm/model_executor/layers/vocab_parallel_embedding.py
+index f4f86d090d..c79025a81c 100644
+--- a/vllm/model_executor/layers/vocab_parallel_embedding.py
++++ b/vllm/model_executor/layers/vocab_parallel_embedding.py
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import math
+ from collections.abc import Sequence
+ from dataclasses import dataclass
+ 
+@@ -277,7 +278,9 @@ class VocabParallelEmbedding(PluggableLayer):
+             self.tp_size = get_tensor_model_parallel_world_size()
+         self.tp_rank = tp_rank
+         self.num_embeddings = num_embeddings
+-        self.padding_size = padding_size
++        # Preserve the requested storage alignment while also guaranteeing
++        # equal vocabulary shards for non-power-of-two TP sizes such as TP3.
++        self.padding_size = math.lcm(padding_size, self.tp_size)
+         self.org_vocab_size = org_num_embeddings or num_embeddings
+         num_added_embeddings = num_embeddings - self.org_vocab_size
+         self.org_vocab_size_padded = pad_vocab_size(
+-- 
+2.54.0 (Apple Git-157)

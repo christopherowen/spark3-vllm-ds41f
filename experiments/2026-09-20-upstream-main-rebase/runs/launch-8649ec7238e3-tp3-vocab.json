@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "status": "failed-before-weight-load",
+  "image_id": "sha256:8649ec7238e36351b079ccf1fd170189c39a8e5d8f81c7e291a1f0910287018e",
+  "deployment_revision": "4601634a40c63a71195489f177d8f3e930460880",
+  "observed": {
+    "stage": "model construction before checkpoint weight loading",
+    "error": "AssertionError: 129280 is not divisible by 3",
+    "source": "VocabParallelEmbedding padded the 129280-token vocabulary to its existing 64-row alignment but not to the TP3 world size",
+    "oom_killed": false,
+    "candidate_cleanup": "failed candidate containers removed from all three nodes",
+    "rollback_state": "stopped promoted containers remained intact on all three nodes"
+  },
+  "resolution": {
+    "method": "pad vocabulary storage to lcm(requested_alignment, tensor_parallel_size)",
+    "tp3_padded_vocab_size": 129408,
+    "quality_invariant": "the original 129280 token rows and logits are unchanged; the additional 128 global rows are inert storage padding and are excluded by the existing logits processor",
+    "provenance": "the same generic behavior exists in the previously working downstream branch; the candidate ports it as an isolated upstream-oriented change",
+    "coverage": "TP1, TP2, TP3, TP5, and TP8 alignment regression cases"
+  }
+}

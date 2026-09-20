@@ -611,11 +611,32 @@ def memguard_is_active(cluster: dict, nodes: dict, node: dict) -> bool:
 
 def wait_for_api(cluster: dict, nodes: dict) -> None:
     head = next(node for node in nodes["nodes"] if node["head"])
+    name = cluster["container"]["name"]
     url = cluster["deployment"]["ready_url"]
     timeout = int(cluster["deployment"]["ready_timeout_seconds"])
     deadline = time.monotonic() + timeout
     print(f"waiting up to {timeout}s for {head['name']} API readiness", flush=True)
     while time.monotonic() < deadline:
+        for node in nodes["nodes"]:
+            state = run_ssh(
+                nodes,
+                node,
+                "docker",
+                "inspect",
+                "--format",
+                "{{.State.Running}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}",
+                name,
+            )
+            if state.returncode or not state.stdout.startswith("true "):
+                state_detail = state.stdout.strip() or state.stderr.strip() or "absent"
+                logs = run_ssh(nodes, node, "docker", "logs", "--tail", "20", name)
+                log_detail = (logs.stdout or logs.stderr).strip()
+                if len(log_detail) > 4000:
+                    log_detail = log_detail[-4000:]
+                raise RuntimeError(
+                    f"{node['name']}: {name} stopped before readiness "
+                    f"({state_detail})\n{log_detail}"
+                )
         result = run_ssh(
             nodes,
             head,
@@ -727,8 +748,9 @@ def command_cluster_start(args: argparse.Namespace) -> int:
             print(f"{node['name']}: launched {result.stdout.strip()}", flush=True)
         wait_for_api(cluster, nodes)
         start_memguards(cluster, nodes, config_relative)
-    except RuntimeError as error:
-        print(f"ERROR: {error}", file=sys.stderr)
+    except (RuntimeError, KeyboardInterrupt) as error:
+        detail = str(error) if str(error) else "cluster start interrupted"
+        print(f"ERROR: {detail}", file=sys.stderr)
         print("rolling back containers started by this command", file=sys.stderr)
         restore_containers(cluster, nodes, backups, started)
         if backups:
@@ -737,7 +759,7 @@ def command_cluster_start(args: argparse.Namespace) -> int:
                 start_memguards(cluster, nodes, config_relative)
             except RuntimeError as rollback_error:
                 print(f"WARN: rollback health check failed: {rollback_error}", file=sys.stderr)
-        return 1
+        return 130 if isinstance(error, KeyboardInterrupt) else 1
 
     for node in nodes["nodes"]:
         backup = backups.get(node["name"])

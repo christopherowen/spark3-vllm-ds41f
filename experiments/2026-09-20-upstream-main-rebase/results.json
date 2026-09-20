@@ -1,5 +1,5 @@
 {
-  "status": "prelaunch-qualified-pending-cluster-run",
+  "status": "tp3-vocabulary-fix-qualified-pending-rebuild",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,11 +15,13 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all five vLLM and four B12X patches replayed from the exact base objects and matched recorded Git tree identities 4262bf458dc2 and a1523b067b4d",
+    "deterministic_source_preparer": "all six vLLM and four B12X patches replayed from the exact base objects and matched recorded Git tree identities 36be6d52dd5b and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
-    "candidate_distribution": "identical image ID on dgx1, dgx2, and dgx3; uncompressed parallel Docker streams traversed the two ConnectX-7 internal rails in approximately 82 seconds"
+    "candidate_distribution": "identical image ID on dgx1, dgx2, and dgx3; uncompressed parallel Docker streams traversed the two ConnectX-7 internal rails in approximately 82 seconds",
+    "first_full_launch": "failed before weight loading because upstream vocabulary padding aligned 129280 rows to 64 but not TP3; no OOM occurred and all failed candidate containers were removed",
+    "tp3_vocabulary_resolution": "generic lcm(storage alignment, TP size) padding copied from the known-working branch; 129408 physical rows preserve all 129280 native token rows, and TP1/2/3/5/8 regression coverage passes"
   },
   "summary": {
     "ttft_seconds": null,
@@ -69,7 +71,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "prelaunch-image-qualified-pending-three-rank-serving-gates",
+    "status": "tp3-vocabulary-fix-pending-content-addressed-rebuild",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

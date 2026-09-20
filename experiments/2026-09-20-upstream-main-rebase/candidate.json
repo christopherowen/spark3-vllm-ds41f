@@ -11,16 +11,18 @@
         "fa075bc82948914cb778a33822eea3a5d537202d",
         "d6b40631cad4bf406f25093f56436f2b8ef10800",
         "8a82c50a6a3147ed14adb15a90bc7cb4322c0829",
-        "7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177"
+        "7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177",
+        "38d69a82fdd0ea76f8a92c15476bba8cc74184f4"
       ],
-      "source_tree": "4262bf458dc2ccdae405e39c5b3c5c2f4c62a723",
+      "source_tree": "36be6d52dd5bcea30186a42b5215dc0f5d7d7231",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
         "patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch",
         "patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch",
         "patches/vllm/0004-feat-loader-add-owned-and-file-backed-weight-routing.patch",
-        "patches/vllm/0005-feat-deepseek-v41-stage-Engram-rows-from-disk.patch"
+        "patches/vllm/0005-feat-deepseek-v41-stage-Engram-rows-from-disk.patch",
+        "patches/vllm/0006-fix-vocab-align-padding-to-tensor-parallel-size.patch"
       ]
     },
     {
@@ -48,10 +50,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "not-built",
-  "deployment_status": "not-deployed",
+  "image_digest": "previous-image-rejected-at-first-full-model-construction",
+  "deployment_status": "candidate-stopped; promoted rollback retained",
   "integration_status": {
-    "status": "source-integration-complete-pending-target-qualification",
+    "status": "source-integration-complete-with-tp3-vocabulary-fix-pending-rebuild",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
