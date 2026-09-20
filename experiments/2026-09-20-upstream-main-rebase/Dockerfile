@@ -31,14 +31,15 @@ USER root
 COPY --from=vllm-source . /opt/spark3/candidate/vllm/
 COPY --from=b12x-source . /opt/spark3/candidate/b12x/
 
-# The base image was built from the exact vLLM base above. Reuse only those
-# matching native extensions, then expose the reviewable Python overlay.
+# The base image was built from the exact vLLM base above. Preserve install-only
+# generated Python modules and matching native extensions that are absent from
+# the Git tree, without overwriting any reviewable candidate source file.
 RUN set -eux; \
     installed=$(python3 -c \
       'from pathlib import Path; import vllm; print(Path(vllm.__file__).parent)'); \
-    cd "$installed"; \
-    find . -type f \( -name '*.so' -o -name '_version.py' \) \
-      -exec cp --parents -a '{}' /opt/spark3/candidate/vllm/vllm/ ';'
+    cp -a --no-clobber "$installed"/. /opt/spark3/candidate/vllm/vllm/; \
+    test -f \
+      /opt/spark3/candidate/vllm/vllm/third_party/flashmla/flash_mla_interface.py
 
 # The official nightly intentionally carries NCCL 2.30.7 over Torch's declared
 # 2.29.7 dependency, and pip check also reports the ARM64 cuSPARSELt marker.
