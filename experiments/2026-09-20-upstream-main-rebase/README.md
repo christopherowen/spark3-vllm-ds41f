@@ -370,6 +370,20 @@ cgroup OOM on either node. The evidence is recorded in
 `runs/build-56820972a862-two-rank-validation.json`. No DS4.1 weights were loaded;
 full TP3 qualification remains gated on recovery of dgx3.
 
+Patch 0022 replaces the remaining architecture-wide warmup guesses with
+model/backend registration. Eligible router layers register their exact shape
+and reachable token range; the finalized DeepSeek indexer metadata builder
+registers its actual strides, verification depth, compression ratio, and PCP
+alignment classes; and B12X paged attention compiles only the page size bound
+to its KV cache. FlashInfer autotuning now requires an explicit capability from
+a selected FlashInfer attention, linear, or MoE backend, rather than merely an
+installed package on a supported GPU. The replay head is
+`6964357a771af30c341a008813ca7bba8810b2e4` with tree
+`f7e10aa21545cf60f41d72a2d39a8b0913efcdf2`. A 32 GiB-capped, model-free GB10
+run passed all 55 focused registration and geometry tests. This source revision
+is prepared for a new immutable image; it has not replaced or restarted the
+stopped patch-0021 candidate.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its

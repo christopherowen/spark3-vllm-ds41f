@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "status": "passed-source-and-model-free-gb10-qualification",
+  "source": {
+    "vllm_patch_head": "6964357a771af30c341a008813ca7bba8810b2e4",
+    "vllm_tree": "f7e10aa21545cf60f41d72a2d39a8b0913efcdf2",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "test_environment": {
+    "host": "dgx1",
+    "base_image": "sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993",
+    "candidate_files_overlaid": true,
+    "immutable_candidate_image_built": false,
+    "memory_limit_gib": 32,
+    "memory_swap_limit_gib": 32
+  },
+  "safety": {
+    "model_loaded": false,
+    "serving_container_started": false,
+    "test_container_removed": true,
+    "host_available_memory_bytes_after_validation": 123594518528,
+    "host_swap_used_bytes_after_validation": 0
+  },
+  "checks": {
+    "source_replay": "twenty-two vLLM and five B12X patches reproduced the recorded revisions and Git trees from the exact upstream bases",
+    "focused_tests": "55 passed: shared JIT registry, router ownership, FlashInfer capability registration, exact B12X page geometry, and DeepSeek indexer warmup specialization",
+    "ruff": "all changed Python files passed formatting plus import and fatal-error checks",
+    "patch_hygiene": "git diff --check passed for both the prepared vLLM source and deployment repository",
+    "configuration": "bin/spark3 doctor passed"
+  },
+  "remaining": [
+    "build a new immutable candidate image from patch 0022",
+    "run full three-rank DS4.1 startup and record selected warmup keys and retained memory",
+    "verify output parity, 4x128K capacity, TTFT, and throughput before promotion"
+  ]
+}

@@ -1,0 +1,1287 @@
+From 6964357a771af30c341a008813ca7bba8810b2e4 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 16:56:51 +0200
+Subject: [PATCH] perf(warmup): register only selected model kernels
+
+---
+ .../test_flashinfer_autotune_warmup.py        |  35 ++++++
+ tests/model_executor/test_jit_warmup.py       |  14 +++
+ tests/model_executor/test_kernel_warmup.py    |  39 ++++---
+ tests/v1/attention/test_b12x.py               |  30 +++++
+ .../test_indexer_deepseek_v4_slot_mapping.py  |  35 +++++-
+ .../model_executor/kernels/linear/__init__.py |  30 ++++-
+ .../kernels/linear/cute_dsl/ll_bf16.py        |  24 ++++
+ .../layers/attention/attention.py             |   5 +
+ .../layers/attention/mla_attention.py         |   6 -
+ .../fused_moe/experts/flashinfer_b12x_moe.py  |   2 +
+ .../experts/flashinfer_cutedsl_batched_moe.py |   2 +
+ .../experts/flashinfer_cutedsl_moe.py         |   2 +
+ .../experts/flashinfer_cutlass_moe.py         |   2 +
+ .../fused_moe/experts/trtllm_bf16_moe.py      |   3 +
+ .../fused_moe/experts/trtllm_fp8_moe.py       |   3 +
+ .../fused_moe/experts/trtllm_lora_moe.py      |   2 +
+ .../fused_moe/experts/trtllm_mxfp4_moe.py     |   3 +
+ .../fused_moe/experts/trtllm_mxint4_moe.py    |   2 +
+ .../fused_moe/experts/trtllm_nvfp4_moe.py     |   3 +
+ .../layers/fused_moe/modular_kernel.py        |  14 ++-
+ .../router/bf16x3_router_gemm_cutedsl.py      |  42 +++++++
+ .../layers/fused_moe/router/gate_linear.py    |  35 ++++++
+ vllm/model_executor/warmup/jit_warmup.py      |  15 +++
+ vllm/model_executor/warmup/kernel_warmup.py   | 106 ++----------------
+ vllm/models/deepseek_v4/attention.py          |   9 --
+ vllm/models/deepseek_v41/attention.py         |   9 --
+ vllm/v1/attention/backends/b12x.py            |  34 +++---
+ vllm/v1/attention/backends/flashinfer.py      |   6 +
+ vllm/v1/attention/backends/mla/indexer.py     |  91 +++++++++------
+ vllm/v1/worker/gpu_model_runner.py            |   7 +-
+ 30 files changed, 416 insertions(+), 194 deletions(-)
+
+diff --git a/tests/model_executor/test_flashinfer_autotune_warmup.py b/tests/model_executor/test_flashinfer_autotune_warmup.py
+index dd162629b8..c2343b0f06 100644
+--- a/tests/model_executor/test_flashinfer_autotune_warmup.py
++++ b/tests/model_executor/test_flashinfer_autotune_warmup.py
+@@ -8,6 +8,10 @@ from unittest.mock import Mock, call, patch
+ 
+ import pytest
+ 
++from vllm.model_executor.warmup.jit_warmup import (
++    FLASHINFER_AUTOTUNE_FEATURE,
++    JitWarmupRegistry,
++)
+ from vllm.model_executor.warmup.kernel_warmup import (
+     _flashinfer_autotune_token_counts,
+     _run_flashinfer_autotune_dummy_runs,
+@@ -77,6 +81,37 @@ def test_flashinfer_autotune_token_counts_are_bounded_and_deduplicated():
+     assert token_counts == (32,)
+ 
+ 
++def test_flashinfer_autotune_is_registered_by_selected_linear_backend():
++    from vllm.model_executor.kernels import linear
++
++    registry = JitWarmupRegistry(SimpleNamespace())
++    with registry.activate():
++        linear._register_linear_warmup_features(linear.B12xMxfp8LinearKernel)
++    assert not registry.has_feature(FLASHINFER_AUTOTUNE_FEATURE)
++
++    with registry.activate():
++        linear._register_linear_warmup_features(
++            linear.FlashInferCutedslMxfp8LinearKernel
++        )
++    assert registry.has_feature(FLASHINFER_AUTOTUNE_FEATURE)
++
++
++def test_flashinfer_autotune_is_registered_by_selected_moe_backend():
++    from vllm.model_executor.layers.fused_moe.modular_kernel import FusedMoEExperts
++
++    registry = JitWarmupRegistry(SimpleNamespace())
++    non_flashinfer = SimpleNamespace(requires_flashinfer_autotune=False)
++    flashinfer = SimpleNamespace(requires_flashinfer_autotune=True)
++
++    with registry.activate():
++        FusedMoEExperts._register_warmup_features(non_flashinfer)
++    assert not registry.has_feature(FLASHINFER_AUTOTUNE_FEATURE)
++
++    with registry.activate():
++        FusedMoEExperts._register_warmup_features(flashinfer)
++    assert registry.has_feature(FLASHINFER_AUTOTUNE_FEATURE)
++
++
+ @pytest.mark.parametrize("skip_attn", [False, True])
+ def test_flashinfer_autotune_uses_token_buckets_for_each_dummy_run(skip_attn):
+     from vllm.v1.worker.gpu.model_runner import GPUModelRunner as V2Runner
+diff --git a/tests/model_executor/test_jit_warmup.py b/tests/model_executor/test_jit_warmup.py
+index 7d38f4b40d..92b402edb7 100644
+--- a/tests/model_executor/test_jit_warmup.py
++++ b/tests/model_executor/test_jit_warmup.py
+@@ -9,6 +9,7 @@ from typing import Any, cast
+ import pytest
+ 
+ from vllm.model_executor.warmup.jit_warmup import (
++    FLASHINFER_AUTOTUNE_FEATURE,
+     JitWarmupRegistry,
+     VllmJitKernel,
+     WarmupIntRange,
+@@ -590,6 +591,19 @@ def test_registry_records_only_inside_model_setup_context() -> None:
+     assert kernel.compiled == []
+ 
+ 
++def test_registry_records_features_only_inside_model_setup_context() -> None:
++    registry = JitWarmupRegistry(_config())
++
++    JitWarmupRegistry.register_feature(FLASHINFER_AUTOTUNE_FEATURE)
++    assert not registry.has_feature(FLASHINFER_AUTOTUNE_FEATURE)
++
++    with registry.activate():
++        JitWarmupRegistry.register_feature(FLASHINFER_AUTOTUNE_FEATURE)
++        JitWarmupRegistry.register_feature(FLASHINFER_AUTOTUNE_FEATURE)
++
++    assert registry.has_feature(FLASHINFER_AUTOTUNE_FEATURE)
++
++
+ def test_registry_capture() -> None:
+     class Owner:
+         @JitWarmupRegistry.capture
+diff --git a/tests/model_executor/test_kernel_warmup.py b/tests/model_executor/test_kernel_warmup.py
+index 73b11fb425..69250d4f3f 100644
+--- a/tests/model_executor/test_kernel_warmup.py
++++ b/tests/model_executor/test_kernel_warmup.py
+@@ -1,32 +1,43 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+-from types import SimpleNamespace
++from unittest.mock import Mock
+ 
+ import torch
+ 
+ from vllm.model_executor.layers.fused_moe.router.gate_linear import GateLinear
+-from vllm.model_executor.warmup.kernel_warmup import (
+-    _ll_bf16_router_shapes_from_model,
+-)
++from vllm.model_executor.warmup.jit_warmup import JitWarmupRegistry
+ 
+ 
+ def _gate(*, shape: tuple[int, int], enabled: bool) -> GateLinear:
+     gate = object.__new__(GateLinear)
+     object.__setattr__(gate, "weight", torch.empty(shape, dtype=torch.bfloat16))
++    object.__setattr__(gate, "input_size", shape[1])
++    object.__setattr__(gate, "output_size", shape[0])
+     object.__setattr__(gate, "allow_ll_bf16_gemm", enabled)
+     return gate
+ 
+ 
+-def test_ll_bf16_warmup_only_collects_runtime_eligible_gates() -> None:
+-    model = SimpleNamespace(
+-        modules=lambda: iter(
+-            (
+-                _gate(shape=(384, 5120), enabled=True),
+-                _gate(shape=(256, 4096), enabled=False),
+-                torch.nn.Linear(8, 8),
+-            )
++def test_ll_bf16_warmup_is_registered_only_by_runtime_eligible_gate(
++    monkeypatch,
++) -> None:
++    from vllm.model_executor.kernels.linear.cute_dsl import ll_bf16
++
++    registry = JitWarmupRegistry(object())
++    compile_many = Mock()
++    monkeypatch.setattr(ll_bf16.ll_bf16_gemm_warmup, "compile_many", compile_many)
++
++    with registry.activate():
++        _gate(shape=(384, 5120), enabled=True)._register_ll_bf16_warmup()
++        _gate(shape=(256, 4096), enabled=False)._register_ll_bf16_warmup()
++
++    registry.warmup()
++
++    compile_many.assert_called_once()
++    keys = compile_many.call_args.args[0]
++    assert keys == dict.fromkeys(
++        ll_bf16.ll_bf16_gemm_warmup.get_warmup_keys(
++            shapes=((5120, 384),),
++            m_values=range(1, 17),
+         )
+     )
+-
+-    assert _ll_bf16_router_shapes_from_model(model) == ((5120, 384),)
+diff --git a/tests/v1/attention/test_b12x.py b/tests/v1/attention/test_b12x.py
+index d4fb03764f..9660979dd8 100644
+--- a/tests/v1/attention/test_b12x.py
++++ b/tests/v1/attention/test_b12x.py
+@@ -168,6 +168,36 @@ def test_b12x_attention_runtime_page_size_comes_from_cache() -> None:
+         _kv_page_size(key_cache, torch.empty((3, 128, 4, 128), device="meta"))
+ 
+ 
++def test_b12x_attention_warmup_uses_bound_page_size(monkeypatch) -> None:
++    impl = object.__new__(B12xPagedAttentionImpl)
++    impl.num_heads = 8
++    impl.num_kv_heads = 2
++    impl.head_size = 128
++    impl.output_head_size = 128
++    impl.window_left = -1
++    impl.sinks = None
++    impl.dtype = torch.bfloat16
++    impl.kv_cache_dtype = "auto"
++    impl.kv_torch_dtype = torch.bfloat16
++    impl.device = torch.device("cpu")
++    compiled = []
++    monkeypatch.setattr(
++        impl,
++        "_compile_paged_extend_entry",
++        lambda page_size: compiled.append(page_size),
++    )
++    layer = SimpleNamespace(
++        kv_cache=torch.empty((3, 2, 64, 2 * 128), dtype=torch.bfloat16)
++    )
++
++    unit = impl.get_b12x_warmup_unit(layer, (1, 8), torch.bfloat16)
++    unit.compile()
++
++    assert unit.name == "paged attention"
++    assert unit.key[-1] == 64
++    assert compiled == [64]
++
++
+ def test_b12x_attention_lazily_prepares_decode_bucket(monkeypatch) -> None:
+     impl = object.__new__(B12xPagedAttentionImpl)
+     plan = SimpleNamespace(layout=SimpleNamespace(nbytes=96))
+diff --git a/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py b/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
+index 83fceef018..48d600a778 100644
+--- a/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
++++ b/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
+@@ -21,6 +21,7 @@ from vllm.v1.attention.backends.mla.indexer import (
+     DeepseekV4IndexerBackend,
+     DeepseekV32IndexerMetadataBuilder,
+     DeepseekV41IndexerBackend,
++    PrepareUniformDecodeKernel,
+ )
+ from vllm.v1.attention.backends.mla.sparse_utils import (
+     ConvertReqIndexToGlobalIndexKernel,
+@@ -170,7 +171,7 @@ def test_indexer_preserves_deepseek_v41_mla_block_size():
+     )
+ 
+ 
+-def test_indexer_warmup_normalizes_zero_compress_ratios():
++def test_indexer_warmup_uses_registered_compress_ratio_and_non_pcp_alignment():
+     config = SimpleNamespace(
+         scheduler_config=SimpleNamespace(max_num_batched_tokens=8),
+         model_config=SimpleNamespace(
+@@ -185,14 +186,37 @@ def test_indexer_warmup_normalizes_zero_compress_ratios():
+         ),
+     )
+ 
+-    keys = BuildPrefillChunkMetadataKernel().get_warmup_keys(config)
++    keys = BuildPrefillChunkMetadataKernel().get_warmup_keys(
++        config,
++        compress_ratio=0,
++    )
+ 
+-    assert {key.compress_ratio for key in keys} == {1, 4, 32, 128}
++    assert {key.compress_ratio for key in keys} == {1}
+     assert {(key.query_slice_start, key.query_slice_stop) for key in keys} == {
+         (query_slice_start, query_slice_stop)
+         for query_slice_start in (1, 2, 16)
+         for query_slice_stop in (1, 2, 16)
+     }
++    assert {
++        (
++            key.input_variant.is_aligned("uncompressed_seq_lens"),
++            key.input_variant.is_aligned("cu_compressed_seq_lens"),
++        )
++        for key in keys
++    } == {(False, True), (True, True)}
++
++
++def test_uniform_decode_warmup_uses_finalized_strides_and_decode_depths():
++    keys = PrepareUniformDecodeKernel().get_warmup_keys(
++        block_table_stride=64,
++        expanded_bt_stride=64,
++        max_decode_lens=range(1, 5),
++    )
++
++    assert {(key.block_table_stride, key.expanded_bt_stride) for key in keys} == {
++        (16, 16)
++    }
++    assert {key.max_decode_len for key in keys} == {1, 2}
+ 
+ 
+ def test_indexer_warmup_includes_pcp_normalized_dcp_key(monkeypatch):
+@@ -212,7 +236,10 @@ def test_indexer_warmup_includes_pcp_normalized_dcp_key(monkeypatch):
+         ),
+     )
+ 
+-    keys = BuildPrefillChunkMetadataKernel().get_warmup_keys(config)
++    keys = BuildPrefillChunkMetadataKernel().get_warmup_keys(
++        config,
++        compress_ratio=32,
++    )
+ 
+     # Triton's compile key normalizes generic i32 values to 2 and divisible
+     # i32 values (including zero) to 16.
+diff --git a/vllm/model_executor/kernels/linear/__init__.py b/vllm/model_executor/kernels/linear/__init__.py
+index fb7a170b82..fb7d510282 100644
+--- a/vllm/model_executor/kernels/linear/__init__.py
++++ b/vllm/model_executor/kernels/linear/__init__.py
+@@ -354,6 +354,25 @@ _LINEAR_BACKEND_KERNEL_MAP: dict[str, set[type]] = {
+     },
+ }
+ 
++_FLASHINFER_AUTOTUNE_KERNELS = set().union(
++    *(
++        kernels
++        for backend, kernels in _LINEAR_BACKEND_KERNEL_MAP.items()
++        if backend.startswith("flashinfer_")
++    )
++)
++
++
++def _register_linear_warmup_features(kernel: type) -> type:
++    if kernel in _FLASHINFER_AUTOTUNE_KERNELS:
++        from vllm.model_executor.warmup.jit_warmup import (
++            FLASHINFER_AUTOTUNE_FEATURE,
++            JitWarmupRegistry,
++        )
++
++        JitWarmupRegistry.register_feature(FLASHINFER_AUTOTUNE_FEATURE)
++    return kernel
++
+ 
+ def _filter_kernels_by_backend(
+     backend: str,
+@@ -668,7 +687,7 @@ def choose_scaled_mm_linear_kernel(
+             force_kernel, config, compute_capability
+         )
+         if can_implement:
+-            return force_kernel
++            return _register_linear_warmup_features(force_kernel)
+ 
+         logger.info_once(
+             "Tried to force %s, but the kernel couldn't be implemented",
+@@ -690,7 +709,7 @@ def choose_scaled_mm_linear_kernel(
+             is_supported_and_can_implement_kernel(kernel, config, compute_capability)
+         )
+         if is_supported_and_can_implement:
+-            return kernel
++            return _register_linear_warmup_features(kernel)
+         failure_reason_list.append(failure_reason)
+ 
+     raise ValueError(
+@@ -869,7 +888,7 @@ def choose_mp_linear_kernel(
+         can_implement, failure_reason = kernel.can_implement(config)
+         if can_implement:
+             logger.info_once("Using %s for mixed-precision linear", kernel.__name__)
+-            return kernel
++            return _register_linear_warmup_features(kernel)
+         else:
+             failure_reasons.append(
+                 f" {kernel.__name__} cannot implement due to: {failure_reason}"
+@@ -923,6 +942,7 @@ def init_mxfp8_linear_kernel(*, bmm_batch_size: int | None = None) -> Mxfp8Linea
+             continue
+ 
+         logger.info_once("Using %s for MXFP8 GEMM", kernel_cls.__name__)
++        _register_linear_warmup_features(kernel_cls)
+         return kernel_cls(config)
+ 
+     raise ValueError(
+@@ -969,6 +989,7 @@ def init_mxfp4_linear_kernel(
+             continue
+ 
+         logger.info_once("Using %s for MXFP4 GEMM", kernel_cls.__name__)
++        _register_linear_warmup_features(kernel_cls)
+         return kernel_cls(config)
+ 
+     raise ValueError(
+@@ -1022,6 +1043,7 @@ def init_mxfp6_linear_kernel(
+             continue
+ 
+         logger.info_once("Using %s for MXFP6 GEMM", kernel_cls.__name__)
++        _register_linear_warmup_features(kernel_cls)
+         return kernel_cls(config)
+ 
+     raise ValueError(
+@@ -1136,6 +1158,7 @@ def init_nvfp4_linear_kernel(use_a16: bool = False) -> NvFp4LinearKernel:
+                 f"supported: {reason}"
+             )
+         logger.info_once("Using %s for NVFP4 GEMM", force_kernel.__name__)
++        _register_linear_warmup_features(force_kernel)
+         return force_kernel(config)
+ 
+     # Auto-select from registry (or --linear-backend filtered).
+@@ -1180,6 +1203,7 @@ def init_nvfp4_linear_kernel(use_a16: bool = False) -> NvFp4LinearKernel:
+             )
+ 
+         logger.info_once("Using %s for NVFP4 GEMM", kernel_cls.__name__)
++        _register_linear_warmup_features(kernel_cls)
+         return kernel_cls(config)
+ 
+     raise ValueError(
+diff --git a/vllm/model_executor/kernels/linear/cute_dsl/ll_bf16.py b/vllm/model_executor/kernels/linear/cute_dsl/ll_bf16.py
+index 564abbd84b..fa3f2c4854 100644
+--- a/vllm/model_executor/kernels/linear/cute_dsl/ll_bf16.py
++++ b/vllm/model_executor/kernels/linear/cute_dsl/ll_bf16.py
+@@ -11,6 +11,8 @@ from typing import Any, Literal
+ 
+ import torch
+ 
++from vllm.model_executor.warmup.jit_warmup import VllmJitKernel
++
+ logger = logging.getLogger(__name__)
+ 
+ _cutedsl_available: bool | None = None
+@@ -329,8 +331,30 @@ class LLBf16Gemm:
+         return output
+ 
+ 
++class LLBf16Warmup(VllmJitKernel[LLBf16Gemm.CompileKey]):
++    """Registry adapter for the runtime-owned ll_bf16 kernel cache."""
++
++    CompileKey = LLBf16Gemm.CompileKey
++
++    def __init__(self, kernel: LLBf16Gemm) -> None:
++        self.kernel = kernel
++        super().__init__()
++
++    def get_warmup_keys(
++        self,
++        *,
++        shapes: Iterable[tuple[int, int]],
++        m_values: Iterable[int],
++    ) -> list[LLBf16Gemm.CompileKey]:
++        return self.kernel.get_warmup_keys(shapes=shapes, m_values=m_values)
++
++    def compile(self, compile_key: LLBf16Gemm.CompileKey) -> None:
++        self.kernel.compile(compile_key)
++
++
+ ll_bf16_gemm_kernel = LLBf16Gemm()
+ ll_bf16_gemm_c1_pdl_kernel = LLBf16Gemm(prefetch_pdl_weights=True)
++ll_bf16_gemm_warmup = LLBf16Warmup(ll_bf16_gemm_kernel)
+ 
+ 
+ def ll_bf16_gemm(
+diff --git a/vllm/model_executor/layers/attention/attention.py b/vllm/model_executor/layers/attention/attention.py
+index 79012a4a5c..a8b46a775a 100644
+--- a/vllm/model_executor/layers/attention/attention.py
++++ b/vllm/model_executor/layers/attention/attention.py
+@@ -584,6 +584,11 @@ class Attention(nn.Module, AttentionLayerBase):
+ 
+     def process_weights_after_loading(self, act_dtype: torch.dtype):
+         self.impl.process_weights_after_loading(act_dtype)
++        if callable(getattr(self.impl, "get_b12x_warmup_unit", None)):
++            # The selected implementation owns its warmup. Binding it to the
++            # instantiated layer lets the provider inspect finalized KV-cache
++            # geometry instead of compiling every page size the backend knows.
++            self.b12x_warmup_provider = self.impl
+ 
+         # If we should not load quant weights, we initialize the scales to 1.0
+         # as the default value. See [Note: Register q/k/v/prob scales in state dict]
+diff --git a/vllm/model_executor/layers/attention/mla_attention.py b/vllm/model_executor/layers/attention/mla_attention.py
+index 3104ac25c6..75761df6f1 100644
+--- a/vllm/model_executor/layers/attention/mla_attention.py
++++ b/vllm/model_executor/layers/attention/mla_attention.py
+@@ -647,14 +647,8 @@ class MLAAttention(nn.Module, AttentionLayerBase):
+                 from vllm.v1.attention.backends.mla.compressor_utils import (
+                     _COMPRESSED_SLOT_MAPPING_KERNEL,
+                 )
+-                from vllm.v1.attention.backends.mla.indexer import (
+-                    _BUILD_PREFILL_CHUNK_METADATA_KERNEL,
+-                    _PREPARE_UNIFORM_DECODE_KERNEL,
+-                )
+ 
+                 _COMPRESSED_SLOT_MAPPING_KERNEL.register_warmup()
+-                _PREPARE_UNIFORM_DECODE_KERNEL.register_warmup()
+-                _BUILD_PREFILL_CHUNK_METADATA_KERNEL.register_warmup()
+ 
+                 if backend_name != "DEEPSEEK_V32_INDEXER":
+                     from vllm.v1.attention.backends.mla.sparse_swa import (
+diff --git a/vllm/model_executor/layers/fused_moe/experts/flashinfer_b12x_moe.py b/vllm/model_executor/layers/fused_moe/experts/flashinfer_b12x_moe.py
+index 97e3021afc..7b8e611916 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/flashinfer_b12x_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/flashinfer_b12x_moe.py
+@@ -43,6 +43,8 @@ class FlashInferB12xExperts(mk.FusedMoEExpertsModular):
+     Only NVFP4 (kNvfp4Static/kNvfp4Dynamic) quantization is supported.
+     """
+ 
++    requires_flashinfer_autotune = True
++
+     _ACTIVATION_MAP: dict[MoEActivation, str] = {
+         MoEActivation.SILU: "silu",
+         MoEActivation.GELU_TANH: "gelu_tanh",
+diff --git a/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutedsl_batched_moe.py b/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutedsl_batched_moe.py
+index f7e3371166..76342d2b19 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutedsl_batched_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutedsl_batched_moe.py
+@@ -32,6 +32,8 @@ logger = init_logger(__name__)
+ 
+ 
+ class FlashInferCuteDSLBatchedExperts(mk.FusedMoEExpertsModular):
++    requires_flashinfer_autotune = True
++
+     def __init__(
+         self,
+         moe_config: FusedMoEConfig,
+diff --git a/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutedsl_moe.py b/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutedsl_moe.py
+index d525822b91..0cab6764a9 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutedsl_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutedsl_moe.py
+@@ -29,6 +29,8 @@ from vllm.utils.flashinfer import (
+ 
+ 
+ class FlashInferCuteDSLExperts(mk.FusedMoEExpertsModular):
++    requires_flashinfer_autotune = True
++
+     """CuteDSL NvFP4 MoE experts using the FlashInfer functional API.
+ 
+     Uses Standard activation format (non-batched). The kernel handles
+diff --git a/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutlass_moe.py b/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutlass_moe.py
+index 718e018c47..cc92f8bec9 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutlass_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/flashinfer_cutlass_moe.py
+@@ -62,6 +62,8 @@ def is_valid_flashinfer_cutlass_fused_moe(
+ 
+ 
+ class FlashInferExperts(mk.FusedMoEExpertsModular):
++    requires_flashinfer_autotune = True
++
+     def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
+         if self.quant_config.use_nvfp4_w4a4:
+             layer.w13_weight_scale_2.data.mul_(layer.w13_input_scale)
+diff --git a/vllm/model_executor/layers/fused_moe/experts/trtllm_bf16_moe.py b/vllm/model_executor/layers/fused_moe/experts/trtllm_bf16_moe.py
+index 54227d3cd1..543bdc7cf0 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/trtllm_bf16_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/trtllm_bf16_moe.py
+@@ -45,6 +45,8 @@ class TrtLlmBf16ExpertsBase:
+     monolithic interfaces.
+     """
+ 
++    requires_flashinfer_autotune = True
++
+     @staticmethod
+     def is_supported_config(
+         cls: type[mk.FusedMoEExperts],
+@@ -75,6 +77,7 @@ class TrtLlmBf16ExpertsBase:
+         moe_config: FusedMoEConfig,
+         quant_config: FusedMoEQuantConfig,
+     ):
++        self._register_warmup_features()
+         self.routing_method_type = moe_config.routing_method
+         self.topk = moe_config.experts_per_token
+         self.intermediate_size_per_partition = (
+diff --git a/vllm/model_executor/layers/fused_moe/experts/trtllm_fp8_moe.py b/vllm/model_executor/layers/fused_moe/experts/trtllm_fp8_moe.py
+index e860597bcb..28cf037373 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/trtllm_fp8_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/trtllm_fp8_moe.py
+@@ -58,6 +58,8 @@ def prepare_deepseek_fp8_x_sf(x: torch.Tensor, x_sf: torch.Tensor) -> torch.Tens
+ 
+ 
+ class TrtLlmFp8ExpertsBase:
++    requires_flashinfer_autotune = True
++
+     """Fp8 TRTLLM-Gen MoE kernels. Shared base for modular and monolithic
+     interfaces.
+     """
+@@ -112,6 +114,7 @@ class TrtLlmFp8ExpertsBase:
+         moe_config: FusedMoEConfig,
+         quant_config: FusedMoEQuantConfig,
+     ):
++        self._register_warmup_features()
+         self.routing_method_type = moe_config.routing_method
+         self.topk = moe_config.experts_per_token
+         self.intermediate_size_per_partition = (
+diff --git a/vllm/model_executor/layers/fused_moe/experts/trtllm_lora_moe.py b/vllm/model_executor/layers/fused_moe/experts/trtllm_lora_moe.py
+index 1c5698932a..775e94c7f3 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/trtllm_lora_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/trtllm_lora_moe.py
+@@ -113,6 +113,8 @@ def _finalize_lora_kernel(
+ class _TrtLlmLoRAExpertsBase(LoRAExpertsMixin, mk.FusedMoEExpertsModular):
+     """LoRA-aware trtllm MoE experts."""
+ 
++    requires_flashinfer_autotune = True
++
+     def __init__(
+         self,
+         moe_config: FusedMoEConfig,
+diff --git a/vllm/model_executor/layers/fused_moe/experts/trtllm_mxfp4_moe.py b/vllm/model_executor/layers/fused_moe/experts/trtllm_mxfp4_moe.py
+index 1c20bc1cbc..1ed171dda1 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/trtllm_mxfp4_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/trtllm_mxfp4_moe.py
+@@ -37,12 +37,15 @@ from vllm.utils.flashinfer import has_flashinfer
+ class TrtLlmMxfp4ExpertsBase:
+     """MXFP4 TRTLLM-Gen MoE kernels. Shared base for modular and monolithic."""
+ 
++    requires_flashinfer_autotune = True
++
+     def __init__(
+         self,
+         moe_config: FusedMoEConfig,
+         quant_config: FusedMoEQuantConfig,
+         **kwargs,
+     ):
++        self._register_warmup_features()
+         self.moe_config = moe_config
+         self.quant_config = quant_config
+ 
+diff --git a/vllm/model_executor/layers/fused_moe/experts/trtllm_mxint4_moe.py b/vllm/model_executor/layers/fused_moe/experts/trtllm_mxint4_moe.py
+index e3e9bc6f2e..4618f651e3 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/trtllm_mxint4_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/trtllm_mxint4_moe.py
+@@ -25,6 +25,8 @@ class TrtLlmMxint4ExpertsMonolithic(mk.FusedMoEExpertsMonolithic):
+     Wraps flashinfer_trtllm_mxint4_moe().
+     """
+ 
++    requires_flashinfer_autotune = True
++
+     def __init__(
+         self,
+         moe_config: FusedMoEConfig,
+diff --git a/vllm/model_executor/layers/fused_moe/experts/trtllm_nvfp4_moe.py b/vllm/model_executor/layers/fused_moe/experts/trtllm_nvfp4_moe.py
+index cea985830d..e89a0fba0b 100644
+--- a/vllm/model_executor/layers/fused_moe/experts/trtllm_nvfp4_moe.py
++++ b/vllm/model_executor/layers/fused_moe/experts/trtllm_nvfp4_moe.py
+@@ -44,12 +44,15 @@ _PER_TOKEN_BASE_GLOBAL_SCALE = 1.0 / (448.0 * 6.0)
+ class TrtLlmNvFp4ExpertsBase:
+     """NvFp4 TRTLLM-Gen MoE kernels. Supports modular and monolithic interface."""
+ 
++    requires_flashinfer_autotune = True
++
+     def __init__(
+         self,
+         moe_config: FusedMoEConfig,
+         quant_config: FusedMoEQuantConfig,
+         per_token_activation: bool = False,
+     ):
++        self._register_warmup_features()
+         self.moe_config = moe_config
+         self.quant_config = quant_config
+         # Quantize the input here (deferred from prepare) to capture a per-token
+diff --git a/vllm/model_executor/layers/fused_moe/modular_kernel.py b/vllm/model_executor/layers/fused_moe/modular_kernel.py
+index d91743dd95..dfee99f763 100644
+--- a/vllm/model_executor/layers/fused_moe/modular_kernel.py
++++ b/vllm/model_executor/layers/fused_moe/modular_kernel.py
+@@ -5,7 +5,7 @@ from collections.abc import Callable
+ from dataclasses import dataclass
+ from enum import Enum
+ from math import prod
+-from typing import final
++from typing import ClassVar, final
+ 
+ import torch
+ 
+@@ -455,6 +455,7 @@ class FusedMoEExperts(ABC):
+     # expert_map. RoutedExperts.expert_map reads this flag to pick which to hand
+     # the active experts kernel.
+     consumes_expert_mask: bool = False
++    requires_flashinfer_autotune: ClassVar[bool] = False
+ 
+     def __init__(
+         self,
+@@ -466,6 +467,7 @@ class FusedMoEExperts(ABC):
+         """moe_config: MoE layer configuration.
+         quant_config: Quantization parameters for this experts instance.
+         """
++        self._register_warmup_features()
+         if self.activation_format() == FusedMoEActivationFormat.Standard and (
+             max_num_tokens is not None or num_dispatchers is not None
+         ):
+@@ -489,6 +491,16 @@ class FusedMoEExperts(ABC):
+         self.max_num_tokens = max_num_tokens
+         self.num_dispatchers = num_dispatchers
+ 
++    def _register_warmup_features(self) -> None:
++        if not self.requires_flashinfer_autotune:
++            return
++        from vllm.model_executor.warmup.jit_warmup import (
++            FLASHINFER_AUTOTUNE_FEATURE,
++            JitWarmupRegistry,
++        )
++
++        JitWarmupRegistry.register_feature(FLASHINFER_AUTOTUNE_FEATURE)
++
+     def process_weights_after_loading(self, layer: torch.nn.Module) -> None:  # noqa: B027
+         pass
+ 
+diff --git a/vllm/model_executor/layers/fused_moe/router/bf16x3_router_gemm_cutedsl.py b/vllm/model_executor/layers/fused_moe/router/bf16x3_router_gemm_cutedsl.py
+index 2190eea157..74ed7d334f 100644
+--- a/vllm/model_executor/layers/fused_moe/router/bf16x3_router_gemm_cutedsl.py
++++ b/vllm/model_executor/layers/fused_moe/router/bf16x3_router_gemm_cutedsl.py
+@@ -12,6 +12,7 @@ boundaries the epilogue warps drain the main-term accumulator into a register
+ master accumulator and the MMA warp resets it.
+ """
+ 
++from dataclasses import dataclass
+ from functools import cache
+ 
+ import cutlass
+@@ -24,6 +25,7 @@ from cutlass.cutlass_dsl import T, dsl_user_op
+ from quack.compile_utils import make_fake_tensor
+ 
+ from vllm.cute_utils import _tcgen05, simple_tma_copy
++from vllm.model_executor.warmup.jit_warmup import VllmJitKernel
+ from vllm.triton_utils import tl, triton
+ from vllm.utils import math_utils
+ from vllm.utils.torch_utils import direct_register_custom_op
+@@ -605,6 +607,46 @@ def warmup_bf16x3_router_gemm(
+     return configs
+ 
+ 
++class BF16x3RouterWarmup(VllmJitKernel["BF16x3RouterWarmup.CompileKey"]):
++    """Model-registered warmup for one reachable BF16x3 router shape."""
++
++    @dataclass(frozen=True)
++    class CompileKey:
++        input_size: int
++        output_size: int
++        min_num_tokens: int
++        max_num_tokens: int
++
++    def dispatch(
++        self,
++        *,
++        input_size: int,
++        output_size: int,
++        min_num_tokens: int,
++        max_num_tokens: int,
++    ) -> CompileKey:
++        return self.CompileKey(
++            input_size=input_size,
++            output_size=output_size,
++            min_num_tokens=min_num_tokens,
++            max_num_tokens=max_num_tokens,
++        )
++
++    def get_warmup_keys(self, **kwargs) -> list[CompileKey]:
++        return [self.dispatch(**kwargs)]
++
++    def compile(self, compile_key: CompileKey) -> None:
++        warmup_bf16x3_router_gemm(
++            compile_key.input_size,
++            compile_key.output_size,
++            compile_key.min_num_tokens,
++            compile_key.max_num_tokens,
++        )
++
++
++BF16X3_ROUTER_WARMUP = BF16x3RouterWarmup()
++
++
+ def _bf16x3_router_gemm(X: torch.Tensor, W: torch.Tensor) -> torch.Tensor:
+     """Return ``X @ W.T`` using the SM100 BF16x3 router GEMM kernel."""
+     N, K = X.shape
+diff --git a/vllm/model_executor/layers/fused_moe/router/gate_linear.py b/vllm/model_executor/layers/fused_moe/router/gate_linear.py
+index f546dfd98c..5e616c1b12 100644
+--- a/vllm/model_executor/layers/fused_moe/router/gate_linear.py
++++ b/vllm/model_executor/layers/fused_moe/router/gate_linear.py
+@@ -31,6 +31,7 @@ class GateLinear(ReplicatedLinear):
+     #   (3072, 256) -> MiniMax-M2/M2.5,  (6144, 128) -> MiniMax-M3
+     FP32_SUPPORTED_SHAPES = {(3072, 256), (6144, 128)}
+     FP32_MAX_TOKENS = 32
++    LL_BF16_MAX_TOKENS = 16
+ 
+     def __init__(
+         self,
+@@ -132,6 +133,39 @@ class GateLinear(ReplicatedLinear):
+                 and self.out_dtype == torch.float32
+                 and is_available()
+             )
++        self._register_ll_bf16_warmup()
++        self._register_bf16x3_warmup()
++
++    def _register_ll_bf16_warmup(self) -> None:
++        """Register only the router specialization this layer can execute."""
++        if not self.allow_ll_bf16_gemm:
++            return
++        from vllm.model_executor.kernels.linear.cute_dsl.ll_bf16 import (
++            ll_bf16_gemm_warmup,
++        )
++
++        ll_bf16_gemm_warmup.register_warmup(
++            shapes=((self.input_size, self.output_size),),
++            m_values=range(1, self.LL_BF16_MAX_TOKENS + 1),
++        )
++
++    def _register_bf16x3_warmup(self) -> None:
++        if not self.allow_bf16x3_router_gemm:
++            return
++        from vllm.config import get_current_vllm_config
++        from vllm.model_executor.layers.fused_moe.router.bf16x3_router_gemm_cutedsl import (  # noqa: E501
++            BF16X3_ROUTER_WARMUP,
++        )
++
++        max_tokens = get_current_vllm_config().scheduler_config.max_num_batched_tokens
++        BF16X3_ROUTER_WARMUP.register_warmup(
++            input_size=self.input_size,
++            output_size=self.output_size,
++            min_num_tokens=(
++                self.FP32_MAX_TOKENS + 1 if self.allow_fp32_router_gemm else 1
++            ),
++            max_num_tokens=max_tokens,
++        )
+ 
+     def set_out_dtype(self, out_dtype: torch.dtype) -> None:
+         """Set output dtype for the router logits after init.
+@@ -161,6 +195,7 @@ class GateLinear(ReplicatedLinear):
+                 and out_dtype == torch.float32
+                 and is_available()
+             )
++            self._register_ll_bf16_warmup()
+ 
+     def forward(
+         self, x: torch.Tensor
+diff --git a/vllm/model_executor/warmup/jit_warmup.py b/vllm/model_executor/warmup/jit_warmup.py
+index 84f713aa64..62d4cf678c 100644
+--- a/vllm/model_executor/warmup/jit_warmup.py
++++ b/vllm/model_executor/warmup/jit_warmup.py
+@@ -19,6 +19,7 @@ from functools import wraps
+ from typing import Any, Generic, TypeVar, cast
+ 
+ __all__ = [
++    "FLASHINFER_AUTOTUNE_FEATURE",
+     "JitWarmupRegistry",
+     "VllmJitKernel",
+     "WarmupChoices",
+@@ -29,6 +30,8 @@ __all__ = [
+     "zip_inputs",
+ ]
+ 
++FLASHINFER_AUTOTUNE_FEATURE = "flashinfer_autotune"
++
+ 
+ CompileKeyT = TypeVar("CompileKeyT")
+ 
+@@ -1015,6 +1018,7 @@ class JitWarmupRegistry:
+ 
+     def __init__(self, vllm_config: Any) -> None:
+         self.vllm_config = vllm_config
++        self._features: set[str] = set()
+         self._registrations: dict[
+             VllmJitKernel[Any],
+             list[tuple[tuple[Any, ...], dict[str, Any]]],
+@@ -1054,6 +1058,17 @@ class JitWarmupRegistry:
+         if registry is not None:
+             registry._add(kernel, args, kwargs)
+ 
++    @classmethod
++    def register_feature(cls, feature: str) -> None:
++        """Record a warmup capability selected during runner construction."""
++        registry = cls._active.get()
++        if registry is not None:
++            registry._features.add(feature)
++
++    def has_feature(self, feature: str) -> bool:
++        """Return whether a selected model or backend requested ``feature``."""
++        return feature in self._features
++
+     def _add(
+         self,
+         kernel: VllmJitKernel[Any],
+diff --git a/vllm/model_executor/warmup/kernel_warmup.py b/vllm/model_executor/warmup/kernel_warmup.py
+index c2467bb33c..e6ad3e025d 100644
+--- a/vllm/model_executor/warmup/kernel_warmup.py
++++ b/vllm/model_executor/warmup/kernel_warmup.py
+@@ -25,6 +25,7 @@ from vllm.model_executor.warmup.flashinfer_sparse_mla_warmup import (
+     deepseek_v4_sparse_mla_attention_warmup,
+     flashinfer_sparse_mla_decode_autotune_warmup,
+ )
++from vllm.model_executor.warmup.jit_warmup import FLASHINFER_AUTOTUNE_FEATURE
+ from vllm.model_executor.warmup.kimi_k3_triton_warmup import (
+     kimi_k3_triton_warmup,
+ )
+@@ -50,93 +51,6 @@ if TYPE_CHECKING:
+ 
+ logger = init_logger(__name__)
+ 
+-_LL_BF16_WARMUP_M_RANGE = range(1, 17)
+-
+-
+-def _ll_bf16_router_shapes_from_model(
+-    model: torch.nn.Module,
+-) -> tuple[tuple[int, int], ...]:
+-    from vllm.model_executor.layers.fused_moe.router.gate_linear import GateLinear
+-
+-    shapes: set[tuple[int, int]] = set()
+-    for module in model.modules():
+-        if not isinstance(module, GateLinear):
+-            continue
+-        if not module.allow_ll_bf16_gemm:
+-            continue
+-        weight = getattr(module, "weight", None)
+-        if not isinstance(weight, torch.Tensor):
+-            continue
+-        if weight.dim() != 2 or weight.dtype != torch.bfloat16:
+-            continue
+-        n, k = weight.shape
+-        if k % 8 == 0:
+-            shapes.add((int(k), int(n)))
+-    return tuple(sorted(shapes))
+-
+-
+-def _warmup_ll_bf16_router_gemm(model: torch.nn.Module) -> None:
+-    from vllm.model_executor.kernels.linear.cute_dsl.ll_bf16 import (
+-        is_available as is_ll_bf16_gemm_available,
+-    )
+-    from vllm.model_executor.kernels.linear.cute_dsl.ll_bf16 import (
+-        ll_bf16_gemm_kernel,
+-    )
+-
+-    if not is_ll_bf16_gemm_available():
+-        return
+-
+-    shapes = _ll_bf16_router_shapes_from_model(model)
+-    if not shapes:
+-        logger.debug_once(
+-            "Skipping ll_bf16 router GEMM warmup: no bf16 GateLinear shapes found."
+-        )
+-        return
+-
+-    logger.info_once("Warming up ll_bf16 router GEMM kernels for shapes: %s.", shapes)
+-    ll_bf16_gemm_kernel.warmup(
+-        shapes=shapes,
+-        m_values=_LL_BF16_WARMUP_M_RANGE,
+-    )
+-
+-
+-def _warmup_bf16x3_router_gemm(
+-    model: torch.nn.Module,
+-    max_num_tokens: int,
+-) -> None:
+-    from vllm.model_executor.layers.fused_moe.router.bf16x3_router_gemm_cutedsl import (  # noqa: E501
+-        warmup_bf16x3_router_gemm,
+-    )
+-    from vllm.model_executor.layers.fused_moe.router.gate_linear import GateLinear
+-
+-    gate = next(
+-        (
+-            module
+-            for module in model.modules()
+-            if isinstance(module, GateLinear) and module.allow_bf16x3_router_gemm
+-        ),
+-        None,
+-    )
+-    if gate is None:
+-        logger.debug_once(
+-            "Skipping BF16x3 router GEMM warmup: no eligible GateLinear found."
+-        )
+-        return
+-
+-    min_num_tokens = gate.FP32_MAX_TOKENS + 1 if gate.allow_fp32_router_gemm else 1
+-    logger.info_once(
+-        "Warming up BF16x3 router GEMM for K=%d, M=%d.",
+-        gate.input_size,
+-        gate.output_size,
+-    )
+-    configs = warmup_bf16x3_router_gemm(
+-        gate.input_size,
+-        gate.output_size,
+-        min_num_tokens,
+-        max_num_tokens,
+-    )
+-    logger.info_once("Warmed up BF16x3 router GEMM configs: %s.", configs)
+-
+ 
+ def _warmup_kimi_k3_gemm_rs_ar() -> None:
+     # Kimi-K3 model construction imports this module only when GEMM-RS/AR is
+@@ -201,15 +115,6 @@ def kernel_warmup(worker: "Worker", *, process_local_only: bool = False):
+         watermark_sample_warmup(worker)
+         qwen4_exp_qsa_triton_warmup(worker)
+ 
+-    if enable_jit_warmup and current_platform.is_device_capability_family(100):
+-        _warmup_bf16x3_router_gemm(
+-            worker.get_model(),
+-            worker.scheduler_config.max_num_batched_tokens,
+-        )
+-
+-    if current_platform.has_device_capability(90):
+-        _warmup_ll_bf16_router_gemm(worker.get_model())
+-
+     _warmup_kimi_k3_gemm_rs_ar()
+ 
+     if worker.vllm_config.kernel_config.enable_cutedsl_warmup:
+@@ -251,9 +156,18 @@ def kernel_warmup(worker: "Worker", *, process_local_only: bool = False):
+     enable_flashinfer_autotune = (
+         worker.vllm_config.kernel_config.enable_flashinfer_autotune
+     )
++    flashinfer_autotune_registered = (
++        worker.model_runner.jit_warmup_registry.has_feature(  # type: ignore[attr-defined]
++            FLASHINFER_AUTOTUNE_FEATURE
++        )
++    )
+     # FlashInfer autotune for Hopper (SM 9.0) and Blackwell (SM 10.0) GPUs
+     if enable_flashinfer_autotune is False:
+         logger.info_once("Skipping FlashInfer autotune because it is disabled.")
++    elif not flashinfer_autotune_registered:
++        logger.info_once(
++            "Skipping FlashInfer autotune because no selected backend requested it."
++        )
+     elif has_flashinfer() and current_platform.has_device_capability(90):
+         flashinfer_autotune(worker.model_runner)
+ 
+diff --git a/vllm/models/deepseek_v4/attention.py b/vllm/models/deepseek_v4/attention.py
+index 8a151dba1d..ec8d0b88bb 100644
+--- a/vllm/models/deepseek_v4/attention.py
++++ b/vllm/models/deepseek_v4/attention.py
+@@ -386,15 +386,6 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+ 
+                 _COMPRESSED_SLOT_MAPPING_KERNEL.register_warmup()
+ 
+-            if self.indexer is not None:
+-                from vllm.v1.attention.backends.mla.indexer import (
+-                    _BUILD_PREFILL_CHUNK_METADATA_KERNEL,
+-                    _PREPARE_UNIFORM_DECODE_KERNEL,
+-                )
+-
+-                _PREPARE_UNIFORM_DECODE_KERNEL.register_warmup()
+-                _BUILD_PREFILL_CHUNK_METADATA_KERNEL.register_warmup()
+-
+             spec_config = vllm_config.speculative_config
+             if spec_config is not None and spec_config.use_dspark():
+                 from vllm.v1.attention.backends.mla.sparse_swa import (
+diff --git a/vllm/models/deepseek_v41/attention.py b/vllm/models/deepseek_v41/attention.py
+index d4bbcb1212..c914ebcc71 100644
+--- a/vllm/models/deepseek_v41/attention.py
++++ b/vllm/models/deepseek_v41/attention.py
+@@ -623,15 +623,6 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+ 
+                 _COMPRESSED_SLOT_MAPPING_KERNEL.register_warmup()
+ 
+-            if self.indexer is not None:
+-                from vllm.v1.attention.backends.mla.indexer import (
+-                    _BUILD_PREFILL_CHUNK_METADATA_KERNEL,
+-                    _PREPARE_UNIFORM_DECODE_KERNEL,
+-                )
+-
+-                _PREPARE_UNIFORM_DECODE_KERNEL.register_warmup()
+-                _BUILD_PREFILL_CHUNK_METADATA_KERNEL.register_warmup()
+-
+             spec_config = vllm_config.speculative_config
+             if spec_config is not None and spec_config.use_dspark():
+                 from vllm.v1.attention.backends.mla.sparse_swa import (
+diff --git a/vllm/v1/attention/backends/b12x.py b/vllm/v1/attention/backends/b12x.py
+index d2b28eed0a..6e7cb1e909 100644
+--- a/vllm/v1/attention/backends/b12x.py
++++ b/vllm/v1/attention/backends/b12x.py
+@@ -15,13 +15,9 @@ import torch
+ from vllm.config import VllmConfig, get_current_vllm_config
+ from vllm.config.cache import CacheDType
+ from vllm.logger import init_logger
+-from vllm.model_executor.warmup.cutedsl_warmup import (
+-    CuTeDSLCompileUnit,
+-    register_cutedsl_warmup_provider,
+-)
+ from vllm.platforms import current_platform
+ from vllm.platforms.interface import DeviceCapability
+-from vllm.utils.b12x import get_b12x_paged_attention
++from vllm.utils.b12x import B12xWarmupUnit, get_b12x_paged_attention
+ from vllm.utils.math_utils import cdiv
+ from vllm.utils.torch_utils import (
+     canonicalize_singleton_dim_strides,
+@@ -712,8 +708,6 @@ class B12xPagedAttentionImpl(AttentionImpl[B12xPagedMetadata]):
+         )
+ 
+         self.supports_quant_query_input = False
+-        register_cutedsl_warmup_provider(self)
+-
+         logger.info_once(
+             "Using b12x with q_heads=%d kv_heads=%d head_dim_qk=%d "
+             "head_dim_vo=%d window_left=%d planned_page_sizes=%s "
+@@ -815,7 +809,19 @@ class B12xPagedAttentionImpl(AttentionImpl[B12xPagedMetadata]):
+                 # metadata variant shared by its Q-capacity plans.
+                 self._paged_attention.run(binding=binding)
+ 
+-    def get_cutedsl_warmup_compile_units(self) -> tuple[CuTeDSLCompileUnit, ...]:
++    def get_b12x_warmup_unit(
++        self,
++        layer: AttentionLayer,
++        token_counts: tuple[int, ...],
++        output_dtype: torch.dtype,
++    ) -> B12xWarmupUnit:
++        """Warm only the page geometry bound to this attention layer."""
++        del token_counts, output_dtype
++        kv_cache = layer.kv_cache
++        if not isinstance(kv_cache, torch.Tensor) or kv_cache.numel() == 0:
++            raise RuntimeError("b12x attention warmup requires a bound KV cache")
++        key_cache, value_cache = self._kv_cache_views(kv_cache)
++        page_size = _kv_page_size(key_cache, value_cache)
+         common_key = (
+             "b12x_paged_extend",
+             str(self.device),
+@@ -827,14 +833,12 @@ class B12xPagedAttentionImpl(AttentionImpl[B12xPagedMetadata]):
+             self.output_head_size,
+             self.window_left,
+             self.sinks is not None,
++            page_size,
+         )
+-        return tuple(
+-            CuTeDSLCompileUnit(
+-                name="b12x_paged_extend",
+-                key=(*common_key, page_size),
+-                compile=partial(self._compile_paged_extend_entry, page_size),
+-            )
+-            for page_size in _B12X_SUPPORTED_PAGE_SIZES
++        return B12xWarmupUnit(
++            name="paged attention",
++            key=common_key,
++            compile=partial(self._compile_paged_extend_entry, page_size),
+         )
+ 
+     def process_weights_after_loading(self, act_dtype: torch.dtype) -> None:
+diff --git a/vllm/v1/attention/backends/flashinfer.py b/vllm/v1/attention/backends/flashinfer.py
+index 3113c261dd..f7d5a4eff0 100755
+--- a/vllm/v1/attention/backends/flashinfer.py
++++ b/vllm/v1/attention/backends/flashinfer.py
+@@ -692,6 +692,12 @@ class FlashInferMetadataBuilder(AttentionMetadataBuilder[FlashInferMetadata]):
+         device: torch.device,
+     ):
+         super().__init__(kv_cache_spec, layer_names, vllm_config, device)
++        from vllm.model_executor.warmup.jit_warmup import (
++            FLASHINFER_AUTOTUNE_FEATURE,
++            JitWarmupRegistry,
++        )
++
++        JitWarmupRegistry.register_feature(FLASHINFER_AUTOTUNE_FEATURE)
+         self.cache_config = vllm_config.cache_config
+         self.model_config = vllm_config.model_config
+         self.attention_config = vllm_config.attention_config
+diff --git a/vllm/v1/attention/backends/mla/indexer.py b/vllm/v1/attention/backends/mla/indexer.py
+index 430bd10c99..771cb926cb 100644
+--- a/vllm/v1/attention/backends/mla/indexer.py
++++ b/vllm/v1/attention/backends/mla/indexer.py
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++from collections.abc import Iterable
+ from dataclasses import dataclass
+ from typing import Any
+ 
+@@ -137,12 +138,18 @@ class PrepareUniformDecodeKernel(
+             max_decode_len=triton_scalar_specialization_rep(max_decode_len),
+         )
+ 
+-    def get_warmup_keys(self) -> list[CompileKey]:
++    def get_warmup_keys(
++        self,
++        *,
++        block_table_stride: int,
++        expanded_bt_stride: int,
++        max_decode_lens: Iterable[int],
++    ) -> list[CompileKey]:
+         return self._trace_dispatch(self.dispatch)(
+             block_size=self.BLOCK_SIZE,
+-            block_table_stride=(1, 2, 16),
+-            expanded_bt_stride=(1, 2, 16),
+-            max_decode_len=(1, 2, 16),
++            block_table_stride=block_table_stride,
++            expanded_bt_stride=expanded_bt_stride,
++            max_decode_len=tuple(max_decode_lens),
+         )
+ 
+     def warmup_inputs(self, compile_key: CompileKey) -> dict[str, Any]:
+@@ -485,9 +492,13 @@ class BuildPrefillChunkMetadataKernel(
+             input_variant=input_variant,
+         )
+ 
+-    def get_warmup_keys(self, vllm_config: VllmConfig) -> list[CompileKey]:
++    def get_warmup_keys(
++        self,
++        vllm_config: VllmConfig,
++        *,
++        compress_ratio: int,
++    ) -> list[CompileKey]:
+         max_tokens = max(1, min(vllm_config.scheduler_config.max_num_batched_tokens, 8))
+-        hf_text_config = vllm_config.model_config.hf_text_config
+         parallel_config = vllm_config.parallel_config
+         dcp_world = parallel_config.decode_context_parallel_size
+         dcp_interleave = parallel_config.cp_kv_cache_interleave_size
+@@ -500,18 +511,22 @@ class BuildPrefillChunkMetadataKernel(
+             # explicitly so one PCP rank cannot enter a collective while
+             # another rank is still compiling the first real inference batch.
+             dcp_cases.append(dict(DCP_RANK=0, DCP_WORLD=1))
+-        compress_ratios = tuple(
+-            dict.fromkeys(
+-                max(1, int(ratio))
+-                for ratio in (
+-                    *(getattr(hf_text_config, "compress_ratios", None) or (1,)),
+-                    getattr(hf_text_config, "index_kpool", 1) or 1,
+-                )
++        # A non-PCP batch owns cu_compressed_seq_lens as a fresh allocation,
++        # which is always aligned. PCP can pass the second row of a packed
++        # allocation and therefore needs both alignment classes.
++        compressed_alignments = (
++            (True, False)
++            if parallel_config.prefill_context_parallel_size > 1
++            else (True,)
++        )
++        input_variants = tuple(
++            TritonPointerInputVariant.from_alignment(
++                uncompressed_seq_lens=uncompressed_aligned,
++                cu_compressed_seq_lens=compressed_aligned,
+             )
++            for uncompressed_aligned in (True, False)
++            for compressed_aligned in compressed_alignments
+         )
+-        index_kpool = getattr(hf_text_config, "index_kpool", None)
+-        if index_kpool and index_kpool > 1 and index_kpool not in compress_ratios:
+-            compress_ratios = compress_ratios + (index_kpool,)
+         return self._trace_dispatch(self.dispatch)(
+             zip_inputs(*dcp_cases),
+             # Cover Triton's divisible, exact-one, and generic i32 classes.
+@@ -519,28 +534,11 @@ class BuildPrefillChunkMetadataKernel(
+             query_slice_stop=(1, 2 * max_tokens - 1, 2 * max_tokens),
+             DCP_INTERLEAVE=dcp_interleave,
+             BLOCK_SIZE=self.BLOCK_SIZE,
+-            COMPRESS_RATIO=list(compress_ratios),
++            COMPRESS_RATIO=max(1, int(compress_ratio)),
+             # PCP's global cumulative lengths are the second row of one packed
+             # allocation, so their pointer is not always 16-byte aligned.
+             # Prefill chunking can independently unalign uncompressed lengths.
+-            input_variant=(
+-                TritonPointerInputVariant.from_alignment(
+-                    uncompressed_seq_lens=True,
+-                    cu_compressed_seq_lens=True,
+-                ),
+-                TritonPointerInputVariant.from_alignment(
+-                    uncompressed_seq_lens=True,
+-                    cu_compressed_seq_lens=False,
+-                ),
+-                TritonPointerInputVariant.from_alignment(
+-                    uncompressed_seq_lens=False,
+-                    cu_compressed_seq_lens=True,
+-                ),
+-                TritonPointerInputVariant.from_alignment(
+-                    uncompressed_seq_lens=False,
+-                    cu_compressed_seq_lens=False,
+-                ),
+-            ),
++            input_variant=input_variants,
+         )
+ 
+     def warmup_inputs(self, compile_key: CompileKey) -> dict[str, Any]:
+@@ -912,6 +910,29 @@ class DeepseekV32IndexerMetadataBuilder(AttentionMetadataBuilder):
+         self.indexer_decode_block_table_buffer: torch.Tensor | None = None
+         self._max_num_batched_tokens = scheduler_config.max_num_batched_tokens
+ 
++        if getattr(
++            getattr(self.vllm_config, "kernel_config", None),
++            "enable_jit_warmup",
++            False,
++        ):
++            next_n = self.num_speculative_tokens + 1
++            adaptive = bool(
++                self.vllm_config.speculative_config
++                and self.vllm_config.speculative_config.enable_adaptive_verification
++            )
++            max_decode_lens: Iterable[int] = (
++                range(1, next_n + 1) if adaptive else (next_n,)
++            )
++            _PREPARE_UNIFORM_DECODE_KERNEL.register_warmup(
++                block_table_stride=block_table_width,
++                expanded_bt_stride=self.expanded_block_table_buffer.stride(0),
++                max_decode_lens=max_decode_lens,
++            )
++            _BUILD_PREFILL_CHUNK_METADATA_KERNEL.register_warmup(
++                vllm_config=self.vllm_config,
++                compress_ratio=self.compress_ratio,
++            )
++
+     def _dcp_localize_decode_seq_lens(
+         self,
+         seq_lens: torch.Tensor,
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+index 7d933917bc..8d2419a308 100644
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@ -7441,8 +7441,11 @@ class GPUModelRunner(
+         )
+         self._kernel_block_sizes = kernel_block_sizes
+ 
+-        # create metadata builders
+-        self.initialize_metadata_builders(kv_cache_config, kernel_block_sizes)
++        # Metadata builders own warmups whose compile keys depend on finalized
++        # KV geometry. Capture those registrations only after block-size
++        # negotiation, rather than asking model constructors to guess them.
++        with self.jit_warmup_registry.activate():  # type: ignore[attr-defined]
++            self.initialize_metadata_builders(kv_cache_config, kernel_block_sizes)
+ 
+         # Reinitialize need to after initialize_attn_backend
+         self.may_reinitialize_input_batch(kv_cache_config, kernel_block_sizes)
+-- 
+2.54.0 (Apple Git-157)
+

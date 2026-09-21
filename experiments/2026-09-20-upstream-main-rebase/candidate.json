@@ -38,9 +38,10 @@
         "989f199a77ee188c91c203f182471cbc27f2ab49",
         "8bf3113a54ae58db10397e77cd8f863944c008fe",
         "62605500d1997ff302540d6505e26c5caba76031",
-        "9de03517c6be50eef0d20fe2d6cf02c34151a01e"
+        "9de03517c6be50eef0d20fe2d6cf02c34151a01e",
+        "6964357a771af30c341a008813ca7bba8810b2e4"
       ],
-      "source_tree": "c9ce910e3709cbe2967642d9a157b402ac254698",
+      "source_tree": "f7e10aa21545cf60f41d72a2d39a8b0913efcdf2",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -63,7 +64,8 @@
         "patches/vllm/0018-fix-b12x-prepare-draft-model-weight-plans.patch",
         "patches/vllm/0019-fix-b12x-prepare-RoCEnante-before-profiling.patch",
         "patches/vllm/0020-fix-b12x-synchronize-RoCEnante-plan-priming.patch",
-        "patches/vllm/0021-fix-warmup-skip-ineligible-ll_bf16-routers.patch"
+        "patches/vllm/0021-fix-warmup-skip-ineligible-ll_bf16-routers.patch",
+        "patches/vllm/0022-perf-warmup-register-only-selected-model-kernels.patch"
       ]
     },
     {
@@ -93,18 +95,19 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993",
+  "image_digest": null,
+  "last_qualified_image_digest": "sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "the corrected immutable image is byte-identical on dgx1 and dgx2 and passes bounded focused and two-rank dual-rail qualification; TP3 model-load, output, capacity, and performance qualification remain deferred until dgx3 is recoverable",
+  "deployment_status": "patch 0022 source is replay- and model-free-test-qualified but has not been built or deployed; the stopped patch-0021 image remains the last immutable candidate",
   "integration_status": {
-    "status": "the immutable candidate coordinates pre-profile RoCEnante priming and passes a two-rank prepared-plan NCCL comparison across both dgx1-dgx2 rails; three-rank runtime qualification remains required",
+    "status": "patch 0022 changes warmup ownership only and retains the patch-0021 transport implementation; a new image plus three-rank runtime qualification remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "image-and-two-rank-qualified-pending-tp3",
+    "status": "source-qualified-pending-image-and-tp3",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
