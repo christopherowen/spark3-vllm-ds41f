@@ -38,6 +38,18 @@ The donor's entire `deepseek_v4_1` package must not be copied. That would trade
 the known release-branch fork for a newer fork and make future upstream rebases
 hard again.
 
+### B12X MoE preparation
+
+The initial negative port covered the current sparse-MLA and collective plan
+interfaces but incorrectly assumed canonical vLLM's MoE adapter was already
+compatible. It was not: the selected B12X revision replaced the old keyword
+planner with `PackedSource`, `ActivationSpec`, `MoEGeometry`, `PackedWeights`,
+`ExecutionCapacity`, `RoutingSpec`, and preparation sessions. Candidate commit
+`d7e22286ffc9299800e4e448ee525a0b5259f738` ports that boundary without copying
+the donor model. It also moves retained-plan preparation ahead of KV memory
+profiling, while the existing later warmup continues to cover ordinary kernels
+and graph shapes.
+
 ### RoCEnante
 
 The prepared B12X per-peer/HCA commit only supplies transport behavior. The

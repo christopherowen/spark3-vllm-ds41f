@@ -141,6 +141,18 @@ the Dockerfile defaults to `unrecorded` so a future omission cannot silently
 claim an older source identity. The rejection is recorded in
 `runs/build-2326847a0a02-rejected-provenance.json`.
 
+The correctly labelled patch-0014 image passed all earlier boundaries and
+completed distributed checkpoint loading. It then exposed a rebase error in
+the carried MoE adapter: vLLM still called B12X's preceding `plan_weights`
+interface, while the selected B12X revision requires its structured weight,
+capacity, routing, and preparation APIs. Patch 0015 ports that boundary as one
+unit and prepares retained MoE plans before vLLM profiles memory, so compiled
+program state cannot silently consume an already-admitted KV allocation. On a
+GB10 it passes real MXFP4 W4A16 and W4A8 numerical execution, repeated
+preparation and execution across 1/4/16-token capacity, and CUDA-graph replay
+in both modes. The full-model failure is recorded in
+`runs/launch-df249c44bfd5-b12x-moe-preparation-api.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -191,13 +203,13 @@ by this native FP4/FP8 model.
 
 ## Compatibility gate
 
-Source preparation uncovered and resolved four source-level integration
+Source preparation uncovered and resolved five source-level integration
 boundaries. B12X now declares the same CUTLASS DSL `4.7.1` toolchain as vLLM;
-DS4.1 B12X attention and RoCEnante use current prepared-plan interfaces; the
-upstream loader can route owned and file-backed tensors; and the upstream DS4.1
-model can retain Engram on immutable checkpoint storage. No candidate image
-suppresses dependency conflicts, downgrades the vLLM environment, or mixes
-Python with native extensions from a different vLLM revision.
+DS4.1 B12X attention, MoE, and RoCEnante use current prepared-plan interfaces;
+the upstream loader can route owned and file-backed tensors; and the upstream
+DS4.1 model can retain Engram on immutable checkpoint storage. No candidate
+image suppresses dependency conflicts, downgrades the vLLM environment, or
+mixes Python with native extensions from a different vLLM revision.
 
 [compatibility.md](compatibility.md) records the exact matrix and remaining
 SM121 qualification gates. Patch 0010 and the combined DS4.1 adapter suite
@@ -207,7 +219,9 @@ scale regression pass on GB10. Patch 0012 then restores the omitted disk-Engram
 parent-to-leaf handoff. Patch 0013 restores the preceding outer VL filter
 delegation. Patch 0014 closes the file-descriptor dtype gap for native MXFP8
 scales, and the real-header regression plus all 20 focused tests pass on GB10.
-The candidate is not promotable until full
+Patch 0015 closes the B12X MoE preparation-API gap and passes numerical,
+multi-capacity, repeated-preparation, and CUDA-graph tests in both native model
+activation modes on GB10. The candidate is not promotable until full
 three-rank model-load, quality, capacity, and performance gates pass.
 
 ## Quality and safety gates

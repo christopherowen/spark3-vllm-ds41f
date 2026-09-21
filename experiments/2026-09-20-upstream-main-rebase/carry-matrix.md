@@ -6,6 +6,7 @@
 | Heterogeneous KV-cache grouping | Implemented in vLLM main | Adopt; predicts about 1.35M tokens from 3 GiB | Drop local allocator patch |
 | DS4.1 TP3 72-head/9-group geometry | Not implemented in vLLM main | Carry as isolated `277171c959846de8870732e96d23276575e88ae5` | Candidate for vLLM after target validation |
 | DS4.1 B12X sparse-MLA model adapter | Generic B12X exists, but DS4.1 selection has no B12X case | Carried as isolated `fa075bc82948914cb778a33822eea3a5d537202d`; upstream model semantics remain authoritative | Candidate for vLLM and B12X after parity and performance tests |
+| B12X MoE preparation boundary | Canonical vLLM's adapter targets the preceding B12X MoE API; selected B12X uses structured packed weights, execution capacity/routing, and preparation sessions | Carry `d7e22286ffc9299800e4e448ee525a0b5259f738`; prepare retained per-layer plans before KV memory profiling and reject unprepared or over-capacity execution | Candidate for vLLM/B12X after full-model memory and performance evidence |
 | 24-head-per-rank sparse MLA partition | Implemented at B12X `master` revision `0f3a8cbf` | Adopt | Drop local workaround |
 | Bounded compressed-MLA prefill indices | Implemented at B12X `3ab21b3d` | Adopt | Drop local patch 0001 |
 | 3072-token DS4.1 mHC winner | Old policy did not survive the plan/tuning refactor | Port as isolated `348145ea8b6adaea7c32b1b87898ff59b5d43380` | Candidate after current-main GPU requalification |

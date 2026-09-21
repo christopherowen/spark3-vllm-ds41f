@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "failed-after-weight-load-at-b12x-moe-preparation-api",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:8a6eb0cc6f90-c90ba030f2ab-d0502a8c3e842",
+    "id": "sha256:df249c44bfd5c4ff6fbf91e1de15b747558c10e5fbad4e084bc4bab5466f7c32",
+    "source_revision": "8a6eb0cc6f904c15326a2337dc90bd50f041f7c2",
+    "launch_revision": "8729268"
+  },
+  "progress": [
+    "passed every previously recorded loader, virtual-head, Engram, and native MXFP8 metadata boundary",
+    "loaded the checkpoint across all three ranks without OOM or host instability",
+    "entered B12X MoE post-load weight preparation"
+  ],
+  "failure": {
+    "file": "vllm/model_executor/layers/fused_moe/b12x.py",
+    "operation": "plan_weights()",
+    "message": "TypeError: plan_weights() got an unexpected keyword argument 'quant_modes'",
+    "cause": "the vLLM carry series retained the preceding B12X MoE adapter while the selected B12X revision had moved to PackedSource, ActivationSpec, MoEGeometry, PackedWeights, ExecutionCapacity, RoutingSpec, and preparation sessions",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "d7e22286ffc9299800e4e448ee525a0b5259f738",
+    "source_tree": "b99e514fd55976432f442a0c2a7a21732842f7c1",
+    "behavior": "port the MoE boundary to the current B12X weight and execution APIs and prepare retained execution plans before vLLM profiles memory",
+    "validation": "real MXFP4 W4A16 and W4A8 numerical execution, repeated preparation across 1/4/16-token capacity, CUDA-graph capture/replay in both modes, 12 focused unit tests, Ruff, format, and diff checks passed on GB10",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate containers were automatically removed; stopped promoted containers remain present on all three nodes"
+}

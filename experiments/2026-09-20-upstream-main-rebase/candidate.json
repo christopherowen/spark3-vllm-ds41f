@@ -20,9 +20,10 @@
         "097d4f4ac7d2b23bc14fc407af848764e6b96594",
         "4ffca3bc73ecac8c2405ada835ccda4d7e6a2707",
         "161c3c6eaf2f98ec258664d18493fc35f136ebf9",
-        "8a6eb0cc6f904c15326a2337dc90bd50f041f7c2"
+        "8a6eb0cc6f904c15326a2337dc90bd50f041f7c2",
+        "d7e22286ffc9299800e4e448ee525a0b5259f738"
       ],
-      "source_tree": "12b57e435cfd155e0edd7cec5ca3ad2505cc3170",
+      "source_tree": "b99e514fd55976432f442a0c2a7a21732842f7c1",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -38,7 +39,8 @@
         "patches/vllm/0011-fix-deepseek-v41-compose-virtual-heads-with-weight-l.patch",
         "patches/vllm/0012-fix-deepseek-v41-route-disk-Engram-descriptors-to-le.patch",
         "patches/vllm/0013-fix-deepseek-v41-expose-disk-Engram-filter-through-V.patch",
-        "patches/vllm/0014-fix-loader-support-native-MXFP8-scale-metadata.patch"
+        "patches/vllm/0014-fix-loader-support-native-MXFP8-scale-metadata.patch",
+        "patches/vllm/0015-fix-b12x-port-MoE-to-preparation-API.patch"
       ]
     },
     {
@@ -66,10 +68,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:df249c44bfd5c4ff6fbf91e1de15b747558c10e5fbad4e084bc4bab5466f7c32",
-  "deployment_status": "native MXFP8 metadata image distributed with exact identity on all three ranks; pending full-model-load retry; promoted rollback retained",
+  "image_digest": null,
+  "deployment_status": "MoE preparation-API source correction qualified on one GB10; immutable image rebuild pending; promoted rollback retained",
   "integration_status": {
-    "status": "the finished immutable image passes all 20 focused loader and DS4.1 tests, the ModelOpt MXFP8 transform regression, and all 8 disk Engram tests with the production capability set on GB10",
+    "status": "the source candidate passes the existing focused suites plus real MXFP4 W4A16/W4A8 execution, repeated multi-capacity preparation, and CUDA-graph replay on GB10; full TP3 model-load remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

@@ -1,5 +1,5 @@
 {
-  "status": "native-mxfp8-metadata-image-distributed-pending-launch",
+  "status": "b12x-moe-preparation-port-qualified-pending-image-build",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all fourteen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 12b57e435cfd and a1523b067b4d",
+    "deterministic_source_preparer": "all fifteen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities b99e514fd559 and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -56,7 +56,10 @@
     "native_mxfp8_metadata_image": "sha256:df249c44bfd5c4ff6fbf91e1de15b747558c10e5fbad4e084bc4bab5466f7c32 has exact deterministic source labels and passes all 20 focused loader/DS4.1 tests, the ModelOpt MXFP8 transform regression, and all 8 disk Engram tests with production capabilities",
     "first_native_mxfp8_metadata_build": "image sha256:2326847a0a02d30199a08dda122e5f018c4da8050b4397a999b45d15c36d5422 was rejected before distribution because its OCI source labels retained the preceding patch heads and vLLM tree",
     "provenance_label_resolution": "the locked build script now passes every verified base, patch head, and tree; Dockerfile source-identity defaults are unrecorded rather than stale",
-    "native_mxfp8_metadata_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 94 seconds"
+    "native_mxfp8_metadata_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 94 seconds",
+    "eleventh_full_launch": "passed all recorded loader and checkpoint boundaries and completed distributed weight loading, then failed in B12X MoE post-load preparation because the carried vLLM adapter still called the preceding plan_weights API; no OOM or host instability occurred",
+    "b12x_moe_preparation_resolution": "ported the MoE boundary to PackedSource, ActivationSpec, MoEGeometry, PackedWeights, ExecutionCapacity, RoutingSpec, and B12X preparation sessions; retained plan memory is prepared before vLLM admits KV cache",
+    "b12x_moe_preparation_target_tests": "real MXFP4 W4A16 and W4A8 numerical execution, repeated preparation and execution at 1/4/16-token capacity, CUDA-graph capture/replay in both modes, 12 focused unit tests, Ruff, format, and diff checks pass on GB10"
   },
   "summary": {
     "ttft_seconds": null,
@@ -106,7 +109,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "native-mxfp8-metadata-image-distributed-pending-serving-gates",
+    "status": "b12x-moe-preparation-source-qualified-pending-image-and-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

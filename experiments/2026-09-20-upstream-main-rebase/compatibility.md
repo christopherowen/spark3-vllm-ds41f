@@ -5,7 +5,7 @@
 | Component | Revision | Declared dependency |
 |---|---|---|
 | vLLM | `d05da62e9ccdf8e342b15bf6785d83224cc165af` | `torch==2.13.0`, `nvidia-cutlass-dsl[cu13]==4.7.1`, optional `b12x==1.3.0` |
-| B12X | `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68` plus carry through `8099cee92c78dd2472749ca8003053ee73be908d` | all CUTLASS DSL packages `==4.7.1` |
+| B12X | `0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68` plus carry through `c90ba030f2ab4a17959afd05461449ca47259242` | all CUTLASS DSL packages `==4.7.1` |
 
 The dependency sets are now co-installable as declared. The official vLLM
 nightly nevertheless deliberately ships NCCL 2.30.7 while Torch metadata names
@@ -57,6 +57,15 @@ checkpoint destination—attention sinks, mHC tensors, Engram q/k and optional
 resident tables, MoE gate biases, DSpark's Markov embedding, and vision marker
 and norm weights—through the same explicit allocation function. Runtime state
 remains unwrapped and is still audited after load for accidental pool ownership.
+
+The first image to complete distributed checkpoint loading exposed one
+integration boundary that the source review had missed. The carried vLLM MoE
+adapter still called B12X's preceding `plan_weights` API even though the chosen
+B12X revision uses structured weight and execution plans plus preparation
+sessions. The candidate now ports the complete MoE boundary and prepares its
+retained plans before vLLM profiles memory. Real MXFP4 W4A16/W4A8 numerical
+execution, repeated 1/4/16-token capacity preparation, and CUDA-graph replay
+pass on GB10; full TP3 startup remains the qualification gate.
 
 ## Valid routes
 
