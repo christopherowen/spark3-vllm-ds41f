@@ -16,6 +16,10 @@ files=(
   "sshd.conf:/etc/ssh/sshd_config.d/95-spark-recovery.conf:0644"
   "ssh.service.conf:/etc/systemd/system/ssh.service.d/95-spark-recovery.conf:0644"
   "tailscaled.service.conf:/etc/systemd/system/tailscaled.service.d/95-spark-recovery.conf:0644"
+  "kernel-denylist:/etc/spark3/kernel-denylist:0644"
+  "spark-kernel-next-boot:/usr/local/sbin/spark-kernel-next-boot:0755"
+  "spark-kernel-next-boot.service:/etc/systemd/system/spark-kernel-next-boot.service:0644"
+  "spark-kernel-next-boot.timer:/etc/systemd/system/spark-kernel-next-boot.timer:0644"
   "spark-management-health:/usr/local/libexec/spark-management-health:0755"
   "spark-management-health.service:/etc/systemd/system/spark-management-health.service:0644"
   "spark-management-health.timer:/etc/systemd/system/spark-management-health.timer:0644"
@@ -52,6 +56,18 @@ check_files() {
   if ! systemctl is-enabled --quiet spark-management-health.timer \
     || ! systemctl is-active --quiet spark-management-health.timer; then
     echo "spark-management-health.timer is not enabled and active" >&2
+    failed=1
+  fi
+  if ! systemctl is-enabled --quiet spark-kernel-next-boot.timer \
+    || ! systemctl is-active --quiet spark-kernel-next-boot.timer; then
+    echo "spark-kernel-next-boot.timer is not enabled and active" >&2
+    failed=1
+  fi
+  if ! systemctl is-enabled --quiet spark-kernel-next-boot.service; then
+    echo "spark-kernel-next-boot.service is not enabled" >&2
+    failed=1
+  fi
+  if ! sudo -n /usr/local/sbin/spark-kernel-next-boot check; then
     failed=1
   fi
   if ! sudo -n sshd -t; then
@@ -117,6 +133,9 @@ sudo -n systemctl daemon-reload
 sudo -n sysctl --load=/etc/sysctl.d/95-spark-recovery.conf >/dev/null
 sudo -n systemctl daemon-reexec
 sudo -n systemctl enable --now spark-management-health.timer >/dev/null
+sudo -n systemctl enable spark-kernel-next-boot.service >/dev/null
+sudo -n systemctl enable --now spark-kernel-next-boot.timer >/dev/null
+sudo -n systemctl start spark-kernel-next-boot.service
 
 # Start fresh listeners after this SSH command has returned so OOMScoreAdjust
 # applies to the running processes. Ubuntu's ssh.service uses KillMode=process,

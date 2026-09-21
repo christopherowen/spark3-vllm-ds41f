@@ -1,0 +1,13 @@
+[Unit]
+Description=Keep an exact denied kernel out of the next DGX Spark boot
+ConditionPathExists=/boot/grub/grub.cfg
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/spark-kernel-next-boot apply
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

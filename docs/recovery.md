@@ -43,3 +43,19 @@ without changing inference arithmetic or kernel selection:
 
 The policy deliberately does not reboot for gateway loss, Internet loss, a
 single failed health check, or a generic hung task.
+
+## Kernel next-boot policy
+
+The controlled dgx3 recovery reboot exposed a separate boot-consistency issue:
+`GRUB_DEFAULT=0` selected installed kernel `7.0.0-1019-nvidia`, while this
+cluster's RoCE path is qualified on `6.17.0-1032-nvidia`. The earlier one-shot
+selection of 6.17 had been consumed as designed.
+
+Removing 7.0 through apt would also remove `linux-nvidia-hwe-24.04`, preventing
+the normal metapackage from delivering a future corrected kernel. Permanently
+saving 6.17 in GRUB would have the same practical update lock. The recovery
+policy therefore denies only exact release `7.0.0-1019-nvidia`: while that is
+the generated default, a timer maintains a one-shot entry for the running
+eligible kernel. A future default not on the denylist remains eligible and the
+policy removes only its own override. There is no apt hold, package pin, kernel
+removal, or persistent `GRUB_DEFAULT` change.

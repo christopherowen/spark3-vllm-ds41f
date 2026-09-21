@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mode=${1:-apply}
+denylist=/etc/spark3/kernel-denylist
+grub_cfg=/boot/grub/grub.cfg
+state_dir=/var/lib/spark3
+state_file=$state_dir/kernel-next-entry
+
+if [[ "$mode" != apply && "$mode" != check ]]; then
+  echo "usage: spark-kernel-next-boot [apply|check]" >&2
+  exit 2
+fi
+if ((EUID != 0)); then
+  echo "spark-kernel-next-boot must run as root" >&2
+  exit 1
+fi
+
+kernel_is_denied() {
+  local kernel=$1 line
+  while IFS= read -r line; do
+    line=${line%%#*}
+    line=${line//[[:space:]]/}
+    [[ -n "$line" ]] || continue
+    [[ "$line" == "$kernel" ]] && return 0
+  done <"$denylist"
+  return 1
+}
+
+default_kernel=$(awk '
+  /^menuentry / && !found_entry { found_entry=1; next }
+  found_entry && $1 == "linux" {
+    sub(/^\/boot\/vmlinuz-/, "", $2)
+    print $2
+    exit
+  }
+' "$grub_cfg")
+
+if [[ -z "$default_kernel" ]]; then
+  echo "could not determine the default kernel from $grub_cfg" >&2
+  exit 1
+fi
+
+current_entry=$(/usr/bin/grub-editenv list | sed -n 's/^next_entry=//p')
+owned_entry=
+if [[ -s "$state_file" ]]; then
+  IFS= read -r owned_entry <"$state_file"
+fi
+
+if ! kernel_is_denied "$default_kernel"; then
+  if [[ "$mode" == apply && -n "$owned_entry" ]]; then
+    if [[ "$current_entry" == "$owned_entry" ]]; then
+      /usr/bin/grub-editenv - unset next_entry
+    fi
+    : >"$state_file"
+    logger -t spark-kernel-next-boot \
+      "GRUB default $default_kernel is eligible; retired the policy-owned one-shot override"
+  fi
+  if [[ "$mode" == check && -n "$owned_entry" ]]; then
+    echo "stale policy-owned kernel override remains while $default_kernel is eligible" >&2
+    exit 1
+  fi
+  echo "default kernel $default_kernel is eligible"
+  exit
+fi
+
+candidate=$(uname -r)
+if kernel_is_denied "$candidate" \
+  || [[ ! -f "/boot/vmlinuz-$candidate" ]] \
+  || [[ ! -f "/boot/initrd.img-$candidate" ]]; then
+  candidate=
+  while IFS= read -r installed; do
+    kernel_is_denied "$installed" && continue
+    [[ -f "/boot/initrd.img-$installed" ]] || continue
+    [[ -d "/lib/modules/$installed" ]] || continue
+    candidate=$installed
+    break
+  done < <(find /boot -maxdepth 1 -type f -name 'vmlinuz-*' -printf '%f\n' \
+    | sed 's/^vmlinuz-//' | sort -V -r)
+fi
+
+if [[ -z "$candidate" ]]; then
+  echo "default kernel $default_kernel is denied and no eligible fallback is installed" >&2
+  exit 1
+fi
+
+submenu_id=$(awk -F "'" '
+  /^[[:space:]]*submenu / && $4 ~ /^gnulinux-advanced-/ { print $4; exit }
+' "$grub_cfg")
+entry_id=$(awk -F "'" -v candidate="$candidate" '
+  /^[[:space:]]*menuentry / \
+    && index($2, "with Linux " candidate) \
+    && !index($2, "recovery mode") { print $4; exit }
+' "$grub_cfg")
+
+if [[ -z "$submenu_id" || -z "$entry_id" ]]; then
+  echo "could not resolve the GRUB entry for fallback kernel $candidate" >&2
+  exit 1
+fi
+
+target="$submenu_id>$entry_id"
+if [[ "$mode" == check ]]; then
+  if [[ "$current_entry" != "$target" || "$owned_entry" != "$target" ]]; then
+    echo "default kernel $default_kernel is denied but next boot is not $candidate" >&2
+    exit 1
+  fi
+  echo "default kernel $default_kernel is denied; next boot is $candidate"
+  exit
+fi
+
+if [[ "$current_entry" != "$target" || "$owned_entry" != "$target" ]]; then
+  /usr/sbin/grub-reboot "$target"
+  install -d -m 0755 "$state_dir"
+  umask 022
+  printf '%s\n' "$target" >"$state_file"
+  logger -t spark-kernel-next-boot \
+    "GRUB default $default_kernel is denied; set one-shot fallback $candidate"
+fi
+echo "default kernel $default_kernel is denied; next boot is $candidate"
