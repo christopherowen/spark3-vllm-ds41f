@@ -12,9 +12,9 @@ esac
 
 vllm_base=d05da62e9ccdf8e342b15bf6785d83224cc165af
 b12x_base=0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68
-vllm_head=a9e9aca6dfbcef01c2e289d5cbd49a884c0b76fa
+vllm_head=9de03517c6be50eef0d20fe2d6cf02c34151a01e
 b12x_head=b69feee3022c05fa840833a80dd4010156cf7fe1
-vllm_tree=f119b0b002685909cca0ed0efe2d1cfbb6fcee70
+vllm_tree=c9ce910e3709cbe2967642d9a157b402ac254698
 b12x_tree=a251f563557bcbff88b17dedd6fd6bccd859929a
 
 for project in vllm b12x; do

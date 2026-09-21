@@ -45,10 +45,10 @@ interfaces but incorrectly assumed canonical vLLM's MoE adapter was already
 compatible. It was not: the selected B12X revision replaced the old keyword
 planner with `PackedSource`, `ActivationSpec`, `MoEGeometry`, `PackedWeights`,
 `ExecutionCapacity`, `RoutingSpec`, and preparation sessions. Candidate commit
-`d7e22286ffc9299800e4e448ee525a0b5259f738` ports that boundary without copying
+`74de7dde01f26b344ad6085acb4764887e567e32` ports that boundary without copying
 the donor model. It also moves retained-plan preparation ahead of KV memory
 profiling, while the existing later warmup continues to cover ordinary kernels
-and graph shapes. Follow-up `8051ebbaadb9dfc2bb6f60554dfdaf8eede22326`
+and graph shapes. Follow-up `3adda11364767b4e67cd5117d87fd963de7b9fb5`
 gives that early phase a dedicated provider method instead of constructing all
 warmup units and filtering them afterward; this prevents sparse attention from
 being touched before KV-cache storage exists.
@@ -57,7 +57,7 @@ The next launch proved the same API review had missed the ordinary ModelOpt
 MXFP8 linear adapter. Current B12X requires a prepared blockscaled plan, while
 the carried adapter still requested first-use compilation through the removed
 `expected_m` interface. Candidate commit
-`0974d6ec70a94db3483fd19b678437403d469319` declares one bounded capacity plus
+`1a14b1f098e6dca33a83a168b814f1d2fc5febcc` declares one bounded capacity plus
 the exact CUDA-graph token regimes, prepares their retained state before KV
 profiling, and executes only through the retained plan. This is a narrow
 vLLM/B12X integration change rather than donor model code.
@@ -65,19 +65,19 @@ vLLM/B12X integration change rather than donor model code.
 The following profile proved the plan collector itself was target-only. The
 DSpark draft model is a separate vLLM ownership root, so its `main_proj` did not
 appear in `worker.get_model().modules()`. Candidate commit
-`fcdb8715837314ee899308154af380e064a6345d` scans the canonical target and draft
+`989f199a77ee188c91c203f182471cbc27f2ab49` scans the canonical target and draft
 accessors and deduplicates aliases by plan key. This is lifecycle integration
 for current upstream vLLM, not a donor-specific model fork.
 
 Once the draft plans were present, profiling reached a small collective and
 showed that RoCEnante's prepared plan was still scheduled only in normal
 post-profile warmup. Candidate commit
-`96dc80400edf18ca97ad40d99ddb7ac620af3c33` opts the communicator into the same
+`8bf3113a54ae58db10397e77cd8f863944c008fe` opts the communicator into the same
 explicit early contract. It does not broaden early enumeration to attention or
 Engram and does not alter RoCEnante routing or collective numerics.
 The resulting TP3 launch proved distributed priming cannot inherit the generic
 local warmup timing: ranks completed local plans at different times and timed
-out at sequence 1. Commit `5dff83d6dd40cc9f846502cdf85e8b937530d07b`
+out at sequence 1. Commit `62605500d1997ff302540d6505e26c5caba76031`
 rendezvouses after each rank materializes its plan and immediately before the
 first real priming collective. It does not add a steady-state barrier.
 

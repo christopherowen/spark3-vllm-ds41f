@@ -348,6 +348,16 @@ collected. This changes neither weights nor arithmetic and removes no runtime
 kernel selected by DGX Spark. The crash evidence and isolation result are in
 `runs/launch-f3de2589ce25-ineligible-router-warmup.json`.
 
+Before rebuilding patch 0021, a 196-test focused replay sweep found an
+unrelated one-line NVFP4 change embedded in the original loader-routing patch:
+it disabled the upstream `reorder_w13=use_a16` behavior. That line is neither
+needed by the DS4.1 MXFP4 path nor part of owned/file-backed checkpoint
+routing, so it was removed from patch 0004 and the complete series was replayed
+from the pinned upstream base. The corrected replay head is
+`9de03517c6be50eef0d20fe2d6cf02c34151a01e` with tree
+`c9ce910e3709cbe2967642d9a157b402ac254698`. Historical launch receipts retain
+the identities of the images they actually exercised.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its
