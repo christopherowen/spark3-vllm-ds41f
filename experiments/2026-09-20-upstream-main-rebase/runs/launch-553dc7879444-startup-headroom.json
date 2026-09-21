@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "failed-after-model-load-at-startup-physical-memory-headroom",
+  "status": "superseded-diagnosis-low-memory-pressure-was-not-the-causal-exception",
   "image": {
     "tag": "vllm-ds41f-upstream-main:96dc80400edf-c90ba030f2ab-d3b28daac5c84",
     "id": "sha256:553dc78794447882fac6959788124fdc2dca32d1a8a25fc959d55f6035388f6f",
@@ -17,15 +17,15 @@
     "container_exit_code": 1,
     "docker_oom_killed": false,
     "kernel_evidence": "all three hosts repeatedly logged NVRM NV_ERR_NO_MEMORY from mem_desc.c while MemAvailable fell to approximately 1 GiB",
-    "cause": "the 112 GiB resident container allowance plus host services left insufficient physical headroom for NVIDIA driver allocations during pre-profile JIT/preparation; Docker's OOM flag covers cgroup kills and therefore did not report this driver allocation failure",
+    "cause": "initially attributed to low physical headroom from NVIDIA driver messages; persistent logs from the repeat proved the causal exception was uncoordinated RoCEnante plan priming",
     "quality_or_kv_change": "none; explicit KV had not yet been allocated"
   },
-  "resolution_under_test": {
+  "rejected_resolution": {
     "container_resident_limit_gib": 110,
     "container_total_memory_plus_swap_gib": 116,
     "container_swap_allowance_gib": 6,
     "intent": "guarantee additional physical headroom while allowing cold loader and Python pages to spill during the temporary startup peak; keep the 3 GiB KV allocation, 160K announced context, eight-sequence admission, and every model/kernel setting unchanged",
-    "acceptance": "startup must complete with at least 3 GiB host MemAvailable, no NVRM allocation errors, bounded non-growing swap, and unchanged steady-state performance"
+    "result": "the lower resident limit did not control unified-memory pressure and did not address the sequence-1 RoCEnante timeout; it was reverted"
   },
   "rollback": "failed candidate containers were removed; stopped promoted containers remain present on all three nodes"
 }

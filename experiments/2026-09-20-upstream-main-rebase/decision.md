@@ -1,6 +1,6 @@
 # Decision
 
-Status: **Patch-0019 image qualified; startup-headroom policy under TP3 qualification**
+Status: **RoCEnante priming rendezvous corrected; immutable rebuild required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -43,18 +43,14 @@ post-profile warmup. Patch 0019 exposes the same explicit pre-profile contract
 on RoCEnante and includes eligible distributed providers in that phase.
 Ordinary post-cache providers remain structurally excluded. This was not an OOM.
 
-The immutable patch-0019 image now passes the selected source, numerical, disk
-Engram, MoE, CUDA-graph, RoCEnante, and style gates on GB10. The remaining work
-is target evidence:
-
-Its first TP3 launch loaded the target and DSpark model but exhausted physical
-host headroom during pre-profile preparation. All three kernels recorded NVIDIA
-`NV_ERR_NO_MEMORY`; Docker's cgroup OOM flag remained false. The candidate now
-caps resident container memory at 110 GiB and permits up to 6 GiB of swap only
-inside a 116 GiB memory-plus-swap ceiling. This preserves the 3 GiB KV cache and
-all quality/performance settings while giving the driver deterministic physical
-headroom. Promotion requires bounded, non-growing swap and unchanged steady
-performance.
+The immutable patch-0019 image passes the selected source, numerical, disk
+Engram, MoE, CUDA-graph, RoCEnante, and style gates on GB10. Its TP3 launch
+loaded target plus DSpark at 98.1 GiB on every rank, then proved the distributed
+priming unit lacked a rendezvous: ranks entered its first real collective seven
+seconds apart and timed out at sequence 1. Patch 0020 synchronizes ranks after
+local plan materialization and immediately before priming. The temporary Docker
+memory-limit experiment did not address the cause and has been reverted. The
+remaining work is target evidence:
 
 1. distribute the qualified content-addressed ARM64 image to all ranks;
 2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;

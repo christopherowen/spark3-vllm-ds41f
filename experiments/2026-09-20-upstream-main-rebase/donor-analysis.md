@@ -75,6 +75,11 @@ post-profile warmup. Candidate commit
 `96dc80400edf18ca97ad40d99ddb7ac620af3c33` opts the communicator into the same
 explicit early contract. It does not broaden early enumeration to attention or
 Engram and does not alter RoCEnante routing or collective numerics.
+The resulting TP3 launch proved distributed priming cannot inherit the generic
+local warmup timing: ranks completed local plans at different times and timed
+out at sequence 1. Commit `5dff83d6dd40cc9f846502cdf85e8b937530d07b`
+rendezvouses after each rank materializes its plan and immediately before the
+first real priming collective. It does not add a steady-state barrier.
 
 ### RoCEnante
 

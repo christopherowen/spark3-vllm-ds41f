@@ -1,0 +1,113 @@
+From 5dff83d6dd40cc9f846502cdf85e8b937530d07b Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 05:14:38 +0200
+Subject: [PATCH] fix(b12x): synchronize RoCEnante plan priming
+
+---
+ .../distributed/test_b12x_roce_all_reduce.py  | 59 +++++++++++++++++++
+ .../b12x_roce_all_reduce.py                   | 12 +++-
+ 2 files changed, 70 insertions(+), 1 deletion(-)
+
+diff --git a/tests/distributed/test_b12x_roce_all_reduce.py b/tests/distributed/test_b12x_roce_all_reduce.py
+index 76a4f2726..2a44d9ea6 100644
+--- a/tests/distributed/test_b12x_roce_all_reduce.py
++++ b/tests/distributed/test_b12x_roce_all_reduce.py
+@@ -2,8 +2,10 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ from types import SimpleNamespace
++from unittest.mock import sentinel
+ 
+ import pytest
++import torch
+ 
+ import vllm.distributed.device_communicators.b12x_roce_all_reduce as roce_adapter
+ from vllm.distributed.device_communicators.b12x_roce_all_reduce import (
+@@ -89,3 +91,60 @@ def test_roce_plan_is_eligible_for_pre_profile_preparation() -> None:
+         B12xRoceAllReduce.get_b12x_pre_profile_unit
+         is B12xRoceAllReduce.get_b12x_warmup_unit
+     )
++
++
++def test_roce_plan_rendezvouses_after_materialization_before_priming(
++    monkeypatch,
++) -> None:
++    import b12x.preparation as b12x_preparation
++    from b12x.comm.roce import _preparation
++
++    events = []
++    communicator = object.__new__(B12xRoceAllReduce)
++    communicator.device = torch.device("cpu")
++    communicator.group = sentinel.group
++    communicator.global_ranks = (0, 1, 2)
++
++    monkeypatch.setattr(
++        roce_adapter.dist,
++        "barrier",
++        lambda *, group: events.append(("barrier", group)),
++    )
++
++    def prepared_call(state, *, inp):
++        del state, inp
++        return SimpleNamespace(
++            run=lambda: events.append("all_reduce"),
++            output=sentinel.reduce_output,
++        )
++
++    def prepared_gather_call(state, *, inp):
++        del state, inp
++        return SimpleNamespace(
++            run=lambda: events.append("all_gather"),
++            output=sentinel.gather_output,
++        )
++
++    monkeypatch.setattr(_preparation, "prepared_call", prepared_call)
++    monkeypatch.setattr(_preparation, "prepared_gather_call", prepared_gather_call)
++
++    def prepare_default(request) -> None:
++        events.append("materialized")
++        request.prepare_call(sentinel.state).run()
++
++    monkeypatch.setattr(b12x_preparation, "prepare_default", prepare_default)
++    plan = SimpleNamespace(
++        prepared=None,
++        request=lambda **kwargs: SimpleNamespace(**kwargs),
++    )
++
++    communicator._prepare_plan(plan)
++
++    assert events == [
++        "materialized",
++        ("barrier", sentinel.group),
++        "all_reduce",
++        "all_reduce",
++        "all_reduce",
++        "all_gather",
++    ]
+diff --git a/vllm/distributed/device_communicators/b12x_roce_all_reduce.py b/vllm/distributed/device_communicators/b12x_roce_all_reduce.py
+index 8a18bea0e..cc286e5c3 100644
+--- a/vllm/distributed/device_communicators/b12x_roce_all_reduce.py
++++ b/vllm/distributed/device_communicators/b12x_roce_all_reduce.py
+@@ -235,8 +235,18 @@ class B12xRoceAllReduce:
+             ]
+             gather = _preparation.prepared_gather_call(state, inp=buffers[1])
+             all_calls = (*calls, gather)
++
++            def prime_collectives() -> list[Any]:
++                # Local model-plan preparation can finish at different times on
++                # each rank. Rendezvous after this RoCE plan is materialized and
++                # immediately before its first real collective, otherwise an
++                # early rank can exhaust the runtime spin limit while another
++                # rank is still compiling an unrelated local plan.
++                dist.barrier(group=self.group)
++                return [call.run() for call in all_calls]
++
+             return PreparedCall(
+-                run=lambda: [call.run() for call in all_calls],
++                run=prime_collectives,
+                 output=tuple(call.output for call in all_calls),
+                 owners=(*buffers, *all_calls),
+             )
+-- 
+2.54.0 (Apple Git-157)
+

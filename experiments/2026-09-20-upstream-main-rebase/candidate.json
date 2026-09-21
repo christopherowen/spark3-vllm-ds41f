@@ -1,9 +1,6 @@
 {
   "intended_variable": "rebase the source stack onto current upstream architecture and retain only required DS4.1 TP3 behavior",
-  "configuration_delta": {
-    "container_memory": "110 GiB resident, 116 GiB memory-plus-swap during startup instead of 112 GiB resident with swap disabled",
-    "unchanged_capacity": "3 GiB explicit KV per rank, 160K max model length, 8 max sequences, and all model/kernel settings"
-  },
+  "configuration_delta": {},
   "source_delta": [
     {
       "project": "vllm",
@@ -28,9 +25,10 @@
         "8051ebbaadb9dfc2bb6f60554dfdaf8eede22326",
         "0974d6ec70a94db3483fd19b678437403d469319",
         "fcdb8715837314ee899308154af380e064a6345d",
-        "96dc80400edf18ca97ad40d99ddb7ac620af3c33"
+        "96dc80400edf18ca97ad40d99ddb7ac620af3c33",
+        "5dff83d6dd40cc9f846502cdf85e8b937530d07b"
       ],
-      "source_tree": "7d63914525c57f0d40f67cdb4787d3800c7b2e98",
+      "source_tree": "4138f6ad2f3f652e8c5b00a56d25aae0b386d2fb",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -51,7 +49,8 @@
         "patches/vllm/0016-fix-b12x-isolate-pre-profile-MoE-preparation.patch",
         "patches/vllm/0017-fix-b12x-prepare-MXFP8-linear-execution-plans.patch",
         "patches/vllm/0018-fix-b12x-prepare-draft-model-weight-plans.patch",
-        "patches/vllm/0019-fix-b12x-prepare-RoCEnante-before-profiling.patch"
+        "patches/vllm/0019-fix-b12x-prepare-RoCEnante-before-profiling.patch",
+        "patches/vllm/0020-fix-b12x-synchronize-RoCEnante-plan-priming.patch"
       ]
     },
     {
@@ -80,16 +79,16 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:553dc78794447882fac6959788124fdc2dca32d1a8a25fc959d55f6035388f6f",
-  "deployment_status": "the immutable patch-0019 image passes the full selected-path prelaunch suite on GB10 and is identical on all ranks; the first TP3 launch exposed insufficient physical startup headroom, so a bounded resident-memory plus startup-swap policy is pending runtime qualification",
+  "deployment_status": "the immutable patch-0019 image passes the full selected-path prelaunch suite and is identical on all ranks; its TP3 launch exposed uncoordinated distributed plan priming, and patch 0020 adds the required post-materialization rendezvous pending immutable rebuild",
   "integration_status": {
-    "status": "the immutable source candidate retains selected-path qualification and includes pre-profile RoCEnante preparation with collector and adapter regressions; TP3 runtime qualification remains required",
+    "status": "the source candidate retains selected-path qualification and coordinates pre-profile RoCEnante plan priming after per-rank materialization; immutable-image and TP3 runtime qualification remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-patch-0019-image-qualified-pending-tp3-runtime",
+    "status": "aligned-pending-patch-0020-sm121-runtime-qualification",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

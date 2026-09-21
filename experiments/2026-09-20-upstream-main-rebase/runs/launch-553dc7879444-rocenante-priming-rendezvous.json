@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "status": "failed-after-model-load-at-uncoordinated-rocenante-plan-priming",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:96dc80400edf-c90ba030f2ab-d3b28daac5c84",
+    "id": "sha256:553dc78794447882fac6959788124fdc2dca32d1a8a25fc959d55f6035388f6f",
+    "source_revision": "96dc80400edf18ca97ad40d99ddb7ac620af3c33",
+    "launch_revision": "748cd32468d06ec8218c0701c93ba3c7199029c1"
+  },
+  "progress": [
+    "formed the three-rank NCCL 2.30.7 group and selected RoCEnante before PyNCCL for eligible tensor-parallel collectives",
+    "selected the intended B12X sparse-attention, MXFP8 linear, MXFP4 MoE, and disk Engram paths",
+    "completed target and DSpark loading at 98.1 GiB on all three ranks within the same second",
+    "entered pre-profile B12X plan preparation on all ranks"
+  ],
+  "failure": {
+    "operation": "first real all-reduce used to prime the prepared RoCEnante plan",
+    "rank_0_and_1_timestamp": "03:10:33",
+    "rank_2_timestamp": "03:10:40",
+    "message": "RoCE collective timed out at sequence 1 and poisoned the runtime because another rank had not entered the collective",
+    "cause": "patch 0019 added a distributed warmup unit to a generic per-rank local preparation loop; local model-plan compilation order and duration can differ, so RoCEnante priming requires an explicit rendezvous after materialization and immediately before its first collective",
+    "oom": false,
+    "memory_observation": "NVIDIA driver allocation warnings and low physical headroom were observed, but persistent logs prove the causal exception was the RoCEnante sequence-1 timeout"
+  },
+  "rejected_experiment": {
+    "change": "110 GiB resident plus 6 GiB swap allowance",
+    "result": "did not coordinate distributed priming and did not materially control NVIDIA unified-memory pressure; reverted"
+  },
+  "resolution": {
+    "commit": "5dff83d6dd40cc9f846502cdf85e8b937530d07b",
+    "source_tree": "4138f6ad2f3f652e8c5b00a56d25aae0b386d2fb",
+    "behavior": "rendezvous on the existing CPU process group after every rank has materialized its local RoCEnante plan and immediately before executing the priming collectives",
+    "validation": "all 16 focused RoCEnante adapter tests pass on GB10; the regression proves materialization precedes the barrier and every priming collective follows it; Ruff, format, py_compile, exact patch export, and deterministic replay of all twenty vLLM plus four B12X patches pass",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate containers were removed; stopped promoted containers remain present on all three nodes"
+}

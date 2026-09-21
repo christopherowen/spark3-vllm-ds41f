@@ -212,6 +212,14 @@ disk Engram tests, both selected MXFP4 numerical modes, four
 multi-capacity/CUDA-graph cases, Ruff, and format on GB10. Its receipt is
 `runs/build-553dc7879444-validation.json`; TP3 runtime remains a separate gate.
 
+The TP3 launch then showed that distributed priming cannot run with the timing
+of an ordinary local warmup unit. All ranks loaded the model within the same
+second, but they reached the first RoCEnante collective seven seconds apart and
+timed out at sequence 1. Patch 0020 adds a rendezvous after local plan
+materialization and immediately before the priming collectives; it adds no
+steady-state barrier. The failure and rejected memory-limit experiment are
+recorded in `runs/launch-553dc7879444-rocenante-priming-rendezvous.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
