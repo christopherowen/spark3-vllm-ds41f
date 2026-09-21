@@ -73,7 +73,7 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:209944e6423216643cd99780e08194d6cbdf0b5189b88d462799a0688ba419cd",
-  "deployment_status": "the immutable patch-0017 image passed finished-image source, numerical, disk Engram, MoE, CUDA-graph, and style gates on GB10; distribution and full TP3 startup remain required",
+  "deployment_status": "the immutable patch-0017 image passed finished-image source, numerical, disk Engram, MoE, CUDA-graph, and style gates on GB10 and is verified identically on all three ranks; full TP3 startup remains required",
   "integration_status": {
     "status": "the source candidate passes the existing focused suites plus real MXFP4 W4A16/W4A8 and ModelOpt MXFP8 linear numerical execution through prepared multi-capacity plans on GB10; full TP3 startup remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",

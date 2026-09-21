@@ -30,9 +30,8 @@ of a full TP3 startup.
 
 The remaining work is target evidence:
 
-1. distribute the content-addressed ARM64 candidate from dgx3 to dgx1 and dgx2;
-2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
-3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
+1. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
+2. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.
 
 The nodes are now free for qualification. Dependency suppression or an in-place

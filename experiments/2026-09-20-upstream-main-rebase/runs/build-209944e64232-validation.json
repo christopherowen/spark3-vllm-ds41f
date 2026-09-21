@@ -30,11 +30,10 @@
       "dgx1": "192.168.2.1",
       "dgx2": "192.168.4.1 via dgx2-internal"
     },
-    "method": "two parallel uncompressed docker save/load streams over both ConnectX-7 internal rails",
-    "status": "pending"
+    "method": "uncompressed docker save/load over both ConnectX-7 internal rails; dgx2 completed in the initial 137-second concurrent attempt, while dgx1's hostname-form host-key mismatch was retried by its already-verified 192.168.2.1 address and completed in 98 seconds",
+    "status": "complete; exact image ID, source labels, and deployment checkout verified on all three ranks"
   },
   "remaining": [
-    "distribute and verify the exact image on all three ranks",
     "full three-rank model load and selected-kernel JIT qualification",
     "deterministic native-weight output parity",
     "4x128K capacity and normal 8-way Strix workload",
