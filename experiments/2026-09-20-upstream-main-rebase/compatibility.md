@@ -67,6 +67,13 @@ retained plans before vLLM profiles memory. Real MXFP4 W4A16/W4A8 numerical
 execution, repeated 1/4/16-token capacity preparation, and CUDA-graph replay
 pass on GB10; full TP3 startup remains the qualification gate.
 
+That startup reached the corrected MoE boundary but showed that the initial
+pre-memory implementation still constructed unrelated providers before
+filtering their returned units. Sparse attention therefore observed its
+pre-finalization cache placeholder. The corrected contract discovers only a
+dedicated `get_b12x_pre_profile_unit` method. B12X MoE implements it; ordinary
+attention, Engram, linear, and collective providers do not.
+
 ## Valid routes
 
 ### Selected route: qualify B12X on CUTLASS DSL 4.7.1

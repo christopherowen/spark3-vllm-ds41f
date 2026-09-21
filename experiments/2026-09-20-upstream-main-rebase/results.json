@@ -1,5 +1,5 @@
 {
-  "status": "b12x-moe-preparation-image-distributed-pending-full-launch",
+  "status": "pre-profile-provider-order-fix-qualified-pending-image-build",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all fifteen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities b99e514fd559 and a1523b067b4d",
+    "deterministic_source_preparer": "all sixteen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 856e545b6d27 and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -61,7 +61,10 @@
     "b12x_moe_preparation_resolution": "ported the MoE boundary to PackedSource, ActivationSpec, MoEGeometry, PackedWeights, ExecutionCapacity, RoutingSpec, and B12X preparation sessions; retained plan memory is prepared before vLLM admits KV cache",
     "b12x_moe_preparation_target_tests": "real MXFP4 W4A16 and W4A8 numerical execution, repeated preparation and execution at 1/4/16-token capacity, CUDA-graph capture/replay in both modes, 12 focused unit tests, Ruff, format, and diff checks pass on GB10",
     "b12x_moe_preparation_image": "sha256:bdc1deee14daa355b9774e489d48778cfafff4bf364be1f28d067ba9dafb15a2 has exact deterministic source labels and passes the finished-image loader, DS4.1, ModelOpt, disk Engram, B12X warmup/MoE, multi-capacity, numerical, and CUDA-graph gates on GB10",
-    "b12x_moe_preparation_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 120 seconds"
+    "b12x_moe_preparation_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 120 seconds",
+    "twelfth_full_launch": "completed distributed checkpoint loading and the current B12X MoE weight API, then failed because the new pre-memory collector invoked every provider before filtering for MoE; sparse attention therefore saw its pre-KV BF16 placeholder instead of packed uint8 cache storage; no OOM or host instability occurred",
+    "pre_profile_provider_order_resolution": "pre-memory preparation now discovers only providers with an explicit get_b12x_pre_profile_unit method; B12X MoE exposes it, while attention, Engram, linear, and collective warmups cannot be invoked early",
+    "pre_profile_provider_order_tests": "the focused warmup suite now fails if an ordinary provider is even enumerated during pre-profile preparation; all 9 tests plus Ruff, format, and diff checks pass on GB10"
   },
   "summary": {
     "ttft_seconds": null,
@@ -111,7 +114,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "b12x-moe-preparation-image-distributed-pending-serving-gates",
+    "status": "pre-profile-provider-order-source-qualified-pending-image-and-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

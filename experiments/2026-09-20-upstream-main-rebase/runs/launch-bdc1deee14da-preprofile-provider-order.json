@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "failed-after-weight-load-at-pre-profile-provider-order",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:d7e22286ffc9-c90ba030f2ab-defa4255317f7",
+    "id": "sha256:bdc1deee14daa355b9774e489d48778cfafff4bf364be1f28d067ba9dafb15a2",
+    "source_revision": "d7e22286ffc9299800e4e448ee525a0b5259f738",
+    "launch_revision": "86027855e7930fbb30278ad82c87f896ce0a5638"
+  },
+  "progress": [
+    "initialized NCCL 2.30.7 and selected RoCEnante for eligible tensor-parallel collectives",
+    "selected native MXFP8 linear, B12X MXFP4/MXFP8 MoE, FP8 indexer, sparse-MLA, disk Engram, and DSpark paths",
+    "completed distributed checkpoint and draft-model loading at 98.1 GiB per rank",
+    "passed the preceding B12X MoE weight-planning API boundary"
+  ],
+  "failure": {
+    "file": "vllm/model_executor/warmup/b12x_warmup.py",
+    "operation": "b12x_prepare_weights() provider discovery",
+    "message": "TypeError: DeepSeek V4.1 SWA cache must use uint8 packed storage, got torch.bfloat16",
+    "cause": "the pre-memory path constructed every ordinary B12X warmup unit before filtering on the returned pre_profile flag, so sparse attention was invoked before KV-cache finalization",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "8051ebbaadb9dfc2bb6f60554dfdaf8eede22326",
+    "source_tree": "856e545b6d27d65abae8f6fabb985b1137a99087",
+    "behavior": "discover pre-memory providers through a dedicated method; only B12X MoE implements it, so unrelated providers are not called early",
+    "validation": "the focused test uses an ordinary provider that raises if enumerated during pre-profile preparation; all 9 warmup tests, Ruff, format, and diff checks pass on GB10",
+    "quality_change": "none"
+  },
+  "rollback": "the coordinated start removed all candidate containers after failure; stopped promoted containers remain present on all three nodes"
+}

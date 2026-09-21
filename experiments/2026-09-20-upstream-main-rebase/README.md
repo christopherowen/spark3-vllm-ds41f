@@ -153,6 +153,16 @@ preparation and execution across 1/4/16-token capacity, and CUDA-graph replay
 in both modes. The full-model failure is recorded in
 `runs/launch-df249c44bfd5-b12x-moe-preparation-api.json`.
 
+The patch-0015 image completed checkpoint loading and the corrected MoE weight
+boundary, then exposed an ordering defect in that patch's new pre-memory hook.
+It constructed every ordinary B12X warmup unit before filtering the returned
+units for MoE, which caused sparse attention to inspect placeholder cache
+storage before KV-cache finalization. Patch 0016 replaces the returned-unit flag
+with a dedicated provider method implemented only by B12X MoE. Attention,
+Engram, linear, and collective providers are now structurally ineligible for
+pre-memory enumeration. The failure is recorded in
+`runs/launch-bdc1deee14da-preprofile-provider-order.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -221,7 +231,9 @@ delegation. Patch 0014 closes the file-descriptor dtype gap for native MXFP8
 scales, and the real-header regression plus all 20 focused tests pass on GB10.
 Patch 0015 closes the B12X MoE preparation-API gap and passes numerical,
 multi-capacity, repeated-preparation, and CUDA-graph tests in both native model
-activation modes on GB10. The candidate is not promotable until full
+activation modes on GB10. Patch 0016 then makes pre-memory discovery
+MoE-specific rather than constructing unrelated warmup units and filtering
+afterward. The candidate is not promotable until full
 three-rank model-load, quality, capacity, and performance gates pass.
 
 ## Quality and safety gates

@@ -1,6 +1,6 @@
 # Decision
 
-Status: **MoE compatibility correction qualified; immutable rebuild required**
+Status: **pre-profile ordering correction qualified; immutable rebuild required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -17,8 +17,11 @@ retained for rollback.
 The patch-0014 image completed checkpoint loading but proved that the MoE carry
 still targeted B12X's preceding API. Patch 0015 replaces that boundary with the
 current structured preparation API and passes real W4A16/W4A8, multi-capacity,
-repeated-preparation, and CUDA-graph tests on one Spark. This is the final
-identified compatibility correction, not yet proof of a full TP3 startup.
+repeated-preparation, and CUDA-graph tests on one Spark. Its TP3 launch then
+showed that the pre-memory collector constructed unrelated warmup units before
+filtering them. Patch 0016 gives that phase a dedicated provider method exposed
+only by MoE, and its regression fails if an ordinary provider is even invoked.
+This is not yet proof of a full TP3 startup.
 
 The remaining work is target evidence:
 

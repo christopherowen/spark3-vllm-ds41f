@@ -56,7 +56,7 @@ prepare \
   vllm \
   https://github.com/vllm-project/vllm.git \
   d05da62e9ccdf8e342b15bf6785d83224cc165af \
-  b99e514fd55976432f442a0c2a7a21732842f7c1 \
+  856e545b6d27d65abae8f6fabb985b1137a99087 \
   patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch \
   patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch \
   patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch \
@@ -71,7 +71,8 @@ prepare \
   patches/vllm/0012-fix-deepseek-v41-route-disk-Engram-descriptors-to-le.patch \
   patches/vllm/0013-fix-deepseek-v41-expose-disk-Engram-filter-through-V.patch \
   patches/vllm/0014-fix-loader-support-native-MXFP8-scale-metadata.patch \
-  patches/vllm/0015-fix-b12x-port-MoE-to-preparation-API.patch
+  patches/vllm/0015-fix-b12x-port-MoE-to-preparation-API.patch \
+  patches/vllm/0016-fix-b12x-isolate-pre-profile-MoE-preparation.patch
 
 prepare \
   b12x \

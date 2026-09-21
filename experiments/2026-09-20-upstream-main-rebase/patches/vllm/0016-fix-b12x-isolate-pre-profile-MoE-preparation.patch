@@ -1,0 +1,168 @@
+From 559d09a41eee98842a79b4cdf69f1bbeb0a33521 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 03:25:46 +0200
+Subject: [PATCH] fix(b12x): isolate pre-profile MoE preparation
+
+---
+ tests/model_executor/test_b12x_warmup.py     | 16 +++++----
+ vllm/model_executor/layers/fused_moe/b12x.py |  9 ++++-
+ vllm/model_executor/warmup/b12x_warmup.py    | 36 +++++++++++++++-----
+ vllm/utils/b12x.py                           |  1 -
+ 4 files changed, 44 insertions(+), 18 deletions(-)
+
+diff --git a/tests/model_executor/test_b12x_warmup.py b/tests/model_executor/test_b12x_warmup.py
+index 8870c4829f..74c0b330c9 100644
+--- a/tests/model_executor/test_b12x_warmup.py
++++ b/tests/model_executor/test_b12x_warmup.py
+@@ -221,26 +221,28 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+ 
+     calls: list[tuple[str, tuple[int, ...], torch.dtype]] = []
+ 
+-    class Provider:
++    class WeightProvider:
+         def get_b12x_warmup_unit(self, layer, token_counts, output_dtype):
+             return B12xWarmupUnit(
+                 name=layer.name,
+                 key=(layer.name,),
+                 compile=lambda: calls.append((layer.name, token_counts, output_dtype)),
+-                pre_profile=layer.pre_profile,
+             )
+ 
+-    provider = Provider()
++        get_b12x_pre_profile_unit = get_b12x_warmup_unit
++
++    class KernelProvider:
++        def get_b12x_warmup_unit(self, layer, token_counts, output_dtype):
++            raise AssertionError("ordinary warmup provider was called before profiling")
++
+     layers = [
+         SimpleNamespace(
+             name="weights",
+-            pre_profile=True,
+-            b12x_warmup_provider=provider,
++            b12x_warmup_provider=WeightProvider(),
+         ),
+         SimpleNamespace(
+             name="kernel",
+-            pre_profile=False,
+-            b12x_warmup_provider=provider,
++            b12x_warmup_provider=KernelProvider(),
+         ),
+     ]
+     worker = SimpleNamespace(
+diff --git a/vllm/model_executor/layers/fused_moe/b12x.py b/vllm/model_executor/layers/fused_moe/b12x.py
+index 96e222d2d5..862b49aac1 100644
+--- a/vllm/model_executor/layers/fused_moe/b12x.py
++++ b/vllm/model_executor/layers/fused_moe/b12x.py
+@@ -768,9 +768,16 @@ class B12xExperts(mk.FusedMoEExpertsModular):
+                 counts,
+             ),
+             compile=compile,
+-            pre_profile=True,
+         )
+ 
++    def get_b12x_pre_profile_unit(
++        self,
++        layer: torch.nn.Module,
++        token_counts: tuple[int, ...],
++        output_dtype: torch.dtype,
++    ) -> B12xWarmupUnit:
++        return self.get_b12x_warmup_unit(layer, token_counts, output_dtype)
++
+     def workspace_shapes(
+         self,
+         M: int,
+diff --git a/vllm/model_executor/warmup/b12x_warmup.py b/vllm/model_executor/warmup/b12x_warmup.py
+index bd18ecf41d..5871bee200 100644
+--- a/vllm/model_executor/warmup/b12x_warmup.py
++++ b/vllm/model_executor/warmup/b12x_warmup.py
+@@ -24,18 +24,20 @@ def _collect_warmup_units(
+     token_counts: tuple[int, ...],
+     output_dtype: torch.dtype,
+     extra_providers: Iterable[object] = (),
++    *,
++    provider_method: str = "get_b12x_warmup_unit",
+ ) -> Iterable[B12xWarmupUnit]:
+     units: dict[object, B12xWarmupUnit] = {}
+     for layer in model.modules():
+         provider = getattr(layer, "b12x_warmup_provider", None)
+-        get_unit = getattr(provider, "get_b12x_warmup_unit", None)
++        get_unit = getattr(provider, provider_method, None)
+         if not callable(get_unit):
+             continue
+         unit = get_unit(layer, token_counts, output_dtype)
+         assert isinstance(unit, B12xWarmupUnit)
+         units.setdefault(unit.key, unit)
+     for provider in extra_providers:
+-        get_unit = getattr(provider, "get_b12x_warmup_unit", None)
++        get_unit = getattr(provider, provider_method, None)
+         if not callable(get_unit):
+             continue
+         unit = get_unit(provider, token_counts, output_dtype)
+@@ -75,9 +77,9 @@ def _b12x_supported() -> bool:
+     return current_platform.is_device_capability_family(120)
+ 
+ 
+-def _serving_units(
++def _serving_contract(
+     worker: "Worker", cudagraph_capture_sizes: list[int]
+-) -> Iterable[B12xWarmupUnit]:
++) -> tuple[tuple[int, ...], torch.dtype]:
+     output_dtype = getattr(
+         getattr(worker, "model_config", None),
+         "dtype",
+@@ -96,9 +98,21 @@ def _serving_units(
+     max_num_scheduled_tokens = worker.scheduler_config.max_num_scheduled_tokens
+     if max_num_scheduled_tokens is not None:
+         max_tokens = max(max_tokens, max_num_scheduled_tokens)
+-    token_counts = b12x_warmup_token_counts(
+-        max_tokens=max_tokens,
+-        cudagraph_capture_sizes=serving_sizes,
++    return (
++        b12x_warmup_token_counts(
++            max_tokens=max_tokens,
++            cudagraph_capture_sizes=serving_sizes,
++        ),
++        output_dtype,
++    )
++
++
++def _serving_units(
++    worker: "Worker", cudagraph_capture_sizes: list[int]
++) -> Iterable[B12xWarmupUnit]:
++    token_counts, output_dtype = _serving_contract(
++        worker,
++        cudagraph_capture_sizes,
+     )
+     return _collect_warmup_units(
+         worker.get_model(),
+@@ -120,8 +134,12 @@ def b12x_prepare_weights(worker: "Worker") -> None:
+     capture_sizes = list(
+         worker.vllm_config.compilation_config.cudagraph_capture_sizes or ()
+     )
+-    units = tuple(
+-        unit for unit in _serving_units(worker, capture_sizes) if unit.pre_profile
++    token_counts, output_dtype = _serving_contract(worker, capture_sizes)
++    units = _collect_warmup_units(
++        worker.get_model(),
++        token_counts,
++        output_dtype,
++        provider_method="get_b12x_pre_profile_unit",
+     )
+     for name, count in _compile_warmup_units(units).items():
+         logger.info_once(
+diff --git a/vllm/utils/b12x.py b/vllm/utils/b12x.py
+index f48d2d00eb..cd8022e88b 100644
+--- a/vllm/utils/b12x.py
++++ b/vllm/utils/b12x.py
+@@ -17,7 +17,6 @@ class B12xWarmupUnit:
+     name: str
+     key: Hashable
+     compile: Callable[[], None]
+-    pre_profile: bool = False
+ 
+ 
+ _HAS_B12X = importlib.util.find_spec("b12x") is not None
+-- 
+2.54.0 (Apple Git-157)
+

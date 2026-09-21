@@ -48,7 +48,10 @@ planner with `PackedSource`, `ActivationSpec`, `MoEGeometry`, `PackedWeights`,
 `d7e22286ffc9299800e4e448ee525a0b5259f738` ports that boundary without copying
 the donor model. It also moves retained-plan preparation ahead of KV memory
 profiling, while the existing later warmup continues to cover ordinary kernels
-and graph shapes.
+and graph shapes. Follow-up `8051ebbaadb9dfc2bb6f60554dfdaf8eede22326`
+gives that early phase a dedicated provider method instead of constructing all
+warmup units and filtering them afterward; this prevents sparse attention from
+being touched before KV-cache storage exists.
 
 ### RoCEnante
 

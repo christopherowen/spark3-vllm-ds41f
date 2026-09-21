@@ -21,9 +21,10 @@
         "4ffca3bc73ecac8c2405ada835ccda4d7e6a2707",
         "161c3c6eaf2f98ec258664d18493fc35f136ebf9",
         "8a6eb0cc6f904c15326a2337dc90bd50f041f7c2",
-        "d7e22286ffc9299800e4e448ee525a0b5259f738"
+        "d7e22286ffc9299800e4e448ee525a0b5259f738",
+        "8051ebbaadb9dfc2bb6f60554dfdaf8eede22326"
       ],
-      "source_tree": "b99e514fd55976432f442a0c2a7a21732842f7c1",
+      "source_tree": "856e545b6d27d65abae8f6fabb985b1137a99087",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -40,7 +41,8 @@
         "patches/vllm/0012-fix-deepseek-v41-route-disk-Engram-descriptors-to-le.patch",
         "patches/vllm/0013-fix-deepseek-v41-expose-disk-Engram-filter-through-V.patch",
         "patches/vllm/0014-fix-loader-support-native-MXFP8-scale-metadata.patch",
-        "patches/vllm/0015-fix-b12x-port-MoE-to-preparation-API.patch"
+        "patches/vllm/0015-fix-b12x-port-MoE-to-preparation-API.patch",
+        "patches/vllm/0016-fix-b12x-isolate-pre-profile-MoE-preparation.patch"
       ]
     },
     {
@@ -68,8 +70,8 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:bdc1deee14daa355b9774e489d48778cfafff4bf364be1f28d067ba9dafb15a2",
-  "deployment_status": "MoE preparation-API image distributed with exact identity on all three ranks; full TP3 launch pending; promoted rollback retained",
+  "image_digest": null,
+  "deployment_status": "pre-profile provider-order correction qualified on one GB10; immutable rebuild pending; promoted rollback retained",
   "integration_status": {
     "status": "the source candidate passes the existing focused suites plus real MXFP4 W4A16/W4A8 execution, repeated multi-capacity preparation, and CUDA-graph replay on GB10; full TP3 model-load remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
