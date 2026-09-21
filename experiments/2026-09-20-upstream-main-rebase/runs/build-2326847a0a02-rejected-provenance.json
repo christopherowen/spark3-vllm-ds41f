@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "rejected-before-distribution",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:8a6eb0cc6f90-c90ba030f2ab-d196937b80a51",
+    "id": "sha256:2326847a0a02d30199a08dda122e5f018c4da8050b4397a999b45d15c36d5422",
+    "size_bytes": 23240249195,
+    "deployment_revision": "196937b80a51650b3305fbff8d36a0da55b20648"
+  },
+  "content": {
+    "vllm_head": "8a6eb0cc6f904c15326a2337dc90bd50f041f7c2",
+    "vllm_tree": "12b57e435cfd155e0edd7cec5ca3ad2505cc3170",
+    "b12x_head": "c90ba030f2ab4a17959afd05461449ca47259242",
+    "b12x_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0"
+  },
+  "failure": {
+    "gate": "immutable image source identity",
+    "cause": "the Dockerfile's default OCI labels still named the preceding vLLM and B12X patch heads and preceding vLLM tree",
+    "runtime_attempted": false,
+    "distributed": false
+  },
+  "resolution": {
+    "behavior": "pass all six verified source identities from build-candidate and make missing Dockerfile source-identity arguments visibly unrecorded",
+    "quality_change": "none"
+  }
+}

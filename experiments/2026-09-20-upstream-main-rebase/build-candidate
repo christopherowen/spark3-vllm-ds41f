@@ -10,10 +10,12 @@ case "$mode" in
   *) echo "usage: $0 [build|check]" >&2; exit 2 ;;
 esac
 
-vllm_tree=12b57e435cfd155e0edd7cec5ca3ad2505cc3170
-b12x_tree=a1523b067b4df679f9aa23d543fa324dc00770f0
+vllm_base=d05da62e9ccdf8e342b15bf6785d83224cc165af
+b12x_base=0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68
 vllm_head=8a6eb0cc6f904c15326a2337dc90bd50f041f7c2
 b12x_head=c90ba030f2ab4a17959afd05461449ca47259242
+vllm_tree=12b57e435cfd155e0edd7cec5ca3ad2505cc3170
+b12x_tree=a1523b067b4df679f9aa23d543fa324dc00770f0
 
 for project in vllm b12x; do
   source_path="$source_root/$project"
@@ -63,6 +65,12 @@ exec docker buildx build \
   --load \
   --build-context "vllm-source=$source_root/vllm" \
   --build-context "b12x-source=$source_root/b12x" \
+  --build-arg "VLLM_BASE=$vllm_base" \
+  --build-arg "VLLM_PATCH_HEAD=$vllm_head" \
+  --build-arg "VLLM_TREE=$vllm_tree" \
+  --build-arg "B12X_BASE=$b12x_base" \
+  --build-arg "B12X_PATCH_HEAD=$b12x_head" \
+  --build-arg "B12X_TREE=$b12x_tree" \
   --build-arg "DEPLOYMENT_COMMIT=$deployment_commit" \
   --tag "$tag" \
   --file "$experiment_root/Dockerfile" \

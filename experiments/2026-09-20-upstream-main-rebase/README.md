@@ -133,6 +133,14 @@ values are unchanged. A real-header regression and all 20 focused loader and
 DS4.1 tests pass on GB10. The exact failure is recorded in
 `runs/launch-f829b45a514d-mxfp8-metadata.json`.
 
+The first image containing patch 0014 was rejected before distribution because
+the Dockerfile still supplied the preceding vLLM and B12X identities as default
+OCI labels. Its source trees were correct, but its provenance was not. The
+build script now passes every verified base, patch head, and tree explicitly;
+the Dockerfile defaults to `unrecorded` so a future omission cannot silently
+claim an older source identity. The rejection is recorded in
+`runs/build-2326847a0a02-rejected-provenance.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
