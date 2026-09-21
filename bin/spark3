@@ -615,8 +615,10 @@ def wait_for_api(cluster: dict, nodes: dict) -> None:
     url = cluster["deployment"]["ready_url"]
     timeout = int(cluster["deployment"]["ready_timeout_seconds"])
     deadline = time.monotonic() + timeout
+    unreachable_since: dict[str, float] = {}
     print(f"waiting up to {timeout}s for {head['name']} API readiness", flush=True)
     while time.monotonic() < deadline:
+        unavailable = False
         for node in nodes["nodes"]:
             state = run_ssh(
                 nodes,
@@ -627,7 +629,25 @@ def wait_for_api(cluster: dict, nodes: dict) -> None:
                 "{{.State.Running}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}",
                 name,
             )
-            if state.returncode or not state.stdout.startswith("true "):
+            if state.returncode:
+                unavailable = True
+                if node["name"] not in unreachable_since:
+                    unreachable_since[node["name"]] = time.monotonic()
+                    detail = state.stderr.strip() or "SSH unavailable"
+                    print(
+                        f"WARN: {node['name']} temporarily unreachable during "
+                        f"startup ({detail}); waiting for an inspectable state",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                continue
+            if node["name"] in unreachable_since:
+                elapsed = int(time.monotonic() - unreachable_since.pop(node["name"]))
+                print(
+                    f"{node['name']}: control path recovered after {elapsed}s",
+                    flush=True,
+                )
+            if not state.stdout.startswith("true "):
                 state_detail = state.stdout.strip() or state.stderr.strip() or "absent"
                 logs = run_ssh(nodes, node, "docker", "logs", "--tail", "20", name)
                 log_detail = (logs.stdout or logs.stderr).strip()
@@ -637,6 +657,9 @@ def wait_for_api(cluster: dict, nodes: dict) -> None:
                     f"{node['name']}: {name} stopped before readiness "
                     f"({state_detail})\n{log_detail}"
                 )
+        if unavailable:
+            time.sleep(10)
+            continue
         result = run_ssh(
             nodes,
             head,
@@ -652,7 +675,9 @@ def wait_for_api(cluster: dict, nodes: dict) -> None:
             print("API ready; JIT/autotuning startup has completed", flush=True)
             return
         time.sleep(10)
-    raise RuntimeError(f"API did not become ready within {timeout}s")
+    unreachable = ", ".join(sorted(unreachable_since))
+    suffix = f"; unreachable nodes: {unreachable}" if unreachable else ""
+    raise RuntimeError(f"API did not become ready within {timeout}s{suffix}")
 
 
 def start_memguards(cluster: dict, nodes: dict, cluster_config: str) -> None:
