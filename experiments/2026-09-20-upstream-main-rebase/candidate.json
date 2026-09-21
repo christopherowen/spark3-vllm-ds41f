@@ -80,9 +80,9 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
+  "image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f",
-  "deployment_status": "the four-open/two-routed RoCEnante prepared-plan fix passes the exact three-rank transport probe; immutable image qualification remains required",
+  "deployment_status": "the corrected immutable image passes 140 selected source, numerical, Engram, MoE, CUDA-graph, and topology tests; distribution and TP3 runtime qualification remain required",
   "integration_status": {
     "status": "the source candidate coordinates pre-profile RoCEnante priming and keys prepared flag geometry by routed stripes; immutable image and TP3 runtime qualification remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
@@ -91,7 +91,7 @@
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-rocenante-stripe-fix-pending-image-qualification",
+    "status": "aligned-rocenante-stripe-fix-image-qualified-pending-tp3-runtime",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

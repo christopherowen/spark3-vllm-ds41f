@@ -1,5 +1,5 @@
 {
-  "status": "rocenante-switchless-stripe-layout-correction-pending-image-qualification",
+  "status": "rocenante-switchless-stripe-layout-image-qualified-pending-tp3-runtime",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -93,7 +93,8 @@
     "rocenante_transport_isolation": "the promoted legacy path and rebased direct path both match NCCL from 16 B through 1 MiB across all three ranks; only the PreparationSession path failed, independent of compiler-worker count",
     "rocenante_stripe_layout_cause": "the switchless ring opens four local HCA functions but routes two stripes per peer; prepared query metadata incorrectly compiled a four-lane GPU flag layout while the C proxy correctly wrote the two routed lanes",
     "rocenante_stripe_layout_resolution": "B12X commit b69feee3022c keys prepared all-reduce and all-gather flag geometry by runtime.stripe_count while retaining all opened HCA functions for peer routing",
-    "rocenante_stripe_layout_probe": "the fixed prepared-plan path primes three reductions and one gather, then matches NCCL at 16 B, 4 KiB, 256 KiB, and 1 MiB on every rank with balanced completions across all four local HCA functions"
+    "rocenante_stripe_layout_probe": "the fixed prepared-plan path primes three reductions and one gather, then matches NCCL at 16 B, 4 KiB, 256 KiB, and 1 MiB on every rank with balanced completions across all four local HCA functions",
+    "rocenante_stripe_layout_image": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1 has exact deterministic source labels and passes 118 focused vLLM tests, 8 B12X RoCEnante topology/layout tests, 8 production-capability disk Engram tests, both selected real MXFP4 numerical modes, and four multi-capacity/CUDA-graph cases"
   },
   "summary": {
     "ttft_seconds": null,
@@ -143,7 +144,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "rocenante-switchless-stripe-layout-correction-pending-image-and-serving-gates",
+    "status": "rocenante-switchless-stripe-layout-image-qualified-pending-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

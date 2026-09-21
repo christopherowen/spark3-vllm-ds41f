@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "passed-prelaunch-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:5dff83d6dd40-b69feee3022c-d5c6172f43495",
+    "id": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
+    "size_bytes": 23240447004,
+    "deployment_revision": "5c6172f43495381725434549b76dbe52a4b714d7",
+    "vllm_patch_head": "5dff83d6dd40cc9f846502cdf85e8b937530d07b",
+    "vllm_tree": "4138f6ad2f3f652e8c5b00a56d25aae0b386d2fb",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "checks": {
+    "source_replay": "twenty vLLM and five B12X patches reproduced both deterministic revisions and recorded Git trees from exact upstream bases",
+    "image_labels": "deployment, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "focused_vllm": "118 warmup, linear, DS4.1 B12X, virtual-head, file-backed loader, weight-transfer, and RoCEnante tests passed from the finished image",
+    "b12x_rocenante": "8 topology and prepared-layout tests passed, including four-open/two-routed geometry",
+    "b12x_engram": "8 tests passed with IPC_LOCK, unlimited memlock, and the production seccomp capability set",
+    "b12x_moe": "both selected real MXFP4 numerical modes and all four multi-capacity/CUDA-graph cases passed",
+    "transport_overlay_gate": "the exact patch content passed a three-rank prepared-plan NCCL comparison from 16 B through 1 MiB before the immutable build",
+    "rollback_state": "promoted containers remain stopped and present on all three nodes"
+  },
+  "remaining": [
+    "distribute the exact image to dgx1 and dgx2",
+    "repeat the three-rank RoCEnante transport probe from the immutable image",
+    "full three-rank model load and selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}
