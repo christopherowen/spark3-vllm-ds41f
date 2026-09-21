@@ -24,8 +24,8 @@
       "--security-opt=seccomp=unconfined",
       "--security-opt=label=disable",
       "--shm-size=16g",
-      "--memory=112g",
-      "--memory-swap=112g"
+      "--memory=110g",
+      "--memory-swap=116g"
     ],
     "mounts": [
       [

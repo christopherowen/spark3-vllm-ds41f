@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "failed-after-model-load-at-startup-physical-memory-headroom",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:96dc80400edf-c90ba030f2ab-d3b28daac5c84",
+    "id": "sha256:553dc78794447882fac6959788124fdc2dca32d1a8a25fc959d55f6035388f6f",
+    "source_revision": "96dc80400edf18ca97ad40d99ddb7ac620af3c33",
+    "launch_revision": "114305fe073a682826d472e7f62943614f7212fc"
+  },
+  "progress": [
+    "formed the three-rank NCCL 2.30.7 group and selected RoCEnante before PyNCCL for eligible tensor-parallel collectives",
+    "selected the intended B12X sparse-attention, MXFP8 linear, MXFP4 MoE, and disk Engram paths",
+    "completed target and DSpark loading at 98.1 GiB on rank 0"
+  ],
+  "failure": {
+    "first_failed_rank": "dgx2",
+    "container_exit_code": 1,
+    "docker_oom_killed": false,
+    "kernel_evidence": "all three hosts repeatedly logged NVRM NV_ERR_NO_MEMORY from mem_desc.c while MemAvailable fell to approximately 1 GiB",
+    "cause": "the 112 GiB resident container allowance plus host services left insufficient physical headroom for NVIDIA driver allocations during pre-profile JIT/preparation; Docker's OOM flag covers cgroup kills and therefore did not report this driver allocation failure",
+    "quality_or_kv_change": "none; explicit KV had not yet been allocated"
+  },
+  "resolution_under_test": {
+    "container_resident_limit_gib": 110,
+    "container_total_memory_plus_swap_gib": 116,
+    "container_swap_allowance_gib": 6,
+    "intent": "guarantee additional physical headroom while allowing cold loader and Python pages to spill during the temporary startup peak; keep the 3 GiB KV allocation, 160K announced context, eight-sequence admission, and every model/kernel setting unchanged",
+    "acceptance": "startup must complete with at least 3 GiB host MemAvailable, no NVRM allocation errors, bounded non-growing swap, and unchanged steady-state performance"
+  },
+  "rollback": "failed candidate containers were removed; stopped promoted containers remain present on all three nodes"
+}

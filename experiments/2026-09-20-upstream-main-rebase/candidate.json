@@ -1,6 +1,9 @@
 {
   "intended_variable": "rebase the source stack onto current upstream architecture and retain only required DS4.1 TP3 behavior",
-  "configuration_delta": {},
+  "configuration_delta": {
+    "container_memory": "110 GiB resident, 116 GiB memory-plus-swap during startup instead of 112 GiB resident with swap disabled",
+    "unchanged_capacity": "3 GiB explicit KV per rank, 160K max model length, 8 max sequences, and all model/kernel settings"
+  },
   "source_delta": [
     {
       "project": "vllm",
@@ -77,7 +80,7 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:553dc78794447882fac6959788124fdc2dca32d1a8a25fc959d55f6035388f6f",
-  "deployment_status": "the immutable patch-0019 image passes the full selected-path prelaunch suite on GB10; three-rank distribution and runtime qualification remain required",
+  "deployment_status": "the immutable patch-0019 image passes the full selected-path prelaunch suite on GB10 and is identical on all ranks; the first TP3 launch exposed insufficient physical startup headroom, so a bounded resident-memory plus startup-swap policy is pending runtime qualification",
   "integration_status": {
     "status": "the immutable source candidate retains selected-path qualification and includes pre-profile RoCEnante preparation with collector and adapter regressions; TP3 runtime qualification remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",

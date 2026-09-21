@@ -1,6 +1,6 @@
 # Decision
 
-Status: **Patch-0019 image qualified; TP3 runtime qualification required**
+Status: **Patch-0019 image qualified; startup-headroom policy under TP3 qualification**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -46,6 +46,15 @@ Ordinary post-cache providers remain structurally excluded. This was not an OOM.
 The immutable patch-0019 image now passes the selected source, numerical, disk
 Engram, MoE, CUDA-graph, RoCEnante, and style gates on GB10. The remaining work
 is target evidence:
+
+Its first TP3 launch loaded the target and DSpark model but exhausted physical
+host headroom during pre-profile preparation. All three kernels recorded NVIDIA
+`NV_ERR_NO_MEMORY`; Docker's cgroup OOM flag remained false. The candidate now
+caps resident container memory at 110 GiB and permits up to 6 GiB of swap only
+inside a 116 GiB memory-plus-swap ceiling. This preserves the 3 GiB KV cache and
+all quality/performance settings while giving the driver deterministic physical
+headroom. Promotion requires bounded, non-growing swap and unchanged steady
+performance.
 
 1. distribute the qualified content-addressed ARM64 image to all ranks;
 2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
