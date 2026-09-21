@@ -1,0 +1,97 @@
+From 96dc80400edf18ca97ad40d99ddb7ac620af3c33 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 04:45:00 +0200
+Subject: [PATCH] fix(b12x): prepare RoCEnante before profiling
+
+---
+ tests/distributed/test_b12x_roce_all_reduce.py  |  7 +++++++
+ tests/model_executor/test_b12x_warmup.py        | 17 +++++++++++++++++
+ .../b12x_roce_all_reduce.py                     |  2 ++
+ vllm/model_executor/warmup/b12x_warmup.py       |  1 +
+ 4 files changed, 27 insertions(+)
+
+diff --git a/tests/distributed/test_b12x_roce_all_reduce.py b/tests/distributed/test_b12x_roce_all_reduce.py
+index 4a719ef18..76a4f2726 100644
+--- a/tests/distributed/test_b12x_roce_all_reduce.py
++++ b/tests/distributed/test_b12x_roce_all_reduce.py
+@@ -82,3 +82,10 @@ def test_dispatch_uses_prepared_plan_and_preserves_fallback() -> None:
+     assert communicator.custom_all_reduce("large") is None
+     assert communicator.custom_all_reduce("small") == "reduced"
+     assert calls == [("small", plan)]
++
++
++def test_roce_plan_is_eligible_for_pre_profile_preparation() -> None:
++    assert (
++        B12xRoceAllReduce.get_b12x_pre_profile_unit
++        is B12xRoceAllReduce.get_b12x_warmup_unit
++    )
+diff --git a/tests/model_executor/test_b12x_warmup.py b/tests/model_executor/test_b12x_warmup.py
+index b98775820..f3d6b196a 100644
+--- a/tests/model_executor/test_b12x_warmup.py
++++ b/tests/model_executor/test_b12x_warmup.py
+@@ -307,6 +307,17 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+         def get_b12x_warmup_unit(self, layer, token_counts, output_dtype):
+             raise AssertionError("ordinary warmup provider was called before profiling")
+ 
++    class DistributedProvider:
++        def get_b12x_pre_profile_unit(self, owner, token_counts, output_dtype):
++            assert owner is self
++            return B12xWarmupUnit(
++                name="distributed",
++                key=("distributed",),
++                compile=lambda: calls.append(
++                    ("distributed", token_counts, output_dtype)
++                ),
++            )
++
+     target_layers = [
+         SimpleNamespace(
+             name="weights",
+@@ -345,6 +356,11 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+     )
+     synchronized = []
+     monkeypatch.setattr(warmup_mod, "current_platform", platform)
++    monkeypatch.setattr(
++        warmup_mod,
++        "_distributed_warmup_providers",
++        lambda: (DistributedProvider(),),
++    )
+     monkeypatch.setattr(
+         warmup_mod.torch.accelerator,
+         "synchronize",
+@@ -356,6 +372,7 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+     assert calls == [
+         ("weights", (1, 2, 4, 8, 32), torch.bfloat16),
+         ("draft_weights", (1, 2, 4, 8, 32), torch.bfloat16),
++        ("distributed", (1, 2, 4, 8, 32), torch.bfloat16),
+     ]
+     assert synchronized == [True]
+ 
+diff --git a/vllm/distributed/device_communicators/b12x_roce_all_reduce.py b/vllm/distributed/device_communicators/b12x_roce_all_reduce.py
+index e32d3d513..8a18bea0e 100644
+--- a/vllm/distributed/device_communicators/b12x_roce_all_reduce.py
++++ b/vllm/distributed/device_communicators/b12x_roce_all_reduce.py
+@@ -216,6 +216,8 @@ class B12xRoceAllReduce:
+             compile=lambda: self._prepare_plan(plan),
+         )
+ 
++    get_b12x_pre_profile_unit = get_b12x_warmup_unit
++
+     def _prepare_plan(self, plan: Any) -> None:
+         from b12x.comm.roce import _preparation
+         from b12x.preparation import PreparedCall, prepare_default
+diff --git a/vllm/model_executor/warmup/b12x_warmup.py b/vllm/model_executor/warmup/b12x_warmup.py
+index 2d82b8a05..a249b26c4 100644
+--- a/vllm/model_executor/warmup/b12x_warmup.py
++++ b/vllm/model_executor/warmup/b12x_warmup.py
+@@ -177,6 +177,7 @@ def b12x_prepare_weights(worker: "Worker") -> None:
+         worker,
+         token_counts,
+         output_dtype,
++        _distributed_warmup_providers(),
+         provider_method="get_b12x_pre_profile_unit",
+     )
+     for name, count in _compile_warmup_units(units).items():
+-- 
+2.54.0 (Apple Git-157)
+

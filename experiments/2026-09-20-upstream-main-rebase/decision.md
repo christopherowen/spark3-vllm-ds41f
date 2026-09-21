@@ -1,6 +1,6 @@
 # Decision
 
-Status: **Draft-model plan discovery image qualified; TP3 launch required**
+Status: **RoCEnante pre-profile preparation corrected; immutable rebuild required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -36,10 +36,18 @@ Patch 0018 enumerates both roots and deduplicates shared layers by their existin
 plan key. The failure was not an OOM and did not require a configuration change.
 Its immutable image passes the complete selected-path prelaunch suite on GB10.
 
+The next launch proved that fix by preparing 226 MXFP8 and 43 MoE plans, then
+reached the first eligible small collective during the real profile run.
+RoCEnante rejected it because its plan was still deferred to the normal
+post-profile warmup. Patch 0019 exposes the same explicit pre-profile contract
+on RoCEnante and includes eligible distributed providers in that phase.
+Ordinary post-cache providers remain structurally excluded. This was not an OOM.
+
 The remaining work is target evidence:
 
-1. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
-2. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
+1. rebuild and qualify the content-addressed ARM64 candidate on dgx3;
+2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
+3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.
 
 The nodes are now free for qualification. Dependency suppression or an in-place

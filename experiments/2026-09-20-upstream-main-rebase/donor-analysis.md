@@ -69,6 +69,13 @@ appear in `worker.get_model().modules()`. Candidate commit
 accessors and deduplicates aliases by plan key. This is lifecycle integration
 for current upstream vLLM, not a donor-specific model fork.
 
+Once the draft plans were present, profiling reached a small collective and
+showed that RoCEnante's prepared plan was still scheduled only in normal
+post-profile warmup. Candidate commit
+`96dc80400edf18ca97ad40d99ddb7ac620af3c33` opts the communicator into the same
+explicit early contract. It does not broaden early enumeration to attention or
+Engram and does not alter RoCEnante routing or collective numerics.
+
 ### RoCEnante
 
 The prepared B12X per-peer/HCA commit only supplies transport behavior. The

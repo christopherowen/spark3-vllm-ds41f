@@ -197,6 +197,13 @@ passes 60 selected vLLM tests, 8 production-capability disk Engram tests, both
 selected MXFP4 numerical modes, four multi-capacity/CUDA-graph cases, Ruff, and
 format on GB10. Its receipt is `runs/build-811f3078cc1d-validation.json`.
 
+That image prepared 226 MXFP8 and 43 MoE plans, then entered the real profile
+run and reached an eligible DSpark embedding collective. RoCEnante rejected the
+call because its plan was still scheduled only by normal post-profile warmup.
+Patch 0019 opts the communicator into the explicit pre-profile provider
+contract and includes eligible distributed providers in that phase. The failure
+is recorded in `runs/launch-811f3078cc1d-rocenante-preparation.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported

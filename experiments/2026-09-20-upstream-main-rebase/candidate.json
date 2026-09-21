@@ -24,9 +24,10 @@
         "d7e22286ffc9299800e4e448ee525a0b5259f738",
         "8051ebbaadb9dfc2bb6f60554dfdaf8eede22326",
         "0974d6ec70a94db3483fd19b678437403d469319",
-        "fcdb8715837314ee899308154af380e064a6345d"
+        "fcdb8715837314ee899308154af380e064a6345d",
+        "96dc80400edf18ca97ad40d99ddb7ac620af3c33"
       ],
-      "source_tree": "ef0f991c5531323f03fca963da6341092efd1d80",
+      "source_tree": "7d63914525c57f0d40f67cdb4787d3800c7b2e98",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -46,7 +47,8 @@
         "patches/vllm/0015-fix-b12x-port-MoE-to-preparation-API.patch",
         "patches/vllm/0016-fix-b12x-isolate-pre-profile-MoE-preparation.patch",
         "patches/vllm/0017-fix-b12x-prepare-MXFP8-linear-execution-plans.patch",
-        "patches/vllm/0018-fix-b12x-prepare-draft-model-weight-plans.patch"
+        "patches/vllm/0018-fix-b12x-prepare-draft-model-weight-plans.patch",
+        "patches/vllm/0019-fix-b12x-prepare-RoCEnante-before-profiling.patch"
       ]
     },
     {
@@ -75,16 +77,16 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:811f3078cc1d177b82b59fd0bcc0650e6d2a567e185efda05b84b073814c3e76",
-  "deployment_status": "the immutable patch-0018 image passes finished-image source, draft-root discovery, numerical, disk Engram, MoE, CUDA-graph, and style gates on GB10 and is verified identically on all three ranks; full TP3 startup remains required",
+  "deployment_status": "the patch-0018 image prepared 226 MXFP8 plus 43 MoE plans and entered the real profile run, then proved RoCEnante was deferred until post-profile warmup even though profiling routes through it; patch 0019 makes the distributed plan pre-profile eligible and requires an immutable rebuild",
   "integration_status": {
-    "status": "the immutable candidate passes the selected-path suites plus draft-model plan discovery and alias deduplication on GB10; full TP3 startup remains required",
+    "status": "the source candidate retains selected-path qualification and adds pre-profile RoCEnante preparation with focused collector and adapter regressions; target-image and TP3 qualification remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-passed-selected-sm121-prelaunch-qualification",
+    "status": "aligned-pending-patch-0019-sm121-runtime-qualification",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

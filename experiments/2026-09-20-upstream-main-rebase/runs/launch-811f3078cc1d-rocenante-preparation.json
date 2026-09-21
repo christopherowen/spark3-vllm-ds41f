@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "failed-after-model-plan-preparation-at-rocenante-plan-lifecycle",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:fcdb87158373-c90ba030f2ab-d41e77b218b14",
+    "id": "sha256:811f3078cc1d177b82b59fd0bcc0650e6d2a567e185efda05b84b073814c3e76",
+    "source_revision": "fcdb8715837314ee899308154af380e064a6345d",
+    "launch_revision": "739722c32ff3c00bdf6b982d26cf6115610d69e7"
+  },
+  "progress": [
+    "initialized NCCL 2.30.7 and selected RoCEnante before PyNCCL for eligible tensor-parallel collectives",
+    "completed target and DSpark loading at 98.1 GiB per rank",
+    "prepared all 226 target-plus-draft MXFP8 plans and 43 target-plus-draft MoE plans before memory profiling",
+    "entered the real profile run and compiled MHC kernels",
+    "reached the first eligible small DSpark embedding all-reduce"
+  ],
+  "failure": {
+    "file": "vllm/distributed/device_communicators/b12x_roce_all_reduce.py",
+    "operation": "RoCEnante custom_all_reduce during memory-profile DSpark execution",
+    "message": "RuntimeError: RoCEnante plan was not prepared during startup",
+    "cause": "the communicator exposed only the normal warmup provider method even though the profile run routes eligible collectives through it before that post-profile phase",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "96dc80400edf18ca97ad40d99ddb7ac620af3c33",
+    "source_tree": "7d63914525c57f0d40f67cdb4787d3800c7b2e98",
+    "behavior": "make RoCEnante explicitly pre-profile eligible and include distributed pre-profile providers while preserving structural exclusion for ordinary post-cache providers",
+    "validation": "focused collector and adapter regressions added; exact target-image tests remain required",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate residues were removed; stopped promoted containers remain present on all three nodes"
+}

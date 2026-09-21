@@ -85,6 +85,13 @@ weights live under `worker.get_draft_model()`, not the target returned by
 shared or aliased layers by the existing warmup-unit key. This keeps retained
 draft-plan memory inside the same pre-KV accounting boundary.
 
+That corrected profile then reached its first eligible small TP collective and
+proved RoCEnante had the same lifecycle requirement. The communicator already
+owned a prepared plan but exposed it only to normal post-profile warmup. It now
+opts into the explicit pre-profile provider contract, and the early collector
+includes eligible distributed providers without admitting ordinary attention,
+Engram, or other post-cache providers.
+
 ## Valid routes
 
 ### Selected route: qualify B12X on CUTLASS DSL 4.7.1

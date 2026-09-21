@@ -1,5 +1,5 @@
 {
-  "status": "draft-model-plan-discovery-image-distributed-pending-tp3-launch",
+  "status": "rocenante-pre-profile-preparation-correction-pending-image-qualification",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all eighteen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities ef0f991c5531 and a1523b067b4d",
+    "deterministic_source_preparer": "all nineteen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 7d63914525c5 and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -77,7 +77,9 @@
     "draft_model_plan_discovery_resolution": "pre-profile and post-profile B12X collectors now scan both target and separately owned draft-model roots while deduplicating aliased target/draft layers by the existing plan key",
     "draft_model_plan_discovery_tests": "10 focused warmup tests pass on the GB10 stack, including separate draft-root discovery and target/draft alias deduplication; Ruff, format, py_compile, exact patch export, and deterministic source replay checks pass",
     "draft_model_plan_discovery_image": "sha256:811f3078cc1d177b82b59fd0bcc0650e6d2a567e185efda05b84b073814c3e76 has exact deterministic source labels and passes 60 focused vLLM tests, 8 production-capability disk Engram tests, both selected real MXFP4 numerical modes, four multi-capacity/CUDA-graph cases, and immutable-image Ruff and format gates on GB10",
-    "draft_model_plan_discovery_image_distribution": "exact image ID, source labels, and deployment checkout verified on dgx1, dgx2, and dgx3 after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 139 seconds"
+    "draft_model_plan_discovery_image_distribution": "exact image ID, source labels, and deployment checkout verified on dgx1, dgx2, and dgx3 after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 139 seconds",
+    "fifteenth_full_launch": "loaded target and DSpark weights at 98.1 GiB per rank, prepared all 226 MXFP8 and 43 MoE plans, and entered the real profile run; the first eligible small DSpark embedding all-reduce then rejected dispatch because RoCEnante's plan was deferred to post-profile warmup; no OOM occurred",
+    "rocenante_pre_profile_resolution": "RoCEnante explicitly exposes the pre-profile provider contract, and the early collector now includes eligible distributed providers while ordinary attention, Engram, and other post-cache providers remain structurally excluded"
   },
   "summary": {
     "ttft_seconds": null,
@@ -127,7 +129,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "draft-model-plan-discovery-image-distributed-pending-serving-gates",
+    "status": "rocenante-pre-profile-preparation-correction-pending-image-and-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
