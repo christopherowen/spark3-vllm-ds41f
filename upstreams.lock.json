@@ -128,6 +128,13 @@
       "added_to_watchlist": "2026-09-20",
       "role": "four-node switchless topology and profiling reference; GLM-specific changes are not deployment inputs"
     },
+    "tonyd2wild_glm53_nvfp4_spark4_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/tonyd2wild/GLM-5.3-Flash-NVFP4-1M-KV-4x-DGX-Spark",
+      "observed_revision": "2ac4e8dd661b12e6a1d7e69df711707abd6b9cd4",
+      "added_to_watchlist": "2026-09-21",
+      "role": "four-Spark GB10 memory, startup, concurrency, CUDA-graph, DFlash2, and long-context methodology reference; GLM TP4 and NVFP4 changes are not deployment inputs"
+    },
     "oomwrap": {
       "kind": "git-watch",
       "url": "https://github.com/osolmaz/oomwrap",
