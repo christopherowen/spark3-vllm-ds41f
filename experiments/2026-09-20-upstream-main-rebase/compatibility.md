@@ -72,7 +72,11 @@ pre-memory implementation still constructed unrelated providers before
 filtering their returned units. Sparse attention therefore observed its
 pre-finalization cache placeholder. The corrected contract discovers only a
 dedicated `get_b12x_pre_profile_unit` method. B12X MoE implements it; ordinary
-attention, Engram, linear, and collective providers do not.
+attention, Engram, and collective providers do not. The ModelOpt MXFP8 linear
+provider now deliberately implements the same early contract because its
+current B12X plan owns compiled programs and capacity workspace that must be
+counted before KV admission. A real GB10 adapter regression prepares and
+executes 1/4/16-token regimes and exactly matches a dequantized MXFP8 reference.
 
 ## Valid routes
 

@@ -1,5 +1,5 @@
 {
-  "status": "pre-profile-provider-order-image-distributed-pending-full-launch",
+  "status": "mxfp8-linear-preparation-correction-qualified-pending-rebuild",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -15,7 +15,7 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all sixteen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 856e545b6d27 and a1523b067b4d",
+    "deterministic_source_preparer": "all seventeen vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities aa3b0f8f814c and a1523b067b4d",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -66,7 +66,10 @@
     "pre_profile_provider_order_resolution": "pre-memory preparation now discovers only providers with an explicit get_b12x_pre_profile_unit method; B12X MoE exposes it, while attention, Engram, linear, and collective warmups cannot be invoked early",
     "pre_profile_provider_order_tests": "the focused warmup suite now fails if an ordinary provider is even enumerated during pre-profile preparation; all 9 tests plus Ruff, format, and diff checks pass on GB10",
     "pre_profile_provider_order_image": "sha256:7c12c5a6f9a3c82d5b679e6e7c422996759924c1b92a438684fe0c47f7560fcd has exact deterministic source labels and passes the finished-image DS4.1, loader, ModelOpt, disk Engram, B12X warmup/MoE, multi-capacity, numerical, and CUDA-graph gates on GB10",
-    "pre_profile_provider_order_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 120 seconds"
+    "pre_profile_provider_order_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 120 seconds",
+    "thirteenth_full_launch": "cleared the two preceding B12X preparation failures, loaded model and draft weights at 98.1 GiB per rank, and prepared all 40 MoE plans, then failed when the carried ModelOpt MXFP8 linear adapter called current B12X without a required prepared plan; no OOM or host instability occurred",
+    "b12x_mxfp8_linear_preparation_resolution": "ModelOpt MXFP8 linears now declare bounded capacity and exact CUDA-graph regimes, prepare retained plans before memory profiling, execute with the retained plan, and reject unprepared execution",
+    "b12x_mxfp8_linear_preparation_tests": "all 40 focused linear and warmup tests pass on GB10; the new real vLLM adapter regression executes prepared 1/4/16-token plans and exactly matches a dequantized MXFP8 reference; Ruff, format, and diff checks pass"
   },
   "summary": {
     "ttft_seconds": null,

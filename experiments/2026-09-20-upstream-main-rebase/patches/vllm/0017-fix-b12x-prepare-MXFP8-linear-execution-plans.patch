@@ -1,0 +1,414 @@
+From 0974d6ec70a94db3483fd19b678437403d469319 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 03:53:34 +0200
+Subject: [PATCH] fix(b12x): prepare MXFP8 linear execution plans
+
+---
+ .../kernels/test_b12x_linear.py               |  79 +++++++++++-
+ tests/model_executor/test_b12x_warmup.py      |  88 ++++++++++++--
+ .../kernels/linear/mxfp8/b12x.py              | 115 +++++++++++++++---
+ 3 files changed, 254 insertions(+), 28 deletions(-)
+
+diff --git a/tests/model_executor/kernels/test_b12x_linear.py b/tests/model_executor/kernels/test_b12x_linear.py
+index 9d4f9beeb..78af14e53 100644
+--- a/tests/model_executor/kernels/test_b12x_linear.py
++++ b/tests/model_executor/kernels/test_b12x_linear.py
+@@ -601,12 +601,12 @@ def test_b12x_mxfp8_apply_uses_packed_weight(monkeypatch) -> None:
+         source: torch.Tensor,
+         packed_weight,
+         *,
++        plan,
+         bias: torch.Tensor | None = None,
+-        expected_m: int | None = None,
+         stream: object = None,
+     ) -> torch.Tensor:
+         del stream
+-        calls.append((source, packed_weight, bias, expected_m))
++        calls.append((source, packed_weight, plan, bias))
+         return source.new_full((source.shape[0], packed_weight.out_features), 3.0)
+ 
+     monkeypatch.setattr(
+@@ -618,6 +618,8 @@ def test_b12x_mxfp8_apply_uses_packed_weight(monkeypatch) -> None:
+     layer = torch.nn.Module()
+     packed = types.SimpleNamespace(out_features=48)
+     layer.b12x_mxfp8_packed_weight = packed
++    plan = types.SimpleNamespace(prepared=object())
++    layer.b12x_mxfp8_plan = plan
+     x = torch.empty((2, 3, 128), dtype=torch.bfloat16)
+     bias = torch.empty((48,), dtype=torch.bfloat16)
+     kernel = object.__new__(B12xMxfp8LinearKernel)
+@@ -627,11 +629,80 @@ def test_b12x_mxfp8_apply_uses_packed_weight(monkeypatch) -> None:
+     assert output.shape == (2, 3, 48)
+     assert output.dtype == x.dtype
+     assert len(calls) == 1
+-    source, called_packed, called_bias, expected_m = calls[0]
++    source, called_packed, called_plan, called_bias = calls[0]
+     assert source.shape == (6, 128)
+     assert called_packed is packed
++    assert called_plan is plan
+     assert called_bias is bias
+-    assert expected_m == 6
++
++
++@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
++def test_b12x_mxfp8_real_prepared_plan_matches_quantized_reference() -> None:
++    pytest.importorskip("b12x")
++    supported, reason = B12xMxfp8LinearKernel.is_supported()
++    if not supported:
++        pytest.skip(reason or "b12x MXFP8 is unavailable")
++
++    def quantize_rows(source: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
++        rows, width = map(int, source.shape)
++        blocked = source.float().reshape(rows, width // 32, 32)
++        max_abs = blocked.abs().amax(dim=-1)
++        safe = torch.where(max_abs > 0.0, max_abs / 448.0, torch.ones_like(max_abs))
++        exponent = torch.ceil(torch.log2(safe)).clamp(-127, 127)
++        scale_u8 = (exponent + 127).to(torch.uint8)
++        scale = scale_u8.view(torch.float8_e8m0fnu).float()
++        values = (
++            (blocked / scale[..., None])
++            .clamp(-448.0, 448.0)
++            .to(torch.float8_e4m3fn)
++            .reshape(rows, width)
++            .contiguous()
++        )
++        return values, scale_u8.contiguous()
++
++    def dequantize_rows(values: torch.Tensor, scales: torch.Tensor) -> torch.Tensor:
++        scale = scales.view(torch.float8_e8m0fnu).float()
++        return (
++            values.float().reshape(values.shape[0], -1, 32) * scale[..., None]
++        ).reshape(values.shape)
++
++    torch.manual_seed(20260921)
++    weight_bf16 = (
++        torch.randn((64, 128), device="cuda", dtype=torch.bfloat16) / 8
++    ).contiguous()
++    weight, weight_scale = quantize_rows(weight_bf16)
++    layer = torch.nn.Module()
++    layer.weight = torch.nn.Parameter(weight, requires_grad=False)
++    layer.weight_scale = torch.nn.Parameter(weight_scale, requires_grad=False)
++    kernel = object.__new__(B12xMxfp8LinearKernel)
++    kernel.process_weights_after_loading(layer)
++
++    unit = kernel.get_b12x_pre_profile_unit(
++        layer,
++        (1, 4, 16),
++        torch.bfloat16,
++    )
++    unit.compile()
++    assert layer.b12x_mxfp8_plan.prepared is not None
++
++    weight_dequantized = dequantize_rows(weight, weight_scale)
++    for tokens in (1, 4, 16):
++        source = (
++            torch.randn((tokens, 128), device="cuda", dtype=torch.bfloat16) / 4
++        ).contiguous()
++        source_values, source_scales = quantize_rows(source)
++        expected = dequantize_rows(source_values, source_scales) @ weight_dequantized.T
++        actual = kernel.apply_weights(layer, source)
++        torch.cuda.synchronize()
++
++        assert actual.shape == (tokens, 64)
++        assert torch.isfinite(actual).all()
++        torch.testing.assert_close(
++            actual.float(),
++            expected.to(actual.dtype).float(),
++            rtol=0,
++            atol=0,
++        )
+ 
+ 
+ def test_b12x_block_fp8_apply_uses_b12x_recipe_api(monkeypatch) -> None:
+diff --git a/tests/model_executor/test_b12x_warmup.py b/tests/model_executor/test_b12x_warmup.py
+index 74c0b330c..5b65b0aad 100644
+--- a/tests/model_executor/test_b12x_warmup.py
++++ b/tests/model_executor/test_b12x_warmup.py
+@@ -94,32 +94,104 @@ def test_b12x_mxfp8_warmup_unit(monkeypatch) -> None:
+     import vllm.model_executor.kernels.linear.mxfp8.b12x as b12x_mod
+ 
+     calls = []
++
++    class Plan:
++        token_counts = (1, 8)
++        prepared = None
++
++        def request(self, **kwargs):
++            calls.append(("request", kwargs))
++            return SimpleNamespace(plan=self, **kwargs)
++
++    plan = Plan()
+     monkeypatch.setattr(
+         b12x_mod,
+-        "_import_b12x_mxfp8",
++        "_import_b12x_blockscaled",
+         lambda: SimpleNamespace(
+-            mm=lambda *args, **kwargs: calls.append((args, kwargs))
++            query_from_call=lambda *args, **kwargs: (
++                calls.append(("query", args, kwargs)) or object()
++            ),
++            plan_regimes=lambda *args, **kwargs: (
++                calls.append(("plan", args, kwargs)) or plan
++            ),
+         ),
+     )
++    import b12x.preparation
++
++    monkeypatch.setattr(
++        b12x.preparation,
++        "prepare_default",
++        lambda request: calls.append(("prepare", request)),
++    )
++    packed_weight = SimpleNamespace(
++        in_features=128,
++        padded_in_features=128,
++        out_features=256,
++        weight=SimpleNamespace(values=torch.empty(1), scale_mma=torch.empty(1)),
++    )
++    layer = SimpleNamespace(b12x_mxfp8_packed_weight=packed_weight)
++    kernel = object.__new__(B12xMxfp8LinearKernel)
++
++    with pytest.raises(ValueError, match="requires bfloat16"):
++        kernel.get_b12x_warmup_unit(layer, (1, 8), torch.float16)
++
++
++def test_b12x_mxfp8_prepares_capacity_plan_before_profile(monkeypatch) -> None:
++    import vllm.model_executor.kernels.linear.mxfp8.b12x as b12x_mod
++
++    calls = []
++
++    class Plan:
++        token_counts = (1, 8)
++        prepared = None
++
++        def request(self, **kwargs):
++            calls.append(("request", kwargs))
++            return SimpleNamespace(plan=self, **kwargs)
++
++    plan = Plan()
+     monkeypatch.setattr(
+         b12x_mod,
+-        "current_stream",
+-        lambda: SimpleNamespace(cuda_stream=object()),
++        "_import_b12x_blockscaled",
++        lambda: SimpleNamespace(
++            query_from_call=lambda *args, **kwargs: (
++                calls.append(("query", args, kwargs)) or object()
++            ),
++            plan_regimes=lambda *args, **kwargs: (
++                calls.append(("plan", args, kwargs)) or plan
++            ),
++        ),
++    )
++    import b12x.preparation
++
++    monkeypatch.setattr(
++        b12x.preparation,
++        "prepare_default",
++        lambda request: calls.append(("prepare", request)),
+     )
+     packed_weight = SimpleNamespace(
+         in_features=128,
+         padded_in_features=128,
+         out_features=256,
+-        weight=SimpleNamespace(values=torch.empty(1)),
++        weight=SimpleNamespace(values=torch.empty(1), scale_mma=torch.empty(1)),
+     )
+     layer = SimpleNamespace(b12x_mxfp8_packed_weight=packed_weight)
+     kernel = object.__new__(B12xMxfp8LinearKernel)
+ 
+-    unit = kernel.get_b12x_warmup_unit(layer, (1, 8), torch.float16)
++    unit = kernel.get_b12x_pre_profile_unit(
++        layer,
++        (1, 8),
++        torch.bfloat16,
++    )
+     unit.compile()
+ 
+-    assert [args[0].shape for args, _ in calls] == [(1, 128), (8, 128)]
+-    assert [kwargs["expected_m"] for _, kwargs in calls] == [1, 8]
++    query = next(call for call in calls if call[0] == "query")
++    assert query[1][0].shape == (8, 128)
++    planned = next(call for call in calls if call[0] == "plan")
++    assert planned[2]["exact_m"] == (1,)
++    requested = next(call for call in calls if call[0] == "request")
++    assert set(requested[1]["prepare_calls"]) == {1, 8}
++    assert calls[-1][0] == "prepare"
+ 
+ 
+ def test_b12x_tensor_fp8_warmup_unit(monkeypatch) -> None:
+diff --git a/vllm/model_executor/kernels/linear/mxfp8/b12x.py b/vllm/model_executor/kernels/linear/mxfp8/b12x.py
+index 48343f3d6..4264dba3b 100644
+--- a/vllm/model_executor/kernels/linear/mxfp8/b12x.py
++++ b/vllm/model_executor/kernels/linear/mxfp8/b12x.py
+@@ -13,10 +13,12 @@ from vllm.model_executor.layers.quantization.utils.mxfp8_utils import (
+ from vllm.model_executor.utils import replace_parameter
+ from vllm.platforms import current_platform
+ from vllm.utils.b12x import B12xWarmupUnit, reuse_packed_weight_storage
++from vllm.utils.b12x import (
++    get_b12x_blockscaled as _import_b12x_blockscaled,
++)
+ from vllm.utils.b12x import (
+     get_b12x_mxfp8_linear as _import_b12x_mxfp8,
+ )
+-from vllm.utils.torch_utils import current_stream
+ 
+ from .Mxfp8LinearKernel import Mxfp8LinearKernel, Mxfp8LinearLayerConfig
+ 
+@@ -27,6 +29,11 @@ def _apply_b12x_mxfp8_packed_linear(
+     bias: torch.Tensor | None,
+ ) -> torch.Tensor:
+     packed_weight = layer.b12x_mxfp8_packed_weight
++    plan = getattr(layer, "b12x_mxfp8_plan", None)
++    if plan is None or plan.prepared is None:
++        raise RuntimeError(
++            "b12x MXFP8 linear plan must be prepared before memory profiling or capture"
++        )
+ 
+     input_2d = x.reshape(-1, x.shape[-1]).contiguous()
+     output_shape = [*x.shape[:-1], int(packed_weight.out_features)]
+@@ -36,8 +43,8 @@ def _apply_b12x_mxfp8_packed_linear(
+     output = mxfp8.mm(
+         input_2d,
+         packed_weight,
++        plan=plan,
+         bias=bias,
+-        expected_m=max(1, int(input_2d.shape[0])),
+     )
+     return output.view(*output_shape)
+ 
+@@ -104,44 +111,120 @@ class B12xMxfp8LinearKernel(Mxfp8LinearKernel):
+         replace_parameter(layer, "weight_scale", weight_scale.new_empty((0,)))
+         layer.b12x_warmup_provider = self
+ 
++    def _preparation_request(
++        self,
++        layer: torch.nn.Module,
++        token_counts: tuple[int, ...],
++        output_dtype: torch.dtype,
++    ) -> tuple[object, tuple[int, ...]]:
++        if output_dtype != torch.bfloat16:
++            raise ValueError("b12x ModelOpt MXFP8 linear requires bfloat16 activations")
++        counts = tuple(sorted({int(count) for count in token_counts if int(count) > 0}))
++        if not counts:
++            raise ValueError("b12x MXFP8 preparation requires positive token counts")
++
++        packed_weight = layer.b12x_mxfp8_packed_weight
++        device = torch.device(packed_weight.weight.values.device)
++        plan_key = (counts, output_dtype, id(packed_weight))
++        plan = (
++            getattr(layer, "b12x_mxfp8_plan", None)
++            if getattr(layer, "b12x_mxfp8_plan_key", None) == plan_key
++            else None
++        )
++        blockscaled = _import_b12x_blockscaled()
++        assert blockscaled is not None
++        if plan is None:
++            capacity = max(counts)
++            source = torch.empty(
++                (capacity, int(packed_weight.in_features)),
++                dtype=output_dtype,
++                device=device,
++            )
++            query = blockscaled.query_from_call(
++                source,
++                packed_weight,
++                activation_mode="quantized",
++            )
++            plan = blockscaled.plan_regimes(
++                query,
++                exact_m=tuple(count for count in counts if count < capacity),
++            )
++            layer.b12x_mxfp8_plan = plan
++            layer.b12x_mxfp8_plan_key = plan_key
++
++        from b12x.preparation import PreparedCall
++
++        def prepare_call(tokens: int):
++            source = torch.zeros(
++                (tokens, int(packed_weight.in_features)),
++                dtype=output_dtype,
++                device=device,
++            )
++
++            def factory(state):
++                return PreparedCall(
++                    run=lambda: state.run(
++                        source,
++                        packed_weight.weight.values,
++                        packed_weight.weight.scale_mma,
++                        None,
++                    )
++                )
++
++            return factory
++
++        calls = {tokens: prepare_call(tokens) for tokens in plan.token_counts}
++        return (
++            plan.request(
++                name=f"mxfp8_linear:{id(layer)}",
++                prepare_calls=calls,
++                benchmark_calls=calls,
++            ),
++            counts,
++        )
++
+     def get_b12x_warmup_unit(
+         self,
+         layer: torch.nn.Module,
+         token_counts: tuple[int, ...],
+         output_dtype: torch.dtype,
+     ) -> B12xWarmupUnit:
++        from b12x.preparation import prepare_default
++
+         packed_weight = layer.b12x_mxfp8_packed_weight
+         device = torch.device(packed_weight.weight.values.device)
++        request, counts = self._preparation_request(
++            layer,
++            token_counts,
++            output_dtype,
++        )
+ 
+         def compile() -> None:
+-            mxfp8 = _import_b12x_mxfp8()
+-            assert mxfp8 is not None
+-            for tokens in token_counts:
+-                source = torch.zeros(
+-                    (tokens, int(packed_weight.in_features)),
+-                    dtype=output_dtype,
+-                    device=device,
+-                )
+-                mxfp8.mm(
+-                    source,
+-                    packed_weight,
+-                    expected_m=max(1, int(tokens)),
+-                    stream=current_stream().cuda_stream,
+-                )
++            prepare_default(request)
+ 
+         return B12xWarmupUnit(
+             name="MXFP8",
+             key=(
+                 type(self),
++                id(layer.b12x_mxfp8_plan),
+                 device,
+                 int(packed_weight.in_features),
+                 int(packed_weight.padded_in_features),
+                 int(packed_weight.out_features),
+                 output_dtype,
++                counts,
+             ),
+             compile=compile,
+         )
+ 
++    def get_b12x_pre_profile_unit(
++        self,
++        layer: torch.nn.Module,
++        token_counts: tuple[int, ...],
++        output_dtype: torch.dtype,
++    ) -> B12xWarmupUnit:
++        return self.get_b12x_warmup_unit(layer, token_counts, output_dtype)
++
+     def apply_weights(
+         self,
+         layer: torch.nn.Module,

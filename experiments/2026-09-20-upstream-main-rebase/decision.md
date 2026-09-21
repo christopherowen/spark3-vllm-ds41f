@@ -1,6 +1,6 @@
 # Decision
 
-Status: **pre-profile ordering correction qualified; immutable rebuild required**
+Status: **MXFP8 linear preparation correction qualified; immutable rebuild required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -21,7 +21,10 @@ repeated-preparation, and CUDA-graph tests on one Spark. Its TP3 launch then
 showed that the pre-memory collector constructed unrelated warmup units before
 filtering them. Patch 0016 gives that phase a dedicated provider method exposed
 only by MoE, and its regression fails if an ordinary provider is even invoked.
-This is not yet proof of a full TP3 startup.
+That image cleared both failures and exposed the same preparation-API drift in
+the ModelOpt MXFP8 linear adapter during memory profiling. Patch 0017 prepares
+bounded capacity and exact graph regimes before KV admission and passes a real
+numerical adapter test on GB10. This is not yet proof of a full TP3 startup.
 
 The remaining work is target evidence:
 

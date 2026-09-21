@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "failed-after-pre-profile-moe-at-b12x-mxfp8-linear-preparation-api",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:8051ebbaadb9-c90ba030f2ab-d94f3ea16401c",
+    "id": "sha256:7c12c5a6f9a3c82d5b679e6e7c422996759924c1b92a438684fe0c47f7560fcd",
+    "source_revision": "8051ebbaadb9dfc2bb6f60554dfdaf8eede22326",
+    "launch_revision": "f60eb52e9f71d2b33e49afd319d4c325f8c8c998"
+  },
+  "progress": [
+    "initialized NCCL 2.30.7 and selected RoCEnante for eligible tensor-parallel collectives",
+    "selected native ModelOpt MXFP8 linear, B12X MXFP4/MXFP8 MoE, FP8 indexer, sparse MLA, disk Engram, and DSpark paths",
+    "completed distributed checkpoint and draft-model loading at 98.1 GiB per rank",
+    "prepared all 40 B12X MoE plans before memory profiling and cleared both preceding rebase failures"
+  ],
+  "failure": {
+    "file": "vllm/model_executor/kernels/linear/mxfp8/b12x.py",
+    "operation": "blockscaled_mm() during memory-profile execution",
+    "message": "TypeError: blockscaled_mm() missing 1 required keyword-only argument: 'plan'",
+    "cause": "the carried vLLM ModelOpt MXFP8 adapter still used B12X's preceding first-use API while the selected B12X revision requires declared and prepared execution plans",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "0974d6ec70a94db3483fd19b678437403d469319",
+    "source_tree": "aa3b0f8f814c8fe054012df6c9526b4492e8cdcb",
+    "behavior": "declare capacity plus exact CUDA-graph token regimes, prepare and account retained ModelOpt MXFP8 linear plans before KV memory profiling, retain each layer plan, and reject unprepared execution",
+    "validation": "all 40 focused B12X linear and warmup tests pass on GB10; the new real adapter regression executes prepared 1/4/16-token plans and exactly matches a dequantized MXFP8 reference; Ruff, format, and diff checks pass",
+    "quality_change": "none"
+  },
+  "rollback": "candidate containers were removed, including one stopped rank residue; stopped promoted containers remain present on all three nodes"
+}

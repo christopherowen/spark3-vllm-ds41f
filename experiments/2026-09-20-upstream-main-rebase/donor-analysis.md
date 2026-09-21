@@ -53,6 +53,15 @@ gives that early phase a dedicated provider method instead of constructing all
 warmup units and filtering them afterward; this prevents sparse attention from
 being touched before KV-cache storage exists.
 
+The next launch proved the same API review had missed the ordinary ModelOpt
+MXFP8 linear adapter. Current B12X requires a prepared blockscaled plan, while
+the carried adapter still requested first-use compilation through the removed
+`expected_m` interface. Candidate commit
+`0974d6ec70a94db3483fd19b678437403d469319` declares one bounded capacity plus
+the exact CUDA-graph token regimes, prepares their retained state before KV
+profiling, and executes only through the retained plan. This is a narrow
+vLLM/B12X integration change rather than donor model code.
+
 ### RoCEnante
 
 The prepared B12X per-peer/HCA commit only supplies transport behavior. The

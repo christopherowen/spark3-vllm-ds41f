@@ -163,6 +163,17 @@ Engram, linear, and collective providers are now structurally ineligible for
 pre-memory enumeration. The failure is recorded in
 `runs/launch-bdc1deee14da-preprofile-provider-order.json`.
 
+The patch-0016 image then cleared both preparation failures, completed model
+and draft loading at 98.1 GiB per rank, and prepared all 40 MoE plans. Memory
+profiling exposed one more stale boundary: the ModelOpt MXFP8 linear adapter
+still used B12X's preceding first-use interface without a prepared plan. Patch
+0017 declares the bounded serving capacity plus exact graph-capture regimes,
+prepares and accounts their retained memory before KV admission, and requires
+that plan during execution. Its real GB10 regression executes the vLLM adapter
+at 1/4/16 tokens and exactly matches the dequantized MXFP8 reference. The
+failure is recorded in
+`runs/launch-7c12c5a6f9a3-mxfp8-preparation-api.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
