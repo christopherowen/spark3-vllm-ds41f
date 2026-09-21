@@ -30,10 +30,10 @@
       "dgx2": "192.168.4.1 via dgx2-internal"
     },
     "method": "two parallel uncompressed docker save/load streams over both ConnectX-7 internal rails",
-    "status": "pending"
+    "wall_clock_seconds": 120,
+    "status": "complete; exact image ID and all source labels verified on all three ranks"
   },
   "remaining": [
-    "distribute and verify the exact image on all three ranks",
     "full three-rank model load and selected-kernel JIT qualification",
     "deterministic native-weight output parity",
     "4x128K capacity and normal 8-way Strix workload",
