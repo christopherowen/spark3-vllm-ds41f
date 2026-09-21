@@ -1,0 +1,127 @@
+From fcdb8715837314ee899308154af380e064a6345d Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 04:22:38 +0200
+Subject: [PATCH] fix(b12x): prepare draft-model weight plans
+
+---
+ tests/model_executor/test_b12x_warmup.py  | 17 +++++++--
+ vllm/model_executor/warmup/b12x_warmup.py | 46 +++++++++++++++++++++--
+ 2 files changed, 56 insertions(+), 7 deletions(-)
+
+diff --git a/tests/model_executor/test_b12x_warmup.py b/tests/model_executor/test_b12x_warmup.py
+index 5b65b0aad..b98775820 100644
+--- a/tests/model_executor/test_b12x_warmup.py
++++ b/tests/model_executor/test_b12x_warmup.py
+@@ -307,7 +307,7 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+         def get_b12x_warmup_unit(self, layer, token_counts, output_dtype):
+             raise AssertionError("ordinary warmup provider was called before profiling")
+ 
+-    layers = [
++    target_layers = [
+         SimpleNamespace(
+             name="weights",
+             b12x_warmup_provider=WeightProvider(),
+@@ -317,8 +317,16 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+             b12x_warmup_provider=KernelProvider(),
+         ),
+     ]
++    draft_layers = [
++        target_layers[0],
++        SimpleNamespace(
++            name="draft_weights",
++            b12x_warmup_provider=WeightProvider(),
++        ),
++    ]
+     worker = SimpleNamespace(
+-        get_model=lambda: SimpleNamespace(modules=lambda: iter(layers)),
++        get_model=lambda: SimpleNamespace(modules=lambda: iter(target_layers)),
++        get_draft_model=lambda: SimpleNamespace(modules=lambda: iter(draft_layers)),
+         scheduler_config=SimpleNamespace(
+             max_num_batched_tokens=8,
+             max_num_scheduled_tokens=32,
+@@ -345,7 +353,10 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+ 
+     b12x_prepare_weights(worker)
+ 
+-    assert calls == [("weights", (1, 2, 4, 8, 32), torch.bfloat16)]
++    assert calls == [
++        ("weights", (1, 2, 4, 8, 32), torch.bfloat16),
++        ("draft_weights", (1, 2, 4, 8, 32), torch.bfloat16),
++    ]
+     assert synchronized == [True]
+ 
+ 
+diff --git a/vllm/model_executor/warmup/b12x_warmup.py b/vllm/model_executor/warmup/b12x_warmup.py
+index 5871bee20..2d82b8a05 100644
+--- a/vllm/model_executor/warmup/b12x_warmup.py
++++ b/vllm/model_executor/warmup/b12x_warmup.py
+@@ -46,6 +46,44 @@ def _collect_warmup_units(
+     return units.values()
+ 
+ 
++def _worker_model_roots(worker: "Worker") -> tuple[torch.nn.Module, ...]:
++    target_model = worker.get_model()
++    roots = [target_model]
++    get_draft_model = getattr(worker, "get_draft_model", None)
++    if callable(get_draft_model):
++        draft_model = get_draft_model()
++        if draft_model is not None and draft_model is not target_model:
++            roots.append(draft_model)
++    return tuple(roots)
++
++
++def _collect_worker_warmup_units(
++    worker: "Worker",
++    token_counts: tuple[int, ...],
++    output_dtype: torch.dtype,
++    extra_providers: Iterable[object] = (),
++    *,
++    provider_method: str = "get_b12x_warmup_unit",
++) -> Iterable[B12xWarmupUnit]:
++    units: dict[object, B12xWarmupUnit] = {}
++    for model in _worker_model_roots(worker):
++        for unit in _collect_warmup_units(
++            model,
++            token_counts,
++            output_dtype,
++            provider_method=provider_method,
++        ):
++            units.setdefault(unit.key, unit)
++    for provider in extra_providers:
++        get_unit = getattr(provider, provider_method, None)
++        if not callable(get_unit):
++            continue
++        unit = get_unit(provider, token_counts, output_dtype)
++        assert isinstance(unit, B12xWarmupUnit)
++        units.setdefault(unit.key, unit)
++    return units.values()
++
++
+ def _distributed_warmup_providers() -> tuple[object, ...]:
+     if not envs.VLLM_ENABLE_ROCE_ALLREDUCE:
+         return ()
+@@ -114,8 +152,8 @@ def _serving_units(
+         worker,
+         cudagraph_capture_sizes,
+     )
+-    return _collect_warmup_units(
+-        worker.get_model(),
++    return _collect_worker_warmup_units(
++        worker,
+         token_counts,
+         output_dtype,
+         _distributed_warmup_providers(),
+@@ -135,8 +173,8 @@ def b12x_prepare_weights(worker: "Worker") -> None:
+         worker.vllm_config.compilation_config.cudagraph_capture_sizes or ()
+     )
+     token_counts, output_dtype = _serving_contract(worker, capture_sizes)
+-    units = _collect_warmup_units(
+-        worker.get_model(),
++    units = _collect_worker_warmup_units(
++        worker,
+         token_counts,
+         output_dtype,
+         provider_method="get_b12x_pre_profile_unit",
+-- 
+2.54.0 (Apple Git-157)
+

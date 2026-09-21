@@ -78,6 +78,13 @@ current B12X plan owns compiled programs and capacity workspace that must be
 counted before KV admission. A real GB10 adapter regression prepares and
 executes 1/4/16-token regimes and exactly matches a dequantized MXFP8 reference.
 
+The first full profile with that contract prepared all 210 target-model MXFP8
+plans but exposed a lifecycle distinction in current vLLM: speculative draft
+weights live under `worker.get_draft_model()`, not the target returned by
+`worker.get_model()`. The collector now scans both roots and deduplicates any
+shared or aliased layers by the existing warmup-unit key. This keeps retained
+draft-plan memory inside the same pre-KV accounting boundary.
+
 ## Valid routes
 
 ### Selected route: qualify B12X on CUTLASS DSL 4.7.1

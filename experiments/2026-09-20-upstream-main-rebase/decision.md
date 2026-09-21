@@ -1,6 +1,6 @@
 # Decision
 
-Status: **MXFP8 linear preparation image qualified; TP3 launch required**
+Status: **Draft-model plan discovery corrected; immutable rebuild required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -28,10 +28,18 @@ numerical adapter test on GB10. Its immutable image passes the selected source,
 numerical, disk Engram, MoE, CUDA-graph, and style gates. This is not yet proof
 of a full TP3 startup.
 
+That image then loaded the complete target and DSpark models, prepared all 210
+target-model MXFP8 plans plus 40 MoE plans, and entered the real profile run.
+The profile exposed one omitted ownership root: the collector scanned
+`worker.get_model()` but not the separately owned `worker.get_draft_model()`.
+Patch 0018 enumerates both roots and deduplicates shared layers by their existing
+plan key. The failure was not an OOM and did not require a configuration change.
+
 The remaining work is target evidence:
 
-1. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
-2. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
+1. rebuild and qualify the content-addressed ARM64 candidate on dgx3;
+2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
+3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.
 
 The nodes are now free for qualification. Dependency suppression or an in-place

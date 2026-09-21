@@ -1,5 +1,5 @@
 {
-  "status": "mxfp8-linear-preparation-image-distributed-pending-tp3-launch",
+  "status": "draft-model-plan-discovery-correction-pending-image-qualification",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -72,7 +72,9 @@
     "b12x_mxfp8_linear_preparation_tests": "all 40 focused linear and warmup tests pass on GB10; the new real vLLM adapter regression executes prepared 1/4/16-token plans and exactly matches a dequantized MXFP8 reference; Ruff, format, and diff checks pass",
     "b12x_mxfp8_linear_preparation_image": "sha256:209944e6423216643cd99780e08194d6cbdf0b5189b88d462799a0688ba419cd has exact deterministic source labels and passes 60 focused vLLM tests, 8 production-capability disk Engram tests, selected real MXFP4 MoE numerical modes, multi-capacity CUDA-graph replay, and immutable-image Ruff and format gates on GB10",
     "b12x_mxfp8_linear_preparation_image_distribution": "exact image ID, source labels, and deployment checkout verified on dgx1, dgx2, and dgx3 after uncompressed Docker streams used both ConnectX-7 internal rails",
-    "unselected_nvfp4_observation": "the broad B12X MoE suite contains an NVFP4/BF16 SILU case with cosine 0.982 below its 0.99 threshold; the preceding image produces the identical result, and the native DS4.1 configuration selects MXFP4 rather than NVFP4, so this is neither introduced by patch 0017 nor a selected-path blocker"
+    "unselected_nvfp4_observation": "the broad B12X MoE suite contains an NVFP4/BF16 SILU case with cosine 0.982 below its 0.99 threshold; the preceding image produces the identical result, and the native DS4.1 configuration selects MXFP4 rather than NVFP4, so this is neither introduced by patch 0017 nor a selected-path blocker",
+    "fourteenth_full_launch": "loaded target and DSpark weights at 98.1 GiB per rank, prepared all 210 target-model MXFP8 plans plus 40 MoE plans, and entered the real profile run; DSpark main_proj then rejected execution because the collector had scanned only worker.get_model() and omitted worker.get_draft_model(); no OOM occurred",
+    "draft_model_plan_discovery_resolution": "pre-profile and post-profile B12X collectors now scan both target and separately owned draft-model roots while deduplicating aliased target/draft layers by the existing plan key"
   },
   "summary": {
     "ttft_seconds": null,
@@ -122,7 +124,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "mxfp8-linear-preparation-image-distributed-pending-serving-gates",
+    "status": "draft-model-plan-discovery-correction-pending-image-and-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

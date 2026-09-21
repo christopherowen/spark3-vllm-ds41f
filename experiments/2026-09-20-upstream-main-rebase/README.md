@@ -182,6 +182,14 @@ multi-capacity, CUDA-graph, Ruff, and format gates on GB10. Its receipt is
 `runs/build-209944e64232-validation.json`; full TP3 startup remains a separate
 required gate.
 
+That image cleared the original MXFP8 boundary, preparing 210 target-model
+linear plans and all 40 MoE plans before the real profile run. The remaining
+unprepared `DSparkDeepseekV4Model.main_proj` proved the collector had omitted
+the separately owned draft model. Patch 0018 makes both pre-profile and normal
+warmup enumerate target plus draft roots while deduplicating any aliased layers
+by their plan key. The failure is recorded in
+`runs/launch-209944e64232-draft-plan-discovery.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported

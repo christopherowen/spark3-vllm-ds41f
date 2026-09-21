@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "failed-after-target-plan-preparation-at-draft-model-plan-discovery",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:0974d6ec70a9-c90ba030f2ab-da094dcfee76f",
+    "id": "sha256:209944e6423216643cd99780e08194d6cbdf0b5189b88d462799a0688ba419cd",
+    "source_revision": "0974d6ec70a94db3483fd19b678437403d469319",
+    "launch_revision": "525137fa74c93e5cae30178c0edeaa2a251b7e0e"
+  },
+  "progress": [
+    "initialized NCCL 2.30.7 and selected RoCEnante before PyNCCL for eligible tensor-parallel collectives",
+    "selected native ModelOpt MXFP8 linear, B12X MXFP4/MXFP8 MoE, FP8 indexer, sparse MLA, disk Engram, and DSpark paths",
+    "completed target and DSpark loading at 98.1 GiB per rank",
+    "prepared 210 target-model MXFP8 plans and all 40 B12X MoE plans before memory profiling",
+    "entered the real profile run and compiled MHC kernels"
+  ],
+  "failure": {
+    "file": "vllm/model_executor/warmup/b12x_warmup.py",
+    "operation": "DSpark main_proj during memory-profile speculative proposal",
+    "message": "RuntimeError: b12x MXFP8 linear plan must be prepared before memory profiling or capture",
+    "cause": "the collector scanned worker.get_model() but omitted the separately owned worker.get_draft_model(), so the target plans were prepared while DSpark main_proj remained unprepared",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "fcdb8715837314ee899308154af380e064a6345d",
+    "source_tree": "ef0f991c5531323f03fca963da6341092efd1d80",
+    "behavior": "enumerate target and draft model roots for both pre-profile preparation and normal warmup, then deduplicate shared or aliased layers by the existing plan key",
+    "validation": "focused regression covers a separately owned draft layer plus an aliased target layer; target-image tests remain required",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate containers were removed automatically; stopped promoted containers remain present on all three nodes"
+}

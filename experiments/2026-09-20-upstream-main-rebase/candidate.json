@@ -23,9 +23,10 @@
         "8a6eb0cc6f904c15326a2337dc90bd50f041f7c2",
         "d7e22286ffc9299800e4e448ee525a0b5259f738",
         "8051ebbaadb9dfc2bb6f60554dfdaf8eede22326",
-        "0974d6ec70a94db3483fd19b678437403d469319"
+        "0974d6ec70a94db3483fd19b678437403d469319",
+        "fcdb8715837314ee899308154af380e064a6345d"
       ],
-      "source_tree": "aa3b0f8f814c8fe054012df6c9526b4492e8cdcb",
+      "source_tree": "ef0f991c5531323f03fca963da6341092efd1d80",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -44,7 +45,8 @@
         "patches/vllm/0014-fix-loader-support-native-MXFP8-scale-metadata.patch",
         "patches/vllm/0015-fix-b12x-port-MoE-to-preparation-API.patch",
         "patches/vllm/0016-fix-b12x-isolate-pre-profile-MoE-preparation.patch",
-        "patches/vllm/0017-fix-b12x-prepare-MXFP8-linear-execution-plans.patch"
+        "patches/vllm/0017-fix-b12x-prepare-MXFP8-linear-execution-plans.patch",
+        "patches/vllm/0018-fix-b12x-prepare-draft-model-weight-plans.patch"
       ]
     },
     {
@@ -73,16 +75,16 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:209944e6423216643cd99780e08194d6cbdf0b5189b88d462799a0688ba419cd",
-  "deployment_status": "the immutable patch-0017 image passed finished-image source, numerical, disk Engram, MoE, CUDA-graph, and style gates on GB10 and is verified identically on all three ranks; full TP3 startup remains required",
+  "deployment_status": "the patch-0017 image prepared every target-model plan but proved the pre-profile collector omitted the separately owned DSpark draft model; patch 0018 scans target and draft roots with shared-plan deduplication and requires an immutable rebuild",
   "integration_status": {
-    "status": "the source candidate passes the existing focused suites plus real MXFP4 W4A16/W4A8 and ModelOpt MXFP8 linear numerical execution through prepared multi-capacity plans on GB10; full TP3 startup remains required",
+    "status": "the source candidate retains the selected-path qualification and adds draft-model plan discovery with an alias-deduplication regression; target-image tests and full TP3 startup remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-passed-selected-sm121-prelaunch-qualification",
+    "status": "aligned-pending-patch-0018-sm121-runtime-qualification",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

@@ -62,6 +62,13 @@ the exact CUDA-graph token regimes, prepares their retained state before KV
 profiling, and executes only through the retained plan. This is a narrow
 vLLM/B12X integration change rather than donor model code.
 
+The following profile proved the plan collector itself was target-only. The
+DSpark draft model is a separate vLLM ownership root, so its `main_proj` did not
+appear in `worker.get_model().modules()`. Candidate commit
+`fcdb8715837314ee899308154af380e064a6345d` scans the canonical target and draft
+accessors and deduplicates aliases by plan key. This is lifecycle integration
+for current upstream vLLM, not a donor-specific model fork.
+
 ### RoCEnante
 
 The prepared B12X per-peer/HCA commit only supplies transport behavior. The
