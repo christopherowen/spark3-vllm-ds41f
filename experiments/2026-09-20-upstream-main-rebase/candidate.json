@@ -76,17 +76,17 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:811f3078cc1d177b82b59fd0bcc0650e6d2a567e185efda05b84b073814c3e76",
-  "deployment_status": "the patch-0018 image prepared 226 MXFP8 plus 43 MoE plans and entered the real profile run, then proved RoCEnante was deferred until post-profile warmup even though profiling routes through it; patch 0019 makes the distributed plan pre-profile eligible and requires an immutable rebuild",
+  "image_digest": "sha256:553dc78794447882fac6959788124fdc2dca32d1a8a25fc959d55f6035388f6f",
+  "deployment_status": "the immutable patch-0019 image passes the full selected-path prelaunch suite on GB10; three-rank distribution and runtime qualification remain required",
   "integration_status": {
-    "status": "the source candidate retains selected-path qualification and adds pre-profile RoCEnante preparation with focused collector and adapter regressions; target-image and TP3 qualification remain required",
+    "status": "the immutable source candidate retains selected-path qualification and includes pre-profile RoCEnante preparation with collector and adapter regressions; TP3 runtime qualification remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-pending-patch-0019-sm121-runtime-qualification",
+    "status": "aligned-patch-0019-image-qualified-pending-tp3-runtime",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

@@ -1,6 +1,6 @@
 # Decision
 
-Status: **RoCEnante pre-profile preparation corrected; immutable rebuild required**
+Status: **Patch-0019 image qualified; TP3 runtime qualification required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -43,9 +43,11 @@ post-profile warmup. Patch 0019 exposes the same explicit pre-profile contract
 on RoCEnante and includes eligible distributed providers in that phase.
 Ordinary post-cache providers remain structurally excluded. This was not an OOM.
 
-The remaining work is target evidence:
+The immutable patch-0019 image now passes the selected source, numerical, disk
+Engram, MoE, CUDA-graph, RoCEnante, and style gates on GB10. The remaining work
+is target evidence:
 
-1. rebuild and qualify the content-addressed ARM64 candidate on dgx3;
+1. distribute the qualified content-addressed ARM64 image to all ranks;
 2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
 3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.

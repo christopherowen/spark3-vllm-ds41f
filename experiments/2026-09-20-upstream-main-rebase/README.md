@@ -204,6 +204,14 @@ Patch 0019 opts the communicator into the explicit pre-profile provider
 contract and includes eligible distributed providers in that phase. The failure
 is recorded in `runs/launch-811f3078cc1d-rocenante-preparation.json`.
 
+The resulting immutable patch-0019 image is
+`sha256:553dc78794447882fac6959788124fdc2dca32d1a8a25fc959d55f6035388f6f`.
+It reproduces all nineteen vLLM and four B12X patches from the exact bases and
+passes 60 selected vLLM tests, all 15 RoCEnante tests, 8 production-capability
+disk Engram tests, both selected MXFP4 numerical modes, four
+multi-capacity/CUDA-graph cases, Ruff, and format on GB10. Its receipt is
+`runs/build-553dc7879444-validation.json`; TP3 runtime remains a separate gate.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
