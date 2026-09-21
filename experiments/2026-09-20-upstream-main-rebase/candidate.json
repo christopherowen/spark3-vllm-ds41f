@@ -66,10 +66,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
-  "deployment_status": "native MXFP8 metadata correction source-qualified and pending immutable image build; promoted rollback retained",
+  "image_digest": "sha256:df249c44bfd5c4ff6fbf91e1de15b747558c10e5fbad4e084bc4bab5466f7c32",
+  "deployment_status": "native MXFP8 metadata image qualified on GB10 and pending exact three-rank distribution; promoted rollback retained",
   "integration_status": {
-    "status": "the complete outer-to-leaf disk Engram route and native MXFP8 file metadata are covered together; all 20 focused tests pass on GB10 with the corrected module",
+    "status": "the finished immutable image passes all 20 focused loader and DS4.1 tests, the ModelOpt MXFP8 transform regression, and all 8 disk Engram tests with the production capability set on GB10",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
