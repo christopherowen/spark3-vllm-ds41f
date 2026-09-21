@@ -59,3 +59,17 @@ the generated default, a timer maintains a one-shot entry for the running
 eligible kernel. A future default not on the denylist remains eligible and the
 policy removes only its own override. There is no apt hold, package pin, kernel
 removal, or persistent `GRUB_DEFAULT` change.
+
+## Recovery validation
+
+Recovery implementation commit `7f40db1` was installed on all three nodes on
+2026-09-21. Each node passed `scripts/host-recovery check`, reported no failed
+systemd units, and retained working SSH and Tailscale listeners through their
+scheduled restarts. dgx3 then consumed the policy-generated GRUB entry, booted
+`6.17.0-1032-nvidia`, and automatically re-armed the same eligible next boot.
+It had zero swap use, no current-boot `NV_ERR_NO_MEMORY` events, and healthy
+management and peer links after the reboot.
+
+The qualified candidate image is byte-identical on all three nodes as image ID
+`sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993`.
+No inference container was started as part of host recovery.
