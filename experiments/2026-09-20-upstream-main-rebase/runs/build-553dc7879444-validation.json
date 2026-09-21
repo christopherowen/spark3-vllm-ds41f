@@ -29,8 +29,8 @@
       "dgx2": "192.168.4.1 via dgx2-internal"
     },
     "method": "uncompressed docker save/load over both ConnectX-7 internal rails",
-    "wall_clock_seconds": null,
-    "status": "pending"
+    "wall_clock_seconds": 142,
+    "status": "complete; exact image ID, source labels, and deployment checkout verified on all three ranks"
   },
   "remaining": [
     "full three-rank model load and selected-kernel JIT qualification",
