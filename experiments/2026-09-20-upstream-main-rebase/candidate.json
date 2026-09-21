@@ -64,8 +64,8 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
-  "deployment_status": "outer VL file-backed Engram selection source qualified with exact replay; pending immutable image build; promoted rollback retained",
+  "image_digest": "sha256:f829b45a514d273cc16980723fe796503f1339a86c70b946cab805082ea6cd47",
+  "deployment_status": "outer VL file-backed Engram selection image target-qualified pending distribution and full-model-load retry; promoted rollback retained",
   "integration_status": {
     "status": "the real outer VL model preserves raw disk Engram ranges through both mappers and the parent loader to their leaf owner; full outer-to-leaf regression and all 19 focused tests passed on GB10",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",

@@ -1,5 +1,5 @@
 {
-  "status": "outer-vl-disk-engram-filter-source-qualified-pending-image",
+  "status": "outer-vl-disk-engram-filter-image-qualified-pending-launch",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -48,7 +48,8 @@
     "disk_engram_parent_routing_image": "sha256:ad8a2eb74d80fb6a9efa117e314adf0e8b75058b760d893b30c6a5a24e0d7e75 has exact deployment, vLLM, and B12X source labels and passed all 18 focused tests from the finished immutable image",
     "disk_engram_parent_routing_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 94 seconds",
     "ninth_full_launch": "proved the restored parent-to-leaf route executes, then failed because the real outer multimodal model did not expose the inner language model's file-backed checkpoint filter; B12X therefore read the native table before it reached the disk Engram leaf; no OOM occurred",
-    "outer_vl_disk_engram_filter_resolution": "restored the working VL wrapper delegation and added a full raw-name-to-leaf regression that exercises the outer filter, both mappers, inner parent loader, and immutable descriptor identity; all 19 focused DS4.1 tests pass on GB10"
+    "outer_vl_disk_engram_filter_resolution": "restored the working VL wrapper delegation and added a full raw-name-to-leaf regression that exercises the outer filter, both mappers, inner parent loader, and immutable descriptor identity; all 19 focused DS4.1 tests pass on GB10",
+    "outer_vl_disk_engram_filter_image": "sha256:f829b45a514d273cc16980723fe796503f1339a86c70b946cab805082ea6cd47 has exact deployment, vLLM, and B12X source labels and passed all 19 focused tests from the finished immutable image"
   },
   "summary": {
     "ttft_seconds": null,
@@ -98,7 +99,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "outer-vl-disk-engram-filter-pending-exact-replay-image-and-three-rank-serving-gates",
+    "status": "outer-vl-disk-engram-filter-image-qualified-pending-three-rank-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
