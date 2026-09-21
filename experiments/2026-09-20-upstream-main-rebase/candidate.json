@@ -78,17 +78,17 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:553dc78794447882fac6959788124fdc2dca32d1a8a25fc959d55f6035388f6f",
-  "deployment_status": "the immutable patch-0019 image passes the full selected-path prelaunch suite and is identical on all ranks; its TP3 launch exposed uncoordinated distributed plan priming, and patch 0020 adds the required post-materialization rendezvous pending immutable rebuild",
+  "image_digest": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f",
+  "deployment_status": "the immutable patch-0020 image passes the full selected-path prelaunch suite on GB10; three-rank distribution and runtime qualification remain required",
   "integration_status": {
-    "status": "the source candidate retains selected-path qualification and coordinates pre-profile RoCEnante plan priming after per-rank materialization; immutable-image and TP3 runtime qualification remain required",
+    "status": "the immutable source candidate retains selected-path qualification and coordinates pre-profile RoCEnante plan priming after per-rank materialization; TP3 runtime qualification remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-pending-patch-0020-sm121-runtime-qualification",
+    "status": "aligned-patch-0020-image-qualified-pending-tp3-runtime",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

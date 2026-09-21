@@ -220,6 +220,14 @@ materialization and immediately before the priming collectives; it adds no
 steady-state barrier. The failure and rejected memory-limit experiment are
 recorded in `runs/launch-553dc7879444-rocenante-priming-rendezvous.json`.
 
+The resulting immutable patch-0020 image is
+`sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f`.
+It reproduces all twenty vLLM and four B12X patches from the exact bases and
+passes 76 selected vLLM tests, 8 production-capability disk Engram tests, both
+selected MXFP4 numerical modes, four multi-capacity/CUDA-graph cases, Ruff, and
+format on GB10. Its receipt is `runs/build-bfed12063fa0-validation.json`; TP3
+runtime remains a separate gate.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported

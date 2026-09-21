@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "status": "passed-prelaunch-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:5dff83d6dd40-c90ba030f2ab-d09afec3a7461",
+    "id": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f",
+    "size_bytes": 23240395875,
+    "deployment_revision": "09afec3a74614540b2abd83645696db0b87a7091",
+    "vllm_patch_head": "5dff83d6dd40cc9f846502cdf85e8b937530d07b",
+    "vllm_tree": "4138f6ad2f3f652e8c5b00a56d25aae0b386d2fb",
+    "b12x_patch_head": "c90ba030f2ab4a17959afd05461449ca47259242",
+    "b12x_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0"
+  },
+  "checks": {
+    "source_replay": "twenty vLLM and four B12X patches reproduced both deterministic revisions and recorded Git trees from exact upstream bases",
+    "image_labels": "deployment, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "focused_vllm": "76 selected warmup, linear, DS4.1 B12X, virtual-head, file-backed loader, and RoCEnante tests passed from the finished image",
+    "rocenante_rendezvous": "the adapter regression proves local plan materialization occurs before the CPU-group barrier and every real priming collective occurs after it",
+    "modelopt_mxfp8": "the real adapter prepared retained plans, executed 1, 4, and 16 tokens, and exactly matched the dequantized MXFP8 reference",
+    "b12x_engram": "8 tests passed with IPC_LOCK, unlimited memlock, and the production seccomp capability set",
+    "b12x_moe": "both selected real MXFP4 numerical modes and all four multi-capacity/CUDA-graph cases passed",
+    "style": "Ruff and format checks passed on both patch-0020 files from the immutable image",
+    "rollback_state": "promoted containers remain stopped and present on all three nodes; failed candidate containers were removed"
+  },
+  "distribution": {
+    "source": "dgx3",
+    "targets": {
+      "dgx1": "192.168.2.1",
+      "dgx2": "192.168.4.1 via dgx2-internal"
+    },
+    "method": "uncompressed docker save/load over both ConnectX-7 internal rails",
+    "wall_clock_seconds": null,
+    "status": "pending"
+  },
+  "remaining": [
+    "full three-rank model load and selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}

@@ -1,6 +1,6 @@
 # Decision
 
-Status: **RoCEnante priming rendezvous corrected; immutable rebuild required**
+Status: **Patch-0020 image qualified; TP3 runtime qualification required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -51,6 +51,9 @@ seconds apart and timed out at sequence 1. Patch 0020 synchronizes ranks after
 local plan materialization and immediately before priming. The temporary Docker
 memory-limit experiment did not address the cause and has been reverted. The
 remaining work is target evidence:
+
+The immutable patch-0020 image now passes the complete selected source,
+numerical, disk Engram, MoE, CUDA-graph, RoCEnante, and style gates on GB10.
 
 1. distribute the qualified content-addressed ARM64 image to all ranks;
 2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
