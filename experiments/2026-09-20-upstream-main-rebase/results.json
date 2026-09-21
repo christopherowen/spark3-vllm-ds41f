@@ -1,5 +1,5 @@
 {
-  "status": "b12x-moe-preparation-port-qualified-pending-image-build",
+  "status": "b12x-moe-preparation-image-qualified-pending-distribution",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -59,7 +59,8 @@
     "native_mxfp8_metadata_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 94 seconds",
     "eleventh_full_launch": "passed all recorded loader and checkpoint boundaries and completed distributed weight loading, then failed in B12X MoE post-load preparation because the carried vLLM adapter still called the preceding plan_weights API; no OOM or host instability occurred",
     "b12x_moe_preparation_resolution": "ported the MoE boundary to PackedSource, ActivationSpec, MoEGeometry, PackedWeights, ExecutionCapacity, RoutingSpec, and B12X preparation sessions; retained plan memory is prepared before vLLM admits KV cache",
-    "b12x_moe_preparation_target_tests": "real MXFP4 W4A16 and W4A8 numerical execution, repeated preparation and execution at 1/4/16-token capacity, CUDA-graph capture/replay in both modes, 12 focused unit tests, Ruff, format, and diff checks pass on GB10"
+    "b12x_moe_preparation_target_tests": "real MXFP4 W4A16 and W4A8 numerical execution, repeated preparation and execution at 1/4/16-token capacity, CUDA-graph capture/replay in both modes, 12 focused unit tests, Ruff, format, and diff checks pass on GB10",
+    "b12x_moe_preparation_image": "sha256:bdc1deee14daa355b9774e489d48778cfafff4bf364be1f28d067ba9dafb15a2 has exact deterministic source labels and passes the finished-image loader, DS4.1, ModelOpt, disk Engram, B12X warmup/MoE, multi-capacity, numerical, and CUDA-graph gates on GB10"
   },
   "summary": {
     "ttft_seconds": null,
@@ -109,7 +110,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "b12x-moe-preparation-source-qualified-pending-image-and-serving-gates",
+    "status": "b12x-moe-preparation-image-qualified-pending-distribution-and-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
