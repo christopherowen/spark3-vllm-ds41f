@@ -22,7 +22,7 @@ files=(
 )
 
 check_files() {
-  local failed=0 entry source destination mode actual_mode
+  local failed=0 entry source destination mode actual_mode sshd_effective
   for entry in "${files[@]}"; do
     IFS=: read -r source destination mode <<<"$entry"
     if ! sudo -n test -f "$destination"; then
@@ -58,9 +58,10 @@ check_files() {
     echo "sshd configuration is invalid" >&2
     failed=1
   fi
-  if ! sudo -n sshd -T | grep -qx 'logingracetime 30' \
-    || ! sudo -n sshd -T | grep -qx 'maxstartups 64:30:128' \
-    || ! sudo -n sshd -T | grep -qx 'persourcemaxstartups 32'; then
+  sshd_effective=$(sudo -n sshd -T)
+  if ! grep -qx 'logingracetime 30' <<<"$sshd_effective" \
+    || ! grep -qx 'maxstartups 64:30:128' <<<"$sshd_effective" \
+    || ! grep -qx 'persourcemaxstartups 32' <<<"$sshd_effective"; then
     echo "sshd recovery limits are not active" >&2
     failed=1
   fi
