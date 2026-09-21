@@ -25,7 +25,7 @@
     "commit": "fcdb8715837314ee899308154af380e064a6345d",
     "source_tree": "ef0f991c5531323f03fca963da6341092efd1d80",
     "behavior": "enumerate target and draft model roots for both pre-profile preparation and normal warmup, then deduplicate shared or aliased layers by the existing plan key",
-    "validation": "focused regression covers a separately owned draft layer plus an aliased target layer; target-image tests remain required",
+    "validation": "10 focused warmup tests pass on GB10, including a separately owned draft layer plus an aliased target layer; Ruff and format checks pass; immutable-image qualification remains required",
     "quality_change": "none"
   },
   "rollback": "failed candidate containers were removed automatically; stopped promoted containers remain present on all three nodes"
