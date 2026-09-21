@@ -1,0 +1,62 @@
+From a9e9aca6dfbcef01c2e289d5cbd49a884c0b76fa Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 06:59:02 +0200
+Subject: [PATCH] fix(warmup): skip ineligible ll_bf16 routers
+
+---
+ tests/model_executor/test_kernel_warmup.py  | 32 +++++++++++++++++++++
+ vllm/model_executor/warmup/kernel_warmup.py |  2 ++
+ 2 files changed, 34 insertions(+)
+ create mode 100644 tests/model_executor/test_kernel_warmup.py
+
+diff --git a/tests/model_executor/test_kernel_warmup.py b/tests/model_executor/test_kernel_warmup.py
+new file mode 100644
+index 000000000..73b11fb42
+--- /dev/null
++++ b/tests/model_executor/test_kernel_warmup.py
+@@ -0,0 +1,32 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from types import SimpleNamespace
++
++import torch
++
++from vllm.model_executor.layers.fused_moe.router.gate_linear import GateLinear
++from vllm.model_executor.warmup.kernel_warmup import (
++    _ll_bf16_router_shapes_from_model,
++)
++
++
++def _gate(*, shape: tuple[int, int], enabled: bool) -> GateLinear:
++    gate = object.__new__(GateLinear)
++    object.__setattr__(gate, "weight", torch.empty(shape, dtype=torch.bfloat16))
++    object.__setattr__(gate, "allow_ll_bf16_gemm", enabled)
++    return gate
++
++
++def test_ll_bf16_warmup_only_collects_runtime_eligible_gates() -> None:
++    model = SimpleNamespace(
++        modules=lambda: iter(
++            (
++                _gate(shape=(384, 5120), enabled=True),
++                _gate(shape=(256, 4096), enabled=False),
++                torch.nn.Linear(8, 8),
++            )
++        )
++    )
++
++    assert _ll_bf16_router_shapes_from_model(model) == ((5120, 384),)
+diff --git a/vllm/model_executor/warmup/kernel_warmup.py b/vllm/model_executor/warmup/kernel_warmup.py
+index 81eca7ac5..c2467bb33 100644
+--- a/vllm/model_executor/warmup/kernel_warmup.py
++++ b/vllm/model_executor/warmup/kernel_warmup.py
+@@ -62,6 +62,8 @@ def _ll_bf16_router_shapes_from_model(
+     for module in model.modules():
+         if not isinstance(module, GateLinear):
+             continue
++        if not module.allow_ll_bf16_gemm:
++            continue
+         weight = getattr(module, "weight", None)
+         if not isinstance(weight, torch.Tensor):
+             continue

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "candidate_image": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
+  "outcome": "all three ranks stalled during an unused router-kernel warmup; dgx1 and dgx2 recorded NVIDIA allocation failures and later hard-reset, while dgx3 remained network-alive with userland unresponsive",
+  "last_completed_stage": "the shared JIT registry completed 123 compile keys; KV allocation exposed 1,353,553 tokens, or 8.46 complete 160K windows",
+  "failing_stage": "ll_bf16 router GEMM warmup for shape (5120, 384)",
+  "host_evidence": {
+    "kernel": "6.17.0-1032-nvidia before the reset",
+    "journal": "repeated NVRM NV_ERR_NO_MEMORY from _memdescAllocInternal began at the router warmup timestamp",
+    "shutdown": "no orderly shutdown record; the default GRUB entry returned rebooted hosts to 7.0.0-1019-nvidia",
+    "container_state_after_reboot": "Exited (255), OOMKilled=false"
+  },
+  "cause": "upstream warmup selected every BF16 GateLinear on capabilities >= SM90 even though runtime GateLinear dispatch explicitly excludes family-120 GB10 from allow_ll_bf16_gemm and uses the cuBLAS BF16-to-FP32 path",
+  "rejected_explanation": "B12X compiler parallelism was not causal: parallel TileLang compilation completed before the failing warmup began, so the uncommitted B12X_COMPILE_WORKERS override was removed",
+  "isolated_probe": {
+    "hardware": "dgx1 GB10 on 6.17.0-1032-nvidia with all serving workloads stopped",
+    "compiled_keys": 5,
+    "cuda_visible_free_bytes_before": 92321636352,
+    "cuda_visible_free_bytes_after": 91886522368,
+    "cuda_visible_headroom_consumed_bytes": 435113984,
+    "result": "all keys compile outside the resident-model envelope; the kernel itself is functional but unused by SM121 runtime dispatch"
+  },
+  "resolution": {
+    "vllm_commit": "a9e9aca6dfbcef01c2e289d5cbd49a884c0b76fa",
+    "patch": "patches/vllm/0021-fix-warmup-skip-ineligible-ll_bf16-routers.patch",
+    "behavior": "collect warmup shapes only from GateLinear modules whose allow_ll_bf16_gemm runtime flag is true",
+    "quality_and_performance": "no change on SM121 because those layers already dispatch to cuBLAS; only unused startup compilation is removed"
+  }
+}

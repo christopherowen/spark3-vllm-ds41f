@@ -330,6 +330,24 @@ for this model because the indexer packs its pages beside the MLA latent pages.
 The candidate therefore uses the exact common 128-token block. The receipt is
 `runs/launch-f3de2589ce25-kv-block-layout.json`.
 
+That corrected launch then allocated 1,353,553 KV tokens and completed the
+shared JIT registry before every rank stalled at the new upstream `ll_bf16`
+router-GEMM warmup. Kernel journals show repeated NVIDIA
+`NV_ERR_NO_MEMORY` allocations beginning at the same second, followed by
+unclean host resets. The preceding parallel TileLang stage had already
+finished, so reducing B12X compiler workers would not address the failure.
+
+The warmup was unused work on this hardware. `GateLinear` deliberately excludes
+SM121 from its specialized router kernels and dispatches the same BF16 weights
+through cuBLAS with FP32 output, but the global warmup collected every BF16
+gate without checking `allow_ll_bf16_gemm`. Patch 0021 makes preparation follow
+the runtime eligibility decision. A clean isolated SM121 probe confirmed that
+the unused five-key compile consumed 435,113,984 bytes of CUDA-visible
+headroom; the regression test proves an ineligible gate is no longer
+collected. This changes neither weights nor arithmetic and removes no runtime
+kernel selected by DGX Spark. The crash evidence and isolation result are in
+`runs/launch-f3de2589ce25-ineligible-router-warmup.json`.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its

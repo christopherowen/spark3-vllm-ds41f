@@ -37,9 +37,10 @@
         "0974d6ec70a94db3483fd19b678437403d469319",
         "fcdb8715837314ee899308154af380e064a6345d",
         "96dc80400edf18ca97ad40d99ddb7ac620af3c33",
-        "5dff83d6dd40cc9f846502cdf85e8b937530d07b"
+        "5dff83d6dd40cc9f846502cdf85e8b937530d07b",
+        "a9e9aca6dfbcef01c2e289d5cbd49a884c0b76fa"
       ],
-      "source_tree": "4138f6ad2f3f652e8c5b00a56d25aae0b386d2fb",
+      "source_tree": "f119b0b002685909cca0ed0efe2d1cfbb6fcee70",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -61,7 +62,8 @@
         "patches/vllm/0017-fix-b12x-prepare-MXFP8-linear-execution-plans.patch",
         "patches/vllm/0018-fix-b12x-prepare-draft-model-weight-plans.patch",
         "patches/vllm/0019-fix-b12x-prepare-RoCEnante-before-profiling.patch",
-        "patches/vllm/0020-fix-b12x-synchronize-RoCEnante-plan-priming.patch"
+        "patches/vllm/0020-fix-b12x-synchronize-RoCEnante-plan-priming.patch",
+        "patches/vllm/0021-fix-warmup-skip-ineligible-ll_bf16-routers.patch"
       ]
     },
     {
@@ -91,9 +93,9 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "superseded_image_digest": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f",
-  "deployment_status": "the corrected immutable image passes 140 selected source, numerical, Engram, MoE, CUDA-graph, and topology tests; distribution and TP3 runtime qualification remain required",
+  "image_digest": null,
+  "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
+  "deployment_status": "patch 0021 removes an unused SM121 router-kernel warmup that exhausted the startup envelope; immutable-image rebuild and TP3 runtime qualification remain required",
   "integration_status": {
     "status": "the source candidate coordinates pre-profile RoCEnante priming and keys prepared flag geometry by routed stripes; immutable image and TP3 runtime qualification remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
@@ -102,7 +104,7 @@
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-rocenante-stripe-fix-image-qualified-pending-tp3-runtime",
+    "status": "ineligible-router-warmup-fix-source-qualified-pending-image",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

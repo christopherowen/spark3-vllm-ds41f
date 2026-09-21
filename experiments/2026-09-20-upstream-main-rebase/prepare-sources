@@ -56,7 +56,7 @@ prepare \
   vllm \
   https://github.com/vllm-project/vllm.git \
   d05da62e9ccdf8e342b15bf6785d83224cc165af \
-  4138f6ad2f3f652e8c5b00a56d25aae0b386d2fb \
+  f119b0b002685909cca0ed0efe2d1cfbb6fcee70 \
   patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch \
   patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch \
   patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch \
@@ -76,7 +76,8 @@ prepare \
   patches/vllm/0017-fix-b12x-prepare-MXFP8-linear-execution-plans.patch \
   patches/vllm/0018-fix-b12x-prepare-draft-model-weight-plans.patch \
   patches/vllm/0019-fix-b12x-prepare-RoCEnante-before-profiling.patch \
-  patches/vllm/0020-fix-b12x-synchronize-RoCEnante-plan-priming.patch
+  patches/vllm/0020-fix-b12x-synchronize-RoCEnante-plan-priming.patch \
+  patches/vllm/0021-fix-warmup-skip-ineligible-ll_bf16-routers.patch
 
 prepare \
   b12x \
