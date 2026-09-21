@@ -174,6 +174,14 @@ at 1/4/16 tokens and exactly matches the dequantized MXFP8 reference. The
 failure is recorded in
 `runs/launch-7c12c5a6f9a3-mxfp8-preparation-api.json`.
 
+The immutable patch-0017 image is
+`sha256:209944e6423216643cd99780e08194d6cbdf0b5189b88d462799a0688ba419cd`.
+It reproduces all seventeen vLLM and four B12X patches from the exact bases and
+passes the selected DS4.1 loader, ModelOpt MXFP8, disk Engram, MXFP4 MoE,
+multi-capacity, CUDA-graph, Ruff, and format gates on GB10. Its receipt is
+`runs/build-209944e64232-validation.json`; full TP3 startup remains a separate
+required gate.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -204,10 +212,10 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
 source trees. It does not stop, restart, or deploy the service. The current
-lazy-MXFP8-transform-corrected image and checks are recorded in
-`runs/build-3d7121b4d687-validation.json`. The custom-allocation-corrected image
-receipt remains at `runs/build-b6791daa67f1-validation.json`; its full launch
-exposed the isolated scale transformation above.
+patch-0017 image and checks are recorded in
+`runs/build-209944e64232-validation.json`. Earlier immutable receipts remain in
+`runs/` as evidence for the isolated compatibility boundaries found during the
+rebase.
 
 The experiment has its own deterministic cluster configuration. It can be
 inspected without changing the promoted configuration:

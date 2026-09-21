@@ -1,6 +1,6 @@
 # Decision
 
-Status: **MXFP8 linear preparation correction qualified; immutable rebuild required**
+Status: **MXFP8 linear preparation image qualified; TP3 launch required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -24,11 +24,13 @@ only by MoE, and its regression fails if an ordinary provider is even invoked.
 That image cleared both failures and exposed the same preparation-API drift in
 the ModelOpt MXFP8 linear adapter during memory profiling. Patch 0017 prepares
 bounded capacity and exact graph regimes before KV admission and passes a real
-numerical adapter test on GB10. This is not yet proof of a full TP3 startup.
+numerical adapter test on GB10. Its immutable image passes the selected source,
+numerical, disk Engram, MoE, CUDA-graph, and style gates. This is not yet proof
+of a full TP3 startup.
 
 The remaining work is target evidence:
 
-1. rebuild the content-addressed ARM64 candidate on dgx3;
+1. distribute the content-addressed ARM64 candidate from dgx3 to dgx1 and dgx2;
 2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
 3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.
