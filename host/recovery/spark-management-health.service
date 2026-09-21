@@ -1,0 +1,9 @@
+[Unit]
+Description=Check DGX Spark management-plane services
+After=ssh.service tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/spark-management-health
+Nice=10
+IOSchedulingClass=idle

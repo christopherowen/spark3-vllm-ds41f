@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically check DGX Spark management-plane services
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+RandomizedDelaySec=5s
+
+[Install]
+WantedBy=timers.target

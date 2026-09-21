@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source_dir="$repo_root/host/recovery"
+action=${1:-check}
+
+if [[ "$action" != check && "$action" != apply ]]; then
+  echo "usage: scripts/host-recovery [check|apply]" >&2
+  exit 2
+fi
+
+files=(
+  "systemd-system.conf:/etc/systemd/system.conf.d/95-spark-recovery.conf:0644"
+  "sysctl.conf:/etc/sysctl.d/95-spark-recovery.conf:0644"
+  "sshd.conf:/etc/ssh/sshd_config.d/95-spark-recovery.conf:0644"
+  "ssh.service.conf:/etc/systemd/system/ssh.service.d/95-spark-recovery.conf:0644"
+  "tailscaled.service.conf:/etc/systemd/system/tailscaled.service.d/95-spark-recovery.conf:0644"
+  "spark-management-health:/usr/local/libexec/spark-management-health:0755"
+  "spark-management-health.service:/etc/systemd/system/spark-management-health.service:0644"
+  "spark-management-health.timer:/etc/systemd/system/spark-management-health.timer:0644"
+)
+
+check_files() {
+  local failed=0 entry source destination mode actual_mode
+  for entry in "${files[@]}"; do
+    IFS=: read -r source destination mode <<<"$entry"
+    if ! sudo -n test -f "$destination"; then
+      echo "missing: $destination" >&2
+      failed=1
+      continue
+    fi
+    if ! sudo -n cmp -s "$source_dir/$source" "$destination"; then
+      echo "different: $destination" >&2
+      failed=1
+    fi
+    actual_mode=$(sudo -n stat -c '%a' "$destination")
+    if [[ "0$actual_mode" != "$mode" ]]; then
+      echo "mode $actual_mode: $destination (expected ${mode#0})" >&2
+      failed=1
+    fi
+  done
+
+  if [[ "$(systemctl show --property=RuntimeWatchdogUSec --value)" != 30s ]]; then
+    echo "systemd runtime watchdog is not armed at 30s" >&2
+    failed=1
+  fi
+  if [[ "$(systemctl show --property=RebootWatchdogUSec --value)" != 10min ]]; then
+    echo "systemd reboot watchdog is not set to 10 minutes" >&2
+    failed=1
+  fi
+  if ! systemctl is-enabled --quiet spark-management-health.timer \
+    || ! systemctl is-active --quiet spark-management-health.timer; then
+    echo "spark-management-health.timer is not enabled and active" >&2
+    failed=1
+  fi
+  if ! sudo -n sshd -t; then
+    echo "sshd configuration is invalid" >&2
+    failed=1
+  fi
+  if ! sudo -n sshd -T | grep -qx 'logingracetime 30' \
+    || ! sudo -n sshd -T | grep -qx 'maxstartups 64:30:128' \
+    || ! sudo -n sshd -T | grep -qx 'persourcemaxstartups 32'; then
+    echo "sshd recovery limits are not active" >&2
+    failed=1
+  fi
+  if [[ "$(systemctl show ssh.service --property=MemoryMin --value)" != 134217728 ]]; then
+    echo "ssh.service MemoryMin is not 128 MiB" >&2
+    failed=1
+  fi
+  if [[ "$(systemctl show tailscaled.service --property=MemoryMin --value)" != 268435456 ]]; then
+    echo "tailscaled.service MemoryMin is not 256 MiB" >&2
+    failed=1
+  fi
+  for service in ssh.service tailscaled.service; do
+    if [[ "$(systemctl show "$service" --property=OOMScoreAdjust --value)" != -900 ]]; then
+      echo "$service OOMScoreAdjust is not -900" >&2
+      failed=1
+    fi
+  done
+  if [[ "$(sysctl -n kernel.panic)" != 30 \
+    || "$(sysctl -n kernel.panic_on_oops)" != 1 \
+    || "$(sysctl -n vm.panic_on_oom)" != 0 ]]; then
+    echo "kernel recovery sysctls are not active" >&2
+    failed=1
+  fi
+  if ((failed)); then
+    return 1
+  fi
+  echo "host recovery policy matches on $(hostname)"
+}
+
+if [[ "$action" == check ]]; then
+  check_files
+  exit
+fi
+
+sudo -n true
+for entry in "${files[@]}"; do
+  IFS=: read -r source destination mode <<<"$entry"
+  sudo -n install -D -m "$mode" "$source_dir/$source" "$destination"
+done
+
+# Retire the earlier ad-hoc files only after their repository-owned replacements
+# are installed. The disabled copies remain recoverable and are not parsed.
+for legacy in \
+  /etc/systemd/system.conf.d/90-law-watchdog.conf \
+  /etc/sysctl.d/90-law-watchdog.conf; do
+  if sudo -n test -f "$legacy"; then
+    sudo -n mv "$legacy" "$legacy.spark3-migrated"
+  fi
+done
+
+sudo -n sshd -t
+sudo -n systemctl daemon-reload
+sudo -n sysctl --load=/etc/sysctl.d/95-spark-recovery.conf >/dev/null
+sudo -n systemctl daemon-reexec
+sudo -n systemctl enable --now spark-management-health.timer >/dev/null
+
+# Start fresh listeners after this SSH command has returned so OOMScoreAdjust
+# applies to the running processes. Ubuntu's ssh.service uses KillMode=process,
+# so restarting its listener does not terminate the installing session.
+for unit in spark-restart-ssh spark-restart-tailscaled; do
+  sudo -n systemctl reset-failed "$unit.service" "$unit.timer" \
+    >/dev/null 2>&1 || true
+done
+sudo -n systemd-run --quiet --collect --unit=spark-restart-ssh \
+  --on-active=3s /usr/bin/systemctl try-restart ssh.service
+sudo -n systemd-run --quiet --collect --unit=spark-restart-tailscaled \
+  --on-active=8s /usr/bin/systemctl restart tailscaled.service
+
+echo "host recovery policy installed on $(hostname); management restarts scheduled"

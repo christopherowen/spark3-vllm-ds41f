@@ -60,6 +60,8 @@ bin/spark3 upstream prepare flashinfer
 bin/spark3 upstream prepare cutlass
 scripts/fetch-cutlass-dsl-wheels
 scripts/stage-build-contexts
+scripts/host-recovery check
+scripts/host-recovery apply
 bin/spark3 build check
 bin/spark3 build render
 ```
@@ -78,6 +80,11 @@ existing service additionally requires `--replace`.
 
 The compatibility helpers in `scripts/` are thin wrappers around these commands.
 They contain no independent topology, credentials, or launch logic.
+
+Host management-plane recovery is versioned separately under `host/recovery/`.
+It arms the existing hardware watchdog and protects SSH/Tailscale without
+restarting Docker or the inference service. The incident evidence and exact
+policy boundary are documented in [docs/recovery.md](docs/recovery.md).
 
 ## Upstreams
 

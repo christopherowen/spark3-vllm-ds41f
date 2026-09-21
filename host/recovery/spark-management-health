@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+tag=spark-management-health
+
+if ! systemctl is-active --quiet ssh.service \
+  || ! ss -H -ltn 'sport = :22' | grep -q .; then
+  logger -t "$tag" "SSH listener is unavailable; restarting ssh.service"
+  systemctl restart ssh.service
+elif journalctl --quiet --unit ssh.service --since '90 seconds ago' --no-pager \
+  | grep -q 'beginning MaxStartups throttling'; then
+  logger -t "$tag" "SSH entered MaxStartups throttling; restarting its listener"
+  systemctl restart ssh.service
+fi
+
+if ! systemctl is-active --quiet tailscaled.service \
+  || ! timeout --kill-after=5s 10s tailscale status --json >/dev/null 2>&1; then
+  logger -t "$tag" "Tailscale control socket is unresponsive; restarting tailscaled.service"
+  systemctl restart tailscaled.service
+fi
