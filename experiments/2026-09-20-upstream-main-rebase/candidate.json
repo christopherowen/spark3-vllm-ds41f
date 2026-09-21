@@ -75,7 +75,7 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:811f3078cc1d177b82b59fd0bcc0650e6d2a567e185efda05b84b073814c3e76",
-  "deployment_status": "the immutable patch-0018 image passes finished-image source, draft-root discovery, numerical, disk Engram, MoE, CUDA-graph, and style gates on GB10; distribution and full TP3 startup remain required",
+  "deployment_status": "the immutable patch-0018 image passes finished-image source, draft-root discovery, numerical, disk Engram, MoE, CUDA-graph, and style gates on GB10 and is verified identically on all three ranks; full TP3 startup remains required",
   "integration_status": {
     "status": "the immutable candidate passes the selected-path suites plus draft-model plan discovery and alias deduplication on GB10; full TP3 startup remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
