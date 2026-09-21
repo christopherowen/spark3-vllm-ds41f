@@ -1,0 +1,24 @@
+{
+  "status": "failed-at-prepared-rocenante-flag-layout",
+  "image_digest": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f",
+  "vllm_commit": "5dff83d6dd40cc9f846502cdf85e8b937530d07b",
+  "b12x_commit": "c90ba030f2ab4a17959afd05461449ca47259242",
+  "observations": {
+    "full_launch": "all ranks loaded target plus DSpark at 98.1 GiB and entered synchronized RoCEnante priming, then timed out together on sequence 1",
+    "transport": "the C proxy posted and completed all four RDMA writes per rank, but the prepared GPU kernel did not observe their flags",
+    "topology": "live GID index 3 addresses and all six point-to-point subnets exactly match config/nodes.json"
+  },
+  "isolation": {
+    "promoted_image": "the legacy eager RoCEnante path passed exact NCCL comparisons at 16 B, 4 KiB, 256 KiB, and 1 MiB on all three ranks",
+    "candidate_direct_path": "the rebased B12X kernel and identical C proxy passed the same matrix when invoked directly",
+    "candidate_prepared_path": "the B12X PreparationSession path reproduced the sequence-1 timeout with and without compiler workers"
+  },
+  "cause": "the switchless ring opens four local HCA functions but routes two stripes per peer; query_from_runtime encoded len(runtime.hca_names)=4 into the prepared GPU flag layout while the proxy correctly used runtime.stripe_count=2",
+  "resolution": {
+    "b12x_commit": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "source_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a",
+    "behavior": "prepared all-reduce and all-gather kernels now key their flag geometry by routed stripe count while retaining all four opened HCA functions for peer routing",
+    "validation": "8 topology tests pass; the fixed prepared-plan probe primes three reductions plus one gather and then matches NCCL at 16 B, 4 KiB, 256 KiB, and 1 MiB on every rank with balanced completion counters on all four HCA functions; deterministic replay of all vLLM and B12X patches matches the recorded source trees"
+  },
+  "candidate_cleanup": "all exact probe containers exited and the stopped promoted serving containers remain intact"
+}

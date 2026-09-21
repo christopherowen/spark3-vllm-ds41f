@@ -1,5 +1,5 @@
 {
-  "status": "rocenante-pre-profile-preparation-correction-pending-image-qualification",
+  "status": "rocenante-switchless-stripe-layout-correction-pending-image-qualification",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -11,11 +11,11 @@
     "docker_build_check": "the rejected ea3a7e056cb1 build exposed missing compile-time liburing support before launch. Corrected image sha256:8649ec7238e36351b079ccf1fd170189c39a8e5d8f81c7e291a1f0910287018e passed GB10 imports, 8 focused vLLM tests, exact managed direct-I/O, 8 B12X Engram tests with production capabilities, native liburing linkage, and real serve-config construction",
     "vllm_virtual_head_unit_tests": "7 passed with Torch 2.13.0 using an isolated module import",
     "b12x_mhc_policy_tests": "2 passed",
-    "b12x_roce_topology_tests": "7 passed with Torch 2.13.0 using isolated CPU-safe module imports",
+    "b12x_roce_topology_tests": "8 passed, including four-open/two-routed preparation geometry",
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all twenty vLLM and four B12X patches replay from the exact base objects and match recorded Git tree identities 4138f6ad2f3f and a1523b067b4d",
+    "deterministic_source_preparer": "all twenty vLLM and five B12X patches replay from the exact base objects and match recorded Git tree identities 4138f6ad2f3f and a251f563557b",
     "repository_doctor": "configuration OK",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
@@ -88,7 +88,12 @@
     "rocenante_priming_rendezvous_resolution": "patch 0020 synchronizes all ranks on the existing CPU process group after each local plan is materialized and immediately before its first real collective",
     "rocenante_priming_rendezvous_tests": "all 16 focused RoCEnante tests pass on GB10; the new regression proves materialization precedes the barrier and every priming collective follows it; Ruff and format checks pass",
     "rocenante_priming_rendezvous_image": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f has exact deterministic source labels and passes 76 focused vLLM tests, 8 production-capability disk Engram tests, both selected real MXFP4 numerical modes, four multi-capacity/CUDA-graph cases, and immutable-image Ruff and format gates on GB10",
-    "rocenante_priming_rendezvous_image_distribution": "exact image ID, source labels, and deployment checkout verified on dgx1, dgx2, and dgx3 after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 136 seconds"
+    "rocenante_priming_rendezvous_image_distribution": "exact image ID, source labels, and deployment checkout verified on dgx1, dgx2, and dgx3 after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 136 seconds",
+    "seventeenth_full_launch": "loaded target plus DSpark at 98.1 GiB on all ranks and entered synchronized priming, but the prepared RoCEnante kernel timed out at sequence 1 even though all four RDMA writes completed on every rank",
+    "rocenante_transport_isolation": "the promoted legacy path and rebased direct path both match NCCL from 16 B through 1 MiB across all three ranks; only the PreparationSession path failed, independent of compiler-worker count",
+    "rocenante_stripe_layout_cause": "the switchless ring opens four local HCA functions but routes two stripes per peer; prepared query metadata incorrectly compiled a four-lane GPU flag layout while the C proxy correctly wrote the two routed lanes",
+    "rocenante_stripe_layout_resolution": "B12X commit b69feee3022c keys prepared all-reduce and all-gather flag geometry by runtime.stripe_count while retaining all opened HCA functions for peer routing",
+    "rocenante_stripe_layout_probe": "the fixed prepared-plan path primes three reductions and one gather, then matches NCCL at 16 B, 4 KiB, 256 KiB, and 1 MiB on every rank with balanced completions across all four local HCA functions"
   },
   "summary": {
     "ttft_seconds": null,
@@ -138,7 +143,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "rocenante-pre-profile-preparation-correction-pending-image-and-serving-gates",
+    "status": "rocenante-switchless-stripe-layout-correction-pending-image-and-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

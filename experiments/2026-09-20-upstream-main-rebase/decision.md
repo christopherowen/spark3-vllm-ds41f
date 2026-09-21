@@ -1,6 +1,6 @@
 # Decision
 
-Status: **Patch-0020 image qualified; TP3 runtime qualification required**
+Status: **RoCEnante stripe-layout fix proven; immutable image qualification required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -55,7 +55,18 @@ remaining work is target evidence:
 The immutable patch-0020 image now passes the complete selected source,
 numerical, disk Engram, MoE, CUDA-graph, RoCEnante, and style gates on GB10.
 
-1. distribute the qualified content-addressed ARM64 image to all ranks;
+Its synchronized TP3 launch exposed one more carry boundary in our switchless
+extension. Each rank opens four local HCA functions but routes two stripes to
+each peer. The new B12X preparation refactor compiled the GPU flag layout with
+the number of opened functions (four), while the unchanged proxy correctly
+wrote the routed-lane layout (two). A model-free three-rank A/B proved the old
+eager image and the rebased direct kernel both pass, while only the prepared
+path failed with every RDMA write already complete. B12X commit `b69feee3022c`
+uses `runtime.stripe_count` for prepared all-reduce and all-gather geometry.
+The fixed prepared path now primes reductions and gather and matches NCCL from
+16 bytes through 1 MiB on all ranks, using both functions on both peer links.
+
+1. build and distribute the corrected content-addressed ARM64 image to all ranks;
 2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
 3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.

@@ -1,0 +1,72 @@
+From b69feee3022c05fa840833a80dd4010156cf7fe1 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 05:45:50 +0200
+Subject: [PATCH] fix(rocenante): key prepared kernels by route stripes
+
+---
+ b12x/comm/roce/_preparation.py   |  7 ++++++-
+ tests/comm/test_roce_topology.py | 25 +++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/b12x/comm/roce/_preparation.py b/b12x/comm/roce/_preparation.py
+index 1dc2302..7e216d4 100644
+--- a/b12x/comm/roce/_preparation.py
++++ b/b12x/comm/roce/_preparation.py
+@@ -153,7 +153,12 @@ def query_from_runtime(
+                 "threads": runtime._threads,
+                 "slots": runtime._layout.slots,
+                 "flag_stride": runtime._layout.flag_stride,
+-                "hca_count": len(runtime.hca_names),
++                # The GPU flag layout follows route lanes, not the number of
++                # local HCA functions opened across all switchless peers.  A
++                # three-node ring opens four functions but routes two stripes
++                # per edge; compiling for four would make the kernel read flag
++                # offsets the two-stripe proxy never writes.
++                "hca_count": runtime.stripe_count,
+             }
+         ),
+     )
+diff --git a/tests/comm/test_roce_topology.py b/tests/comm/test_roce_topology.py
+index 4c509b8..83ffe0a 100644
+--- a/tests/comm/test_roce_topology.py
++++ b/tests/comm/test_roce_topology.py
+@@ -1,11 +1,36 @@
++from types import SimpleNamespace
++
+ import pytest
+ 
++from b12x.comm.roce._preparation import query_from_runtime
+ from b12x.comm.roce.roce_oneshot import (
+     _peer_hca_names_from_env,
+     _resolve_hca_topology,
+ )
+ 
+ 
++def test_preparation_uses_route_stripes_for_switchless_flag_layout() -> None:
++    runtime = SimpleNamespace(
++        world_size=3,
++        rank=0,
++        hca_names=("mlx5_0", "mlx5_1", "mlx5_2", "mlx5_3"),
++        stripe_count=2,
++        _threads=512,
++        _layout=SimpleNamespace(slots=2, flag_stride=128),
++    )
++
++    query = query_from_runtime(
++        runtime,
++        surface="AllReduce.all_reduce",
++        call={"dtypes": ("bfloat16",)},
++        topology="roce_rdma",
++        peer_hosts=("rank:0", "rank:1", "rank:2"),
++    )
++
++    assert query.hca_names == runtime.hca_names
++    assert query.setup["hca_count"] == runtime.stripe_count
++
++
+ def test_clique_topology_preserves_shared_hca_routes(monkeypatch) -> None:
+     monkeypatch.delenv("B12X_ROCE_PEER_HCAS", raising=False)
+ 
+-- 
+2.54.0 (Apple Git-157)
+

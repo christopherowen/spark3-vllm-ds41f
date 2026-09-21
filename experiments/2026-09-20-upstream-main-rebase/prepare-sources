@@ -82,8 +82,9 @@ prepare \
   b12x \
   https://github.com/local-inference-lab/b12x.git \
   0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68 \
-  a1523b067b4df679f9aa23d543fa324dc00770f0 \
+  a251f563557bcbff88b17dedd6fd6bccd859929a \
   patches/b12x/0001-perf-mhc-retain-qualified-3072-token-DS4.1-geometry.patch \
   patches/b12x/0002-feat-rocenante-route-switchless-peers-by-local-HCA.patch \
   patches/b12x/0003-build-align-CUTLASS-DSL-with-vLLM-main.patch \
-  patches/b12x/0004-fix-vllm-support-upstream-managed-weight-loading.patch
+  patches/b12x/0004-fix-vllm-support-upstream-managed-weight-loading.patch \
+  patches/b12x/0005-fix-rocenante-key-prepared-kernels-by-route-stripes.patch

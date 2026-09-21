@@ -301,6 +301,17 @@ MoE-specific rather than constructing unrelated warmup units and filtering
 afterward. The candidate is not promotable until full
 three-rank model-load, quality, capacity, and performance gates pass.
 
+The patch-0020 TP3 launch synchronized RoCEnante priming but revealed a
+switchless preparation mismatch: four local HCA functions are open across the
+two peer links, while each peer route has two stripes. The prepared GPU plan
+used four as its flag-lane count and therefore read offsets the two-lane proxy
+never wrote. B12X commit `b69feee3022c` makes prepared kernel geometry use the
+routed stripe count. A standalone three-rank probe proves the promoted eager
+path and rebased direct path were already sound, reproduces the failure only
+through `PreparationSession`, and verifies the correction against NCCL from
+16 bytes through 1 MiB on every rank. The exact evidence is recorded in
+`runs/launch-bfed12063fa0-rocenante-stripe-layout.json`.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its

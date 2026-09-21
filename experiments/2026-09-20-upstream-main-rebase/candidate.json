@@ -61,15 +61,17 @@
         "348145ea8b6adaea7c32b1b87898ff59b5d43380",
         "803d7d795d05be3902a30e82743a817a2c26d53f",
         "de8e7fa971eb7ae4c21e634a8931407a0b404568",
-        "c90ba030f2ab4a17959afd05461449ca47259242"
+        "c90ba030f2ab4a17959afd05461449ca47259242",
+        "b69feee3022c05fa840833a80dd4010156cf7fe1"
       ],
-      "source_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0",
+      "source_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/b12x/0001-perf-mhc-retain-qualified-3072-token-DS4.1-geometry.patch",
         "patches/b12x/0002-feat-rocenante-route-switchless-peers-by-local-HCA.patch",
         "patches/b12x/0003-build-align-CUTLASS-DSL-with-vLLM-main.patch",
-        "patches/b12x/0004-fix-vllm-support-upstream-managed-weight-loading.patch"
+        "patches/b12x/0004-fix-vllm-support-upstream-managed-weight-loading.patch",
+        "patches/b12x/0005-fix-rocenante-key-prepared-kernels-by-route-stripes.patch"
       ]
     }
   ],
@@ -78,17 +80,18 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f",
-  "deployment_status": "the immutable patch-0020 image passes the full selected-path prelaunch suite on GB10; three-rank distribution and runtime qualification remain required",
+  "image_digest": null,
+  "superseded_image_digest": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f",
+  "deployment_status": "the four-open/two-routed RoCEnante prepared-plan fix passes the exact three-rank transport probe; immutable image qualification remains required",
   "integration_status": {
-    "status": "the immutable source candidate retains selected-path qualification and coordinates pre-profile RoCEnante plan priming after per-rank materialization; TP3 runtime qualification remains required",
+    "status": "the source candidate coordinates pre-profile RoCEnante priming and keys prepared flag geometry by routed stripes; immutable image and TP3 runtime qualification remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-patch-0020-image-qualified-pending-tp3-runtime",
+    "status": "aligned-rocenante-stripe-fix-pending-image-qualification",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
