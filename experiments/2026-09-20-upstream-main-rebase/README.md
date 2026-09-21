@@ -358,6 +358,18 @@ from the pinned upstream base. The corrected replay head is
 `c9ce910e3709cbe2967642d9a157b402ac254698`. Historical launch receipts retain
 the identities of the images they actually exercised.
 
+The corrected replay was built as immutable image
+`sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993`
+and copied byte-for-byte over the ConnectX-7 link to dgx2. A 32 GiB-capped
+focused sweep passed 193 tests with one expected skip. The two excluded failures
+are separately reproduced baselines: B12X's unselected NVFP4/BF16-SiLU cosine
+threshold and a pinned-upstream Qwen ModelOpt FP8 scale-dtype test. A model-free
+two-rank prepared-plan probe then matched NCCL from 16 bytes through 1 MiB,
+used both dgx1-dgx2 rails, reported no transport errors, and exited without a
+cgroup OOM on either node. The evidence is recorded in
+`runs/build-56820972a862-two-rank-validation.json`. No DS4.1 weights were loaded;
+full TP3 qualification remains gated on recovery of dgx3.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its

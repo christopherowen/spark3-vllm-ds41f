@@ -93,18 +93,18 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
+  "image_digest": "sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0021 removes an unused SM121 router-kernel warmup that exhausted the startup envelope; immutable-image rebuild and TP3 runtime qualification remain required",
+  "deployment_status": "the corrected immutable image is byte-identical on dgx1 and dgx2 and passes bounded focused and two-rank dual-rail qualification; TP3 model-load, output, capacity, and performance qualification remain deferred until dgx3 is recoverable",
   "integration_status": {
-    "status": "the source candidate coordinates pre-profile RoCEnante priming and keys prepared flag geometry by routed stripes; immutable image and TP3 runtime qualification remain required",
+    "status": "the immutable candidate coordinates pre-profile RoCEnante priming and passes a two-rank prepared-plan NCCL comparison across both dgx1-dgx2 rails; three-rank runtime qualification remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "ineligible-router-warmup-fix-source-qualified-pending-image",
+    "status": "image-and-two-rank-qualified-pending-tp3",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

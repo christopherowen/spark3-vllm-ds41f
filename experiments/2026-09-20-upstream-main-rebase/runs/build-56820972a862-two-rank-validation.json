@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "passed-bounded-two-rank-development-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:9de03517c6be-b69feee3022c-d6e86ac67ecca",
+    "id": "sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993",
+    "size_bytes": 23240453496,
+    "deployment_revision": "6e86ac67eccad96eeb485b2df0ac59004737f224",
+    "vllm_patch_head": "9de03517c6be50eef0d20fe2d6cf02c34151a01e",
+    "vllm_tree": "c9ce910e3709cbe2967642d9a157b402ac254698",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "safety": {
+    "model_loaded": false,
+    "test_memory_limit_gib": 32,
+    "test_memory_swap_limit_gib": 32,
+    "host_swap_used_bytes_after_validation": 0,
+    "dgx1_available_memory_gib_after_validation": 115,
+    "dgx2_available_memory_gib_after_validation": 116,
+    "probe_oom_killed": {
+      "dgx1": false,
+      "dgx2": false
+    }
+  },
+  "checks": {
+    "source_replay": "twenty-one vLLM and five B12X patches reproduced the recorded revisions and Git trees from exact upstream bases",
+    "loader_patch_cleanup": "the unrelated reorder_w13=False hunk was removed from patch 0004; the corrected replay preserves pinned-upstream reorder_w13=use_a16",
+    "image_labels": "deployment revision, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "image_distribution": "dgx1 and dgx2 report the same sha256 image ID after an uncompressed transfer over their 192.168.0.0/24 ConnectX-7 link",
+    "focused_vllm": "193 passed, 1 expected checkpoint-dependent skip, 1 known B12X NVFP4/BF16-SiLU numerical case deselected, and 1 pinned-upstream ModelOpt FP8 failure reproduced identically in the unmodified base image",
+    "two_rank_rocenante": "prepared-plan all-reduce matched NCCL at 16 B, 4 KiB, 256 KiB, and 1 MiB on both ranks; both routed HCAs carried balanced bytes and completions with zero transport errors",
+    "cleanup": "all exact test and probe containers exited or were removed; no serving or auxiliary container was started"
+  },
+  "baseline_failures": {
+    "b12x_nvfp4_bf16_silu": "the absolute/relative tolerance passes but the older B12X cosine threshold is 0.982 versus 0.99; DS4.1 selects MXFP4 rather than this NVFP4 mode",
+    "upstream_modelopt_fp8_pb_wo": "test_modelopt_fp8_pb_wo_checkpoint_setup observes int32 block scales instead of float32 on SM121 and fails identically in the exact pinned upstream nightly without any local source or B12X overlay"
+  },
+  "remaining": [
+    "recover dgx3 and distribute the exact immutable image to it",
+    "repeat the prepared-plan transport probe across all three switchless peers",
+    "full three-rank DS4.1 target and DSpark model load with selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}

@@ -2,13 +2,13 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-upstream-5dff-b12x-b69f",
-    "image": "vllm-ds41f-upstream-main:5dff83d6dd40-b69feee3022c-d5c6172f43495",
+    "name": "dsv41-upstream-9de0-b12x-b69f",
+    "image": "vllm-ds41f-upstream-main:9de03517c6be-b69feee3022c-d6e86ac67ecca",
     "expected_labels": {
-      "org.opencontainers.image.revision": "5c6172f43495381725434549b76dbe52a4b714d7",
+      "org.opencontainers.image.revision": "6e86ac67eccad96eeb485b2df0ac59004737f224",
       "local.spark3.vllm.base": "d05da62e9ccdf8e342b15bf6785d83224cc165af",
-      "local.spark3.vllm.patch-head": "5dff83d6dd40cc9f846502cdf85e8b937530d07b",
-      "local.spark3.vllm.tree": "4138f6ad2f3f652e8c5b00a56d25aae0b386d2fb",
+      "local.spark3.vllm.patch-head": "9de03517c6be50eef0d20fe2d6cf02c34151a01e",
+      "local.spark3.vllm.tree": "c9ce910e3709cbe2967642d9a157b402ac254698",
       "local.spark3.b12x.base": "0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68",
       "local.spark3.b12x.patch-head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
       "local.spark3.b12x.tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
