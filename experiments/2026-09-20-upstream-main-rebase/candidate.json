@@ -70,8 +70,8 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
-  "deployment_status": "pre-profile provider-order correction qualified on one GB10; immutable rebuild pending; promoted rollback retained",
+  "image_digest": "sha256:7c12c5a6f9a3c82d5b679e6e7c422996759924c1b92a438684fe0c47f7560fcd",
+  "deployment_status": "pre-profile provider-order image qualified on one GB10; distribution and full TP3 launch pending; promoted rollback retained",
   "integration_status": {
     "status": "the source candidate passes the existing focused suites plus real MXFP4 W4A16/W4A8 execution, repeated multi-capacity preparation, and CUDA-graph replay on GB10; full TP3 model-load remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",

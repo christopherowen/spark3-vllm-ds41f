@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "status": "passed-prelaunch-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:8051ebbaadb9-c90ba030f2ab-d94f3ea16401c",
+    "id": "sha256:7c12c5a6f9a3c82d5b679e6e7c422996759924c1b92a438684fe0c47f7560fcd",
+    "size_bytes": 23240347324,
+    "deployment_revision": "94f3ea16401ca24e05ffcb4e72c49556821fb8fd",
+    "vllm_patch_head": "8051ebbaadb9dfc2bb6f60554dfdaf8eede22326",
+    "vllm_tree": "856e545b6d27d65abae8f6fabb985b1137a99087",
+    "b12x_patch_head": "c90ba030f2ab4a17959afd05461449ca47259242",
+    "b12x_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0"
+  },
+  "checks": {
+    "source_replay": "sixteen vLLM and four B12X patches reproduced both deterministic revisions and recorded Git trees from exact upstream bases",
+    "image_labels": "deployment, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "deepseek_v41": "19 focused B12X adapter and virtual-head tests plus the native MXFP8 file-descriptor regression passed on GB10 from the finished image",
+    "modelopt_mxfp8": "the lazy-source materialization and native 32-row scale expansion regression passed on GB10 from the finished image",
+    "b12x_engram": "8 tests passed with IPC_LOCK, unlimited memlock, and the production seccomp capability set",
+    "b12x_pre_profile": "9 warmup tests passed; the regression proves ordinary providers are not invoked during pre-memory preparation",
+    "b12x_moe": "real MXFP4 W4A16 and W4A8 matched the Torch reference at 1, 4, and 16 tokens after repeated preparation",
+    "cuda_graph": "current B12X composite-capacity plans captured and replayed successfully in both MXFP4 W4A16 and W4A8 modes",
+    "native_loader": "the build gate proved liburing linkage and retained NCCL 2.30.7 plus CUTLASS DSL 4.7.1",
+    "rollback_state": "promoted containers remain stopped and present on all three nodes; failed candidate containers were removed"
+  },
+  "distribution": {
+    "source": "dgx3",
+    "targets": {
+      "dgx1": "192.168.2.1",
+      "dgx2": "192.168.4.1 via dgx2-internal"
+    },
+    "method": "two parallel uncompressed docker save/load streams over both ConnectX-7 internal rails",
+    "status": "pending"
+  },
+  "remaining": [
+    "distribute and verify the exact image on all three ranks",
+    "full three-rank model load and selected-kernel JIT qualification",
+    "deterministic native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and minimum-memory comparison"
+  ]
+}
