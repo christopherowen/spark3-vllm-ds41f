@@ -322,6 +322,14 @@ this preserves target-model quality and leaves its concurrency-dependent
 performance impact to the benchmark matrix. The failure receipt is
 `runs/launch-f3de2589ce25-adaptive-verification.json`.
 
+With adaptive verification disabled, the next upstream guard rejected the
+legacy 256-token manager block: the SM121 indexer and B12X attention share a
+128-token kernel page, while the required block-outer `BLHNC` layout cannot
+split a padded 256-token page into dense views. `LBNHC` is not an alternative
+for this model because the indexer packs its pages beside the MLA latent pages.
+The candidate therefore uses the exact common 128-token block. The receipt is
+`runs/launch-f3de2589ce25-kv-block-layout.json`.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its

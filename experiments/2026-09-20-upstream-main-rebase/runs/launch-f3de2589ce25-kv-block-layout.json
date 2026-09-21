@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "failed-at-kv-view-layout",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:5dff83d6dd40-b69feee3022c-d5c6172f43495",
+    "id": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
+    "launch_revision": "94a7b8fb7c45d04531bac25ac0bc9c063dd51b22"
+  },
+  "progress": [
+    "cleared the adaptive-verification compatibility guard",
+    "loaded target and draft, prepared every B12X plan, and carried real target-model tensors through RoCEnante",
+    "resolved the only layout shared by the DeepSeek V4.1 indexer and B12X attention as BLHNC",
+    "computed 1360738-token KV capacity from the requested 3 GiB allocation"
+  ],
+  "failure": {
+    "file": "vllm/v1/kv_cache_interface.py",
+    "operation": "create_kv_cache_views",
+    "message": "BLHNC block stride 268800 does not equal dense page size 36864, so a 256-token manager block cannot be split into two 128-token kernel blocks",
+    "cause": "the experiment retained the preceding stack's explicit 256-token manager block while current upstream resolves the SM121 DeepSeek V4.1 indexer kernel page to 128 tokens",
+    "classification": "local configuration carry regression exposed by an upstream layout correctness guard",
+    "oom": false
+  },
+  "resolution": {
+    "configuration": "set --block-size 128",
+    "why_not_lBNHC": "the DeepSeek V4.1 indexer packs its pages beside MLA latent pages and supports only block-outer BLHNC or BLNHC layouts, so the generic layer-compact alternative is not valid for this model",
+    "memory_effect": "smaller blocks reduce tail fragmentation while doubling block-table entries; effective capacity and performance remain runtime gates",
+    "quality_change": "none"
+  },
+  "rollback": "complete per-node logs were preserved before removing only the candidate containers"
+}

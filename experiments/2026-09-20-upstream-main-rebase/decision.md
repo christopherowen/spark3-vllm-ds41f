@@ -75,6 +75,13 @@ candidate therefore uses upstream's supported fixed-block DSpark verification.
 This changes speculative scheduling rather than target-token quality and must
 be quantified across the concurrency matrix.
 
+The following launch cleared that guard and exposed the second stale runtime
+setting: a 256-token manager block cannot be split into the 128-token SM121
+kernel pages under the required block-outer `BLHNC` layout. The candidate now
+uses 128, the exact common page size for the DeepSeek V4.1 indexer and B12X
+attention. This is expected to reduce tail fragmentation at the cost of more
+block-table entries; effective capacity and throughput remain measured gates.
+
 1. complete TP3 startup with the supported fixed-block DSpark configuration;
 2. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.

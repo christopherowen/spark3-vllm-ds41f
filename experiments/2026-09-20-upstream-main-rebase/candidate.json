@@ -5,6 +5,11 @@
       "from": true,
       "to": false,
       "reason": "upstream rejects device-trimmed verification with the hard-wired DeepseekV41IndexerBackend on SM121; fixed-block verification preserves target-model quality and is the supported path"
+    },
+    "cache.block_size": {
+      "from": 256,
+      "to": 128,
+      "reason": "128 is the exact common SM121 kernel page for the DeepSeek V4.1 indexer and B12X attention; BLHNC cannot split a padded 256-token manager page into dense 128-token kernel pages"
     }
   },
   "source_delta": [

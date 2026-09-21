@@ -136,7 +136,7 @@
     "--model-loader-extra-config",
     "{\"io_threads\":8}",
     "--block-size",
-    "256",
+    "128",
     "--enable-prefix-caching",
     "--enable-chunked-prefill",
     "--max-model-len",
