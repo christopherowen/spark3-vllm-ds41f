@@ -190,6 +190,13 @@ warmup enumerate target plus draft roots while deduplicating any aliased layers
 by their plan key. The failure is recorded in
 `runs/launch-209944e64232-draft-plan-discovery.json`.
 
+The immutable patch-0018 image is
+`sha256:811f3078cc1d177b82b59fd0bcc0650e6d2a567e185efda05b84b073814c3e76`.
+It reproduces all eighteen vLLM and four B12X patches from the exact bases and
+passes 60 selected vLLM tests, 8 production-capability disk Engram tests, both
+selected MXFP4 numerical modes, four multi-capacity/CUDA-graph cases, Ruff, and
+format on GB10. Its receipt is `runs/build-811f3078cc1d-validation.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -220,8 +227,8 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
 source trees. It does not stop, restart, or deploy the service. The current
-patch-0017 image and checks are recorded in
-`runs/build-209944e64232-validation.json`. Earlier immutable receipts remain in
+patch-0018 image and checks are recorded in
+`runs/build-811f3078cc1d-validation.json`. Earlier immutable receipts remain in
 `runs/` as evidence for the isolated compatibility boundaries found during the
 rebase.
 

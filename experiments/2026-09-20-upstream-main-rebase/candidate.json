@@ -74,17 +74,17 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:209944e6423216643cd99780e08194d6cbdf0b5189b88d462799a0688ba419cd",
-  "deployment_status": "the patch-0017 image prepared every target-model plan but proved the pre-profile collector omitted the separately owned DSpark draft model; patch 0018 scans target and draft roots with shared-plan deduplication and requires an immutable rebuild",
+  "image_digest": "sha256:811f3078cc1d177b82b59fd0bcc0650e6d2a567e185efda05b84b073814c3e76",
+  "deployment_status": "the immutable patch-0018 image passes finished-image source, draft-root discovery, numerical, disk Engram, MoE, CUDA-graph, and style gates on GB10; distribution and full TP3 startup remain required",
   "integration_status": {
-    "status": "the source candidate retains the selected-path qualification and adds draft-model plan discovery with an alias-deduplication regression; target-image tests and full TP3 startup remain required",
+    "status": "the immutable candidate passes the selected-path suites plus draft-model plan discovery and alias deduplication on GB10; full TP3 startup remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "aligned-pending-patch-0018-sm121-runtime-qualification",
+    "status": "aligned-passed-selected-sm121-prelaunch-qualification",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

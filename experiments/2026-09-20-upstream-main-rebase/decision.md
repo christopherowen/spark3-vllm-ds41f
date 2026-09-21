@@ -1,6 +1,6 @@
 # Decision
 
-Status: **Draft-model plan discovery corrected; immutable rebuild required**
+Status: **Draft-model plan discovery image qualified; TP3 launch required**
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X
@@ -34,10 +34,11 @@ The profile exposed one omitted ownership root: the collector scanned
 `worker.get_model()` but not the separately owned `worker.get_draft_model()`.
 Patch 0018 enumerates both roots and deduplicates shared layers by their existing
 plan key. The failure was not an OOM and did not require a configuration change.
+Its immutable image passes the complete selected-path prelaunch suite on GB10.
 
 The remaining work is target evidence:
 
-1. rebuild and qualify the content-addressed ARM64 candidate on dgx3;
+1. distribute the content-addressed ARM64 candidate from dgx3 to dgx1 and dgx2;
 2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
 3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.
