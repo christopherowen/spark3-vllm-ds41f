@@ -1,6 +1,12 @@
 {
   "intended_variable": "rebase the source stack onto current upstream architecture and retain only required DS4.1 TP3 behavior",
-  "configuration_delta": {},
+  "configuration_delta": {
+    "speculative_config.enable_adaptive_verification": {
+      "from": true,
+      "to": false,
+      "reason": "upstream rejects device-trimmed verification with the hard-wired DeepseekV41IndexerBackend on SM121; fixed-block verification preserves target-model quality and is the supported path"
+    }
+  },
   "source_delta": [
     {
       "project": "vllm",

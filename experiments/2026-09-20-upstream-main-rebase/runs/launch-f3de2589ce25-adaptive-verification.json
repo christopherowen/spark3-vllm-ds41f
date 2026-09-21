@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "failed-after-transport-at-adaptive-verification-guard",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:5dff83d6dd40-b69feee3022c-d5c6172f43495",
+    "id": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
+    "vllm_commit": "5dff83d6dd40cc9f846502cdf85e8b937530d07b",
+    "b12x_commit": "b69feee3022c05fa840833a80dd4010156cf7fe1"
+  },
+  "progress": [
+    "loaded the native target and DSpark draft at 98.1 GiB on every rank",
+    "prepared 226 MXFP8 plans, 43 MoE plans, and the corrected RoCEnante plan on every rank",
+    "routed a real 245760-byte target-model all-reduce and a (24, 43136) all-gather through RoCEnante",
+    "allocated a 3 GiB KV cache with 1360738-token capacity, or 8.50 concurrent 160000-token requests"
+  ],
+  "failure": {
+    "file": "vllm/v1/worker/gpu/spec_decode/adaptive_verification.py",
+    "operation": "KV-cache initialization",
+    "message": "Adaptive verification trims verification requests on device, which the DeepseekV41IndexerBackend attention backend does not support",
+    "cause": "the experiment retained enable_adaptive_verification=true from the preceding stack even though upstream's hard-wired DeepSeek V4.1 indexer cannot consume device-decided query lengths on SM121",
+    "classification": "local configuration carry regression exposed by an upstream correctness guard",
+    "oom": false,
+    "transport_failure": false
+  },
+  "resolution": {
+    "configuration": "set enable_adaptive_verification=false and retain DSpark with three fixed verification tokens",
+    "quality_change": "none; fixed-block verification changes speculative work scheduling, not accepted target-model token probabilities",
+    "performance_gate": "measure fixed-block DSpark at concurrency 1, 2, 4, and 8; SM121 device-query-length support is a separate future upstream opportunity"
+  },
+  "rollback": "the coordinated start preserved complete per-node logs before removing only the candidate containers; stopped promoted containers remain intact"
+}

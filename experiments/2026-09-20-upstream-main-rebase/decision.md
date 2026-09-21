@@ -66,9 +66,17 @@ uses `runtime.stripe_count` for prepared all-reduce and all-gather geometry.
 The fixed prepared path now primes reductions and gather and matches NCCL from
 16 bytes through 1 MiB on all ranks, using both functions on both peer links.
 
-1. build and distribute the corrected content-addressed ARM64 image to all ranks;
-2. compile and run the selected B12X kernels and RoCEnante plan on all ranks;
-3. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
+The corrected immutable image subsequently reached KV initialization with real
+model traffic over RoCEnante. It allocated 1,360,738 KV tokens (8.50 times the
+160K hard limit) before current upstream rejected the carried
+`enable_adaptive_verification=true` setting. DeepSeek V4.1 hard-wires an indexer
+backend that does not support device-decided query lengths on SM121. The
+candidate therefore uses upstream's supported fixed-block DSpark verification.
+This changes speculative scheduling rather than target-token quality and must
+be quantified across the concurrency matrix.
+
+1. complete TP3 startup with the supported fixed-block DSpark configuration;
+2. establish deterministic output parity, four-by-128K capacity, memory, TTFT,
    single-stream TPS, and eight-stream aggregate TPS against the live baseline.
 
 The nodes are now free for qualification. Dependency suppression or an in-place

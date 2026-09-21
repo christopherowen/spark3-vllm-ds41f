@@ -312,6 +312,16 @@ through `PreparationSession`, and verifies the correction against NCCL from
 16 bytes through 1 MiB on every rank. The exact evidence is recorded in
 `runs/launch-bfed12063fa0-rocenante-stripe-layout.json`.
 
+The corrected immutable image then carried real model all-reduce and all-gather
+tensors through RoCEnante and allocated 1,360,738 KV tokens before upstream's
+adaptive-verification guard rejected the retained legacy setting. The
+hard-wired DeepSeek V4.1 indexer on SM121 cannot consume device-decided query
+lengths. This is a configuration carry regression, not a transport or memory
+failure. The candidate now uses supported fixed-block DSpark verification;
+this preserves target-model quality and leaves its concurrency-dependent
+performance impact to the benchmark matrix. The failure receipt is
+`runs/launch-f3de2589ce25-adaptive-verification.json`.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its
