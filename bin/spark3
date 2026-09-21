@@ -665,6 +665,46 @@ def start_memguards(cluster: dict, nodes: dict, cluster_config: str) -> None:
         print(f"{node['name']}: {result.stdout.strip()}")
 
 
+def preserve_failed_start_logs(
+    cluster: dict,
+    nodes: dict,
+    started: list[dict],
+    cluster_config: str,
+) -> Path | None:
+    """Copy complete container logs locally before rollback removes containers."""
+    if not started:
+        return None
+
+    config_path = ROOT / cluster_config
+    if config_path.parent.parent == ROOT / "experiments":
+        base = config_path.parent / "runs" / "failed-starts"
+    else:
+        base = ROOT / "results" / "private" / "failed-starts"
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    destination = base / f"{stamp}-{cluster['container']['name']}"
+    destination.mkdir(parents=True, exist_ok=False)
+
+    name = cluster["container"]["name"]
+    for node in started:
+        state = run_ssh(nodes, node, "docker", "inspect", name)
+        logs = remote_shell(
+            nodes,
+            node,
+            f"docker logs --timestamps {shlex.quote(name)} 2>&1",
+        )
+        content = (
+            f"node: {node['name']}\n"
+            f"container: {name}\n"
+            f"inspect_returncode: {state.returncode}\n"
+            "\n[docker inspect]\n"
+            f"{state.stdout}{state.stderr}"
+            "\n[docker logs]\n"
+            f"{logs.stdout}{logs.stderr}"
+        )
+        (destination / f"{node['name']}.log").write_text(content, encoding="utf-8")
+    return destination
+
+
 def restore_containers(
     cluster: dict,
     nodes: dict,
@@ -751,6 +791,15 @@ def command_cluster_start(args: argparse.Namespace) -> int:
     except (RuntimeError, KeyboardInterrupt) as error:
         detail = str(error) if str(error) else "cluster start interrupted"
         print(f"ERROR: {detail}", file=sys.stderr)
+        log_directory = preserve_failed_start_logs(
+            cluster, nodes, started, config_relative
+        )
+        if log_directory is not None:
+            print(
+                f"preserved complete failed-start logs in "
+                f"{log_directory.relative_to(ROOT)}",
+                file=sys.stderr,
+            )
         print("rolling back containers started by this command", file=sys.stderr)
         restore_containers(cluster, nodes, backups, started)
         if backups:
