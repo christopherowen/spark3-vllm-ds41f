@@ -1,5 +1,5 @@
 {
-  "status": "native-mxfp8-metadata-image-qualified-pending-distribution",
+  "status": "native-mxfp8-metadata-image-distributed-pending-launch",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -55,7 +55,8 @@
     "native_mxfp8_metadata_resolution": "extended the descriptor-only dtype map with PyTorch's native float8_e8m0fnu without reading or converting payloads; a real safetensors-header regression and all 20 focused loader and DS4.1 tests pass on GB10",
     "native_mxfp8_metadata_image": "sha256:df249c44bfd5c4ff6fbf91e1de15b747558c10e5fbad4e084bc4bab5466f7c32 has exact deterministic source labels and passes all 20 focused loader/DS4.1 tests, the ModelOpt MXFP8 transform regression, and all 8 disk Engram tests with production capabilities",
     "first_native_mxfp8_metadata_build": "image sha256:2326847a0a02d30199a08dda122e5f018c4da8050b4397a999b45d15c36d5422 was rejected before distribution because its OCI source labels retained the preceding patch heads and vLLM tree",
-    "provenance_label_resolution": "the locked build script now passes every verified base, patch head, and tree; Dockerfile source-identity defaults are unrecorded rather than stale"
+    "provenance_label_resolution": "the locked build script now passes every verified base, patch head, and tree; Dockerfile source-identity defaults are unrecorded rather than stale",
+    "native_mxfp8_metadata_image_distribution": "identical image ID and source labels verified on every rank after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 94 seconds"
   },
   "summary": {
     "ttft_seconds": null,
@@ -105,7 +106,7 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "native-mxfp8-metadata-image-qualified-pending-distribution-and-serving-gates",
+    "status": "native-mxfp8-metadata-image-distributed-pending-serving-gates",
     "remaining_gates": [
       "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"

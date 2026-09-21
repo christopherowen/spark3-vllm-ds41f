@@ -21,10 +21,16 @@
     "rollback_state": "promoted containers remain stopped and present on all three nodes; failed candidate containers were removed"
   },
   "distribution": {
-    "status": "pending"
+    "source": "dgx3",
+    "targets": {
+      "dgx1": "192.168.2.1",
+      "dgx2": "192.168.4.1 via dgx2-internal"
+    },
+    "method": "two parallel uncompressed docker save/load streams over both ConnectX-7 internal rails",
+    "wall_clock_seconds": 94,
+    "status": "complete; exact image ID and all source labels verified on all three ranks"
   },
   "remaining": [
-    "exact image distribution to dgx1 and dgx2",
     "full three-rank model load and selected-kernel JIT qualification",
     "deterministic native-weight output parity",
     "4x128K capacity and normal 8-way Strix workload",
