@@ -87,7 +87,8 @@
     "startup_physical_headroom_observation": "NVIDIA driver allocation warnings and approximately 1.4-2.5 GiB minimum MemAvailable show real pressure, but persistent logs prove the causal exception was the RoCEnante sequence-1 timeout; the ineffective 110/116 GiB cgroup experiment was reverted",
     "rocenante_priming_rendezvous_resolution": "patch 0020 synchronizes all ranks on the existing CPU process group after each local plan is materialized and immediately before its first real collective",
     "rocenante_priming_rendezvous_tests": "all 16 focused RoCEnante tests pass on GB10; the new regression proves materialization precedes the barrier and every priming collective follows it; Ruff and format checks pass",
-    "rocenante_priming_rendezvous_image": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f has exact deterministic source labels and passes 76 focused vLLM tests, 8 production-capability disk Engram tests, both selected real MXFP4 numerical modes, four multi-capacity/CUDA-graph cases, and immutable-image Ruff and format gates on GB10"
+    "rocenante_priming_rendezvous_image": "sha256:bfed12063fa09467733b58e3d131330f432f65221e7f051b9052949cab871d8f has exact deterministic source labels and passes 76 focused vLLM tests, 8 production-capability disk Engram tests, both selected real MXFP4 numerical modes, four multi-capacity/CUDA-graph cases, and immutable-image Ruff and format gates on GB10",
+    "rocenante_priming_rendezvous_image_distribution": "exact image ID, source labels, and deployment checkout verified on dgx1, dgx2, and dgx3 after two concurrent uncompressed Docker streams used both ConnectX-7 internal rails in 136 seconds"
   },
   "summary": {
     "ttft_seconds": null,
