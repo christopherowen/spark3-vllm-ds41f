@@ -123,6 +123,16 @@ checkpoint name and verifies the unchanged file descriptor through the outer
 mapper, inner loader, backbone, and Engram leaf. The exact failure is recorded
 in `runs/launch-ad8a2eb74d80-outer-vl-engram-filter.json`.
 
+The outer-filter-corrected image then preserved the disk Engram selection and
+entered the generic file-backed metadata reader. That reader was introduced by
+this rebase series and reused safetensors' Python torch dtype table, which can
+trail native PyTorch support and did not contain the checkpoint's `F8_E8M0`
+MXFP8 scale dtype. Patch 0014 extends only the descriptor dtype map with
+PyTorch's native `float8_e8m0fnu`; tensor payloads remain lazy and numerical
+values are unchanged. A real-header regression and all 20 focused loader and
+DS4.1 tests pass on GB10. The exact failure is recorded in
+`runs/launch-f829b45a514d-mxfp8-metadata.json`.
+
 See [carry-matrix.md](carry-matrix.md) for the complete disposition.
 [donor-analysis.md](donor-analysis.md) pins the latest known downstream R38
 implementation and records how the missing behavior was negative-ported
@@ -187,8 +197,9 @@ passed on GB10, and full model loading then exposed its missing composition
 with ModelOpt's scale transform. Patch 0011 and the exact 160-to-5120 MXFP8
 scale regression pass on GB10. Patch 0012 then restores the omitted disk-Engram
 parent-to-leaf handoff. Patch 0013 restores the preceding outer VL filter
-delegation, and the full raw-checkpoint-name-to-leaf regression plus all 19
-focused DS4.1 tests pass on GB10. The candidate is not promotable until full
+delegation. Patch 0014 closes the file-descriptor dtype gap for native MXFP8
+scales, and the real-header regression plus all 20 focused tests pass on GB10.
+The candidate is not promotable until full
 three-rank model-load, quality, capacity, and performance gates pass.
 
 ## Quality and safety gates

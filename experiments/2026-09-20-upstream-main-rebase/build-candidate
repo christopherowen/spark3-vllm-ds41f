@@ -10,10 +10,10 @@ case "$mode" in
   *) echo "usage: $0 [build|check]" >&2; exit 2 ;;
 esac
 
-vllm_tree=d2ca0cf2e6f5fbd79bf14b7158a1fd0452384966
+vllm_tree=12b57e435cfd155e0edd7cec5ca3ad2505cc3170
 b12x_tree=a1523b067b4df679f9aa23d543fa324dc00770f0
-vllm_head=a3964182327ec2b9a06146f1f2a49f1dd942eb51
-b12x_head=8099cee92c78dd2472749ca8003053ee73be908d
+vllm_head=8a6eb0cc6f904c15326a2337dc90bd50f041f7c2
+b12x_head=c90ba030f2ab4a17959afd05461449ca47259242
 
 for project in vllm b12x; do
   source_path="$source_root/$project"
@@ -28,6 +28,16 @@ done
 
 actual_vllm_tree=$(git -C "$source_root/vllm" rev-parse HEAD^{tree})
 actual_b12x_tree=$(git -C "$source_root/b12x" rev-parse HEAD^{tree})
+actual_vllm_head=$(git -C "$source_root/vllm" rev-parse HEAD)
+actual_b12x_head=$(git -C "$source_root/b12x" rev-parse HEAD)
+if [ "$actual_vllm_head" != "$vllm_head" ]; then
+  echo "vLLM revision mismatch: expected $vllm_head, got $actual_vllm_head" >&2
+  exit 1
+fi
+if [ "$actual_b12x_head" != "$b12x_head" ]; then
+  echo "B12X revision mismatch: expected $b12x_head, got $actual_b12x_head" >&2
+  exit 1
+fi
 if [ "$actual_vllm_tree" != "$vllm_tree" ]; then
   echo "vLLM tree mismatch: expected $vllm_tree, got $actual_vllm_tree" >&2
   exit 1

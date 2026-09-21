@@ -10,18 +10,19 @@
         "277171c959846de8870732e96d23276575e88ae5",
         "fa075bc82948914cb778a33822eea3a5d537202d",
         "d6b40631cad4bf406f25093f56436f2b8ef10800",
-        "8a82c50a6a3147ed14adb15a90bc7cb4322c0829",
-        "7ace024dfddb0dbeed47bb9ac9f0a2a5fc20f177",
-        "38d69a82fdd0ea76f8a92c15476bba8cc74184f4",
-        "0fe6eed4b7b3a8bcc807d56cdd8a24021d13ea68",
-        "e08ab6356e93f9cfc2087683b441c52997b5300e",
-        "0ede60db3a362f7679419e40bfb3c94756e92ee7",
-        "18088aecd7bd1173217d9db31d0924f8c4beb832",
-        "164c5d5bde7869bff5f2004f01f9f8e432d63d59",
-        "d878afb20dc3aa1d8f68a3a2ed94d1158520cc1a",
-        "a3964182327ec2b9a06146f1f2a49f1dd942eb51"
+        "98ff313483b85e4822d9c93731dc3d9d66afbf8d",
+        "11d940764a17450c2e5fe7a3493f42a62ea255b4",
+        "909dd323f34c6cb88e04419200ea797743059f43",
+        "4937a5f67054938ba7a963ec7fa4b054c71d94a9",
+        "1c76cbcf304e2f3e1f40dba791512b0f816d714e",
+        "fc7ae00648e5a74e897cfd20b570ca13f2a79337",
+        "1423ee920ab0b8b8720a704dddc40eee0aaf6824",
+        "097d4f4ac7d2b23bc14fc407af848764e6b96594",
+        "4ffca3bc73ecac8c2405ada835ccda4d7e6a2707",
+        "161c3c6eaf2f98ec258664d18493fc35f136ebf9",
+        "8a6eb0cc6f904c15326a2337dc90bd50f041f7c2"
       ],
-      "source_tree": "d2ca0cf2e6f5fbd79bf14b7158a1fd0452384966",
+      "source_tree": "12b57e435cfd155e0edd7cec5ca3ad2505cc3170",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -36,7 +37,8 @@
         "patches/vllm/0010-fix-deepseek-v41-materialize-lazy-virtual-head-group.patch",
         "patches/vllm/0011-fix-deepseek-v41-compose-virtual-heads-with-weight-l.patch",
         "patches/vllm/0012-fix-deepseek-v41-route-disk-Engram-descriptors-to-le.patch",
-        "patches/vllm/0013-fix-deepseek-v41-expose-disk-Engram-filter-through-V.patch"
+        "patches/vllm/0013-fix-deepseek-v41-expose-disk-Engram-filter-through-V.patch",
+        "patches/vllm/0014-fix-loader-support-native-MXFP8-scale-metadata.patch"
       ]
     },
     {
@@ -47,7 +49,7 @@
         "348145ea8b6adaea7c32b1b87898ff59b5d43380",
         "803d7d795d05be3902a30e82743a817a2c26d53f",
         "de8e7fa971eb7ae4c21e634a8931407a0b404568",
-        "8099cee92c78dd2472749ca8003053ee73be908d"
+        "c90ba030f2ab4a17959afd05461449ca47259242"
       ],
       "source_tree": "a1523b067b4df679f9aa23d543fa324dc00770f0",
       "branch": "spark3/ds41f-tp3",
@@ -64,10 +66,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:f829b45a514d273cc16980723fe796503f1339a86c70b946cab805082ea6cd47",
-  "deployment_status": "outer VL file-backed Engram selection image distributed with exact identity on all ranks; pending full-model-load retry; promoted rollback retained",
+  "image_digest": null,
+  "deployment_status": "native MXFP8 metadata correction source-qualified and pending immutable image build; promoted rollback retained",
   "integration_status": {
-    "status": "the real outer VL model preserves raw disk Engram ranges through both mappers and the parent loader to their leaf owner; full outer-to-leaf regression and all 19 focused tests passed on GB10",
+    "status": "the complete outer-to-leaf disk Engram route and native MXFP8 file metadata are covered together; all 20 focused tests pass on GB10 with the corrected module",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

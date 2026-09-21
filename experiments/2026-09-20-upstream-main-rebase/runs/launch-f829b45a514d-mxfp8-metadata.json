@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "failed-before-file-backed-mxfp8-descriptor-construction",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:a3964182327e-8099cee92c78-d8edca73be629",
+    "id": "sha256:f829b45a514d273cc16980723fe796503f1339a86c70b946cab805082ea6cd47",
+    "source_revision": "8edca73be629b10704534c14614f3ffd0fe21b4c",
+    "launch_revision": "dbb7606736fa50d49a780165d1a87ff3436517fd"
+  },
+  "progress": [
+    "passed startup admission and all earlier model construction boundaries",
+    "initialized NCCL 2.30.7 and RoCEnante on all three ranks",
+    "selected the intended DS4.1 native kernels and disk Engram path",
+    "preserved raw disk Engram selection through the outer VL wrapper",
+    "entered the generic file-backed safetensors metadata reader"
+  ],
+  "failure": {
+    "file": "vllm/model_executor/model_loader/weight_utils.py",
+    "operation": "safetensors_file_sources(path)",
+    "message": "KeyError: 'F8_E8M0'",
+    "cause": "the rebase-introduced file-backed descriptor helper reused safetensors' Python torch dtype table, which omitted the native MXFP8 scale dtype supported by the installed PyTorch",
+    "oom": false
+  },
+  "resolution": {
+    "commit": "8a6eb0cc6f904c15326a2337dc90bd50f041f7c2",
+    "source_tree": "12b57e435cfd155e0edd7cec5ca3ad2505cc3170",
+    "behavior": "extend only the descriptor dtype map with torch.float8_e8m0fnu; retain immutable file offsets, native shape, and lazy payload loading",
+    "validation": "a real F8_E8M0 safetensors-header regression and all 20 focused file-backed-loader and DS4.1 tests passed on GB10; Ruff and format checks passed",
+    "quality_change": "none"
+  },
+  "rollback": "failed candidate containers were automatically removed; stopped promoted containers remain present on all three nodes"
+}

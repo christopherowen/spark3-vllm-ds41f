@@ -1,0 +1,88 @@
+From b995f48e5e234eef43f8f735787a0942aa073010 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Mon, 21 Sep 2026 02:10:47 +0200
+Subject: [PATCH] fix(loader): support native MXFP8 scale metadata
+
+---
+ .../test_file_backed_weight_utils.py          | 42 +++++++++++++++++++
+ .../model_loader/weight_utils.py              |  8 +++-
+ 2 files changed, 49 insertions(+), 1 deletion(-)
+ create mode 100644 tests/model_executor/model_loader/test_file_backed_weight_utils.py
+
+diff --git a/tests/model_executor/model_loader/test_file_backed_weight_utils.py b/tests/model_executor/model_loader/test_file_backed_weight_utils.py
+new file mode 100644
+index 0000000000..76627576ea
+--- /dev/null
++++ b/tests/model_executor/model_loader/test_file_backed_weight_utils.py
+@@ -0,0 +1,42 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++import json
++
++import pytest
++import torch
++
++from vllm.model_executor.model_loader.weight_utils import safetensors_file_sources
++
++pytestmark = pytest.mark.cpu_test
++
++
++def _write_safetensors(path, header, payload: bytes) -> None:
++    encoded = json.dumps(header, separators=(",", ":")).encode()
++    encoded += b" " * (-len(encoded) % 8)
++    path.write_bytes(len(encoded).to_bytes(8, "little") + encoded + payload)
++
++
++@pytest.mark.skipif(
++    not hasattr(torch, "float8_e8m0fnu"), reason="PyTorch lacks MXFP8 scale dtype"
++)
++def test_file_sources_support_native_mxfp8_scale_dtype(tmp_path):
++    path = tmp_path / "mxfp8-scale.safetensors"
++    _write_safetensors(
++        path,
++        {
++            "weight_scale_inv": {
++                "dtype": "F8_E8M0",
++                "shape": [2],
++                "data_offsets": [0, 2],
++            }
++        },
++        b"\x00\x00",
++    )
++
++    source = safetensors_file_sources(str(path))["weight_scale_inv"]
++
++    assert source.path == str(path)
++    assert source.shape == (2,)
++    assert source.dtype is torch.float8_e8m0fnu
++    assert source.offset == 8 + int.from_bytes(path.read_bytes()[:8], "little")
+diff --git a/vllm/model_executor/model_loader/weight_utils.py b/vllm/model_executor/model_loader/weight_utils.py
+index ae02b23f8e..9fad7c7d1d 100644
+--- a/vllm/model_executor/model_loader/weight_utils.py
++++ b/vllm/model_executor/model_loader/weight_utils.py
+@@ -68,6 +68,12 @@ except ImportError:
+ 
+ from vllm.model_executor.layers.quantization.torchao import torchao_version_at_least
+ 
++_FILE_BACKED_SAFETENSORS_DTYPES = dict(_SAFETENSORS_TO_TORCH_DTYPE)
++if (float8_e8m0fnu := getattr(torch, "float8_e8m0fnu", None)) is not None:
++    # safetensors recognizes this native MXFP8 scale dtype, but its Python
++    # torch dtype table can trail PyTorch's dtype support.
++    _FILE_BACKED_SAFETENSORS_DTYPES["F8_E8M0"] = float8_e8m0fnu
++
+ logger = init_logger(__name__)
+ 
+ # use system-level temp directory for file locks, so that multiple users
+@@ -956,7 +962,7 @@ def safetensors_file_sources(path: str) -> dict[str, FileTensorSource]:
+             path=path,
+             offset=8 + length + entry["data_offsets"][0],
+             shape=tuple(entry["shape"]),
+-            dtype=_SAFETENSORS_TO_TORCH_DTYPE[entry["dtype"]],
++            dtype=_FILE_BACKED_SAFETENSORS_DTYPES[entry["dtype"]],
+         )
+         for name, entry in header.items()
+         if name != "__metadata__"
+-- 
+2.54.0 (Apple Git-157)
+
