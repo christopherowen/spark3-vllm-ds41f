@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "status": "passed-immutable-model-free-qualification",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:6964357a771a-b69feee3022c-d441d0486e246",
+    "id": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
+    "deployment_revision": "441d0486e2460fa50cd4e061e0a396719a6ffcaf",
+    "vllm_patch_head": "6964357a771af30c341a008813ca7bba8810b2e4",
+    "vllm_tree": "f7e10aa21545cf60f41d72a2d39a8b0913efcdf2",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "safety": {
+    "model_loaded": false,
+    "serving_container_started": false,
+    "test_memory_limit_gib": 32,
+    "test_memory_swap_limit_gib": 32,
+    "test_container_removed": true,
+    "running_containers_per_node_after_validation": 0,
+    "swap_used_bytes_after_validation": {
+      "dgx1": 0,
+      "dgx2": 0,
+      "dgx3": 0
+    },
+    "available_memory_bytes_after_validation": {
+      "dgx1": 119530577920,
+      "dgx2": 124882026496,
+      "dgx3": 120028016640
+    }
+  },
+  "checks": {
+    "source_replay": "twenty-two vLLM and five B12X patches reproduced the recorded revisions and Git trees from exact upstream bases",
+    "build_imports": "candidate source, B12X loader, sparse MLA, RoCEnante, disk Engram, CUTLASS DSL 4.7.1, liburing, and NCCL 2.30.7 gates passed",
+    "focused_vllm": "55 passed from the immutable image: shared JIT registry, router ownership, FlashInfer capability registration, exact B12X page geometry, and DeepSeek indexer warmup specialization",
+    "image_labels": "deployment revision, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "image_distribution": "dgx1, dgx2, and dgx3 report the same sha256 image ID after uncompressed transfers over dgx1's ConnectX-7 links",
+    "cleanup": "the exact model-free test container was removed and no serving or auxiliary container was started"
+  },
+  "remaining": [
+    "full three-rank DS4.1 target and DSpark load with selected warmup-key counts",
+    "native-weight output parity",
+    "4x128K capacity and normal 8-way Strix workload",
+    "TTFT, decode TPS, aggregate TPS, and retained-memory comparison before promotion"
+  ]
+}

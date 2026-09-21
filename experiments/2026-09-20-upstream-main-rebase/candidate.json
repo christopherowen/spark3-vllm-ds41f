@@ -95,19 +95,19 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
-  "last_qualified_image_digest": "sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993",
+  "image_digest": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
+  "last_qualified_image_digest": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0022 source is replay- and model-free-test-qualified but has not been built or deployed; the stopped patch-0021 image remains the last immutable candidate",
+  "deployment_status": "the patch-0022 immutable image is byte-identical on all three nodes and passes bounded model-free qualification; it has not replaced or started the stopped patch-0021 service",
   "integration_status": {
-    "status": "patch 0022 changes warmup ownership only and retains the patch-0021 transport implementation; a new image plus three-rank runtime qualification remain required",
+    "status": "the patch-0022 image changes warmup ownership only and retains the patch-0021 transport implementation; full three-rank runtime qualification remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "source-qualified-pending-image-and-tp3",
+    "status": "image-and-model-free-qualified-pending-tp3",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

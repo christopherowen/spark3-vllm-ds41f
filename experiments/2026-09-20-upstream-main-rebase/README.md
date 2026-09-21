@@ -384,6 +384,16 @@ run passed all 55 focused registration and geometry tests. This source revision
 is prepared for a new immutable image; it has not replaced or restarted the
 stopped patch-0021 candidate.
 
+The resulting immutable image is
+`sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df`.
+Its OCI labels exactly match deployment revision `441d0486e246`, vLLM head
+`6964357a771a` and tree `f7e10aa21545`, and the retained B12X identities. The
+same 55 focused tests pass from the image itself under a 32 GiB memory cap. It
+has been copied uncompressed over dgx1's ConnectX-7 links, and all three nodes
+report the same image ID with zero swap use and no running containers. The
+validation receipt is `runs/build-0be891cb05b7-validation.json`. Full TP3 model
+load and selected-key evidence remain required before promotion.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its
