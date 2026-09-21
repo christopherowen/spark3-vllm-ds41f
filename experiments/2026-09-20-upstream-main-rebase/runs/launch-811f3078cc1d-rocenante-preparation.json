@@ -25,7 +25,7 @@
     "commit": "96dc80400edf18ca97ad40d99ddb7ac620af3c33",
     "source_tree": "7d63914525c57f0d40f67cdb4787d3800c7b2e98",
     "behavior": "make RoCEnante explicitly pre-profile eligible and include distributed pre-profile providers while preserving structural exclusion for ordinary post-cache providers",
-    "validation": "focused collector and adapter regressions added; exact target-image tests remain required",
+    "validation": "25 focused collector and RoCEnante adapter tests pass on the GB10 stack, including explicit distributed pre-profile eligibility and ordinary-provider exclusion; Ruff and format checks pass; immutable-image qualification remains required",
     "quality_change": "none"
   },
   "rollback": "failed candidate residues were removed; stopped promoted containers remain present on all three nodes"
