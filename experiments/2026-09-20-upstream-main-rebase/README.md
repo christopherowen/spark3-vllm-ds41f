@@ -394,6 +394,18 @@ report the same image ID with zero swap use and no running containers. The
 validation receipt is `runs/build-0be891cb05b7-validation.json`. Full TP3 model
 load and selected-key evidence remain required before promotion.
 
+The cold TP3 qualification rejected that image. All ranks loaded the native
+target plus DSpark weights at 98.1 GiB and prepared the selected B12X plans,
+then the model-owned JIT registry compiled 37 DeepSeek V4.1 indexer kernels
+with only 1.38--1.57 GiB host headroom. The same 301 Triton cache files and
+content digest appeared on every rank at the NVIDIA `NV_ERR_NO_MEMORY`
+timestamp, followed by host recovery reboots. Patch 0022 therefore identifies
+the right kernels but compiles them in the wrong memory phase. It is not
+promotable; the next candidate must prime those configuration-derived kernels
+before weight residency and treat any resident-model cache miss as a failure.
+The evidence is recorded in
+`runs/launch-0be891cb05b7-indexer-jit-memory.json`.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "candidate_image": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
+  "deployment_commit": "0a0656e685bc55f2ab0fa2356368fea5da04bd76",
+  "outcome": "rejected: the cold TP3 launch loaded the native target and draft weights, then exhausted unified-memory headroom while compiling the selected DeepSeek V4.1 indexer JIT keys; all three hosts recovered by reboot and the candidate was not promoted",
+  "service_scope": "only the three ranks of the single TP3 inference service were started; no Strix, auxiliary, reranking, scanner, or workload-worker container was running",
+  "last_completed_stages": [
+    "all ranks formed NCCL 2.30.7 and selected RoCEnante for eligible TP collectives",
+    "all ranks selected B12X MXFP8 linear, MXFP4 MoE, and sparse-MLA paths",
+    "target plus DSpark loading reported 98.1 GiB per rank",
+    "all ranks prepared 226 B12X MXFP8 plans, 43 B12X MoE plans, and one RoCEnante plan before memory profiling"
+  ],
+  "memory_observations": {
+    "minimum_observed_memavailable_gib": {
+      "dgx1": 1.45,
+      "dgx2": 1.38,
+      "dgx3": 1.57
+    },
+    "container_memory_near_failure_gib": {
+      "dgx1": 100.2,
+      "dgx2": 99.84,
+      "dgx3": 99.93
+    },
+    "host_used_memory_near_failure_gib": {
+      "dgx1": 120.24,
+      "dgx2": 120.31,
+      "dgx3": 120.12
+    },
+    "interpretation": "the approximately 98.1 GiB model and 99.8 GiB container accounting do not include all driver, RDMA, host, compiler, and unified-memory residency; the Docker 112 GiB cgroup therefore did not preserve usable NVIDIA-driver headroom"
+  },
+  "jit_cache_evidence": {
+    "window": "2026-09-21 21:52:20 through 21:52:30 CEST",
+    "files_created_per_rank": 301,
+    "compiled_kernel_groups_per_rank": 37,
+    "source_groups": {
+      "vllm/v1/attention/backends/mla/indexer.py:397": 36,
+      "vllm/v1/attention/backends/mla/indexer.py:91": 1
+    },
+    "cross_rank_content_digest": "98aa77e4ed5a00c8ff72cbb72c0a2d1aafaf4ba831230cc5065c3327ea1aba3a",
+    "result": "patch 0022 selected model-owned kernels correctly, but their compilation still occurred after weight and plan residency"
+  },
+  "driver_evidence": {
+    "dgx1": {
+      "nv_err_no_memory_events": 185,
+      "first": "2026-09-21 21:51:07 CEST",
+      "last": "2026-09-21 21:52:37 CEST"
+    },
+    "dgx2": {
+      "nv_err_no_memory_events": 35,
+      "first": "2026-09-21 21:52:25 CEST",
+      "last": "2026-09-21 21:52:43 CEST"
+    },
+    "dgx3": {
+      "nv_err_no_memory_events": 57,
+      "first": "2026-09-21 21:49:59 CEST",
+      "last": "2026-09-21 21:52:43 CEST"
+    },
+    "message": "NVRM NV_ERR_NO_MEMORY from _memdescAllocInternal"
+  },
+  "additional_gap": "both selected disk-Engram query plans warned that they were prepared on first use rather than by the explicit startup preparation phase",
+  "recovery": {
+    "dgx1_boot": "2026-09-21 21:55:10 CEST",
+    "dgx2_boot": "2026-09-21 22:00:15 CEST",
+    "dgx3_boot": "2026-09-21 21:55:34 CEST",
+    "post_recovery": "all nodes reachable with approximately 116 GiB MemAvailable, zero swap use, and zero running containers"
+  },
+  "conclusion": "do not promote patch 0022. Preserve its model/backend registration, but compile the 37 configuration-derived indexer keys in a GPU-backed, content-addressed cache-priming stage before loading weights. Separately account for retained B12X plans and register the selected Engram queries. A subsequent launch must prove zero cold indexer compilations and no driver allocation failures before quality or performance benchmarking."
+}

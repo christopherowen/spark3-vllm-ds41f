@@ -1,5 +1,5 @@
 {
-  "status": "rocenante-switchless-stripe-layout-image-qualified-pending-tp3-runtime",
+  "status": "patch-0022-rejected-cold-start-indexer-jit-memory",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -94,7 +94,11 @@
     "rocenante_stripe_layout_cause": "the switchless ring opens four local HCA functions but routes two stripes per peer; prepared query metadata incorrectly compiled a four-lane GPU flag layout while the C proxy correctly wrote the two routed lanes",
     "rocenante_stripe_layout_resolution": "B12X commit b69feee3022c keys prepared all-reduce and all-gather flag geometry by runtime.stripe_count while retaining all opened HCA functions for peer routing",
     "rocenante_stripe_layout_probe": "the fixed prepared-plan path primes three reductions and one gather, then matches NCCL at 16 B, 4 KiB, 256 KiB, and 1 MiB on every rank with balanced completions across all four local HCA functions",
-    "rocenante_stripe_layout_image": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1 has exact deterministic source labels and passes 118 focused vLLM tests, 8 B12X RoCEnante topology/layout tests, 8 production-capability disk Engram tests, both selected real MXFP4 numerical modes, and four multi-capacity/CUDA-graph cases"
+    "rocenante_stripe_layout_image": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1 has exact deterministic source labels and passes 118 focused vLLM tests, 8 B12X RoCEnante topology/layout tests, 8 production-capability disk Engram tests, both selected real MXFP4 numerical modes, and four multi-capacity/CUDA-graph cases",
+    "model_owned_warmup_image": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df is byte-identical across all ranks and passes 55 model-free registration tests but is rejected for cold TP3 startup",
+    "eighteenth_full_launch": "loaded target plus DSpark at 98.1 GiB per rank and prepared 226 MXFP8, 43 MoE, and one RoCEnante plan; MemAvailable fell to 1.38-1.57 GiB, then 37 selected indexer Triton groups compiled and coincident NVIDIA NV_ERR_NO_MEMORY failures caused all three hosts to recover by reboot",
+    "indexer_jit_cache_evidence": "each rank created the same 301 cache files for 36 prefill-indexer and one uniform-decode kernel group with content digest 98aa77e4ed5a00c8ff72cbb72c0a2d1aafaf4ba831230cc5065c3327ea1aba3a",
+    "model_owned_warmup_conclusion": "model/backend registration fixed ownership but not phase ordering; prime the selected indexer cache before weight residency and fail closed on resident-model cache misses; explicitly prepare selected disk-Engram queries"
   },
   "summary": {
     "ttft_seconds": null,
@@ -144,9 +148,10 @@
     "confidence": "static source accounting only; requires model-load confirmation before it is a result"
   },
   "integration_gate": {
-    "status": "rocenante-switchless-stripe-layout-image-qualified-pending-serving-gates",
+    "status": "rejected-cold-start-pending-pre-weight-jit-priming",
     "remaining_gates": [
-      "load the complete model across all three ranks and compile every selected B12X kernel with CUTLASS DSL 4.7.1 on SM121",
+      "compile the 37 selected DS4.1 indexer Triton groups into a content-addressed SM121 cache before loading weights and prove zero resident-model cache misses",
+      "load the complete model across all three ranks without NVIDIA driver allocation failures and explicitly prepare the two selected disk-Engram queries",
       "prove DS4.1 output parity, CUDA graph replay, RoCEnante dispatch, capacity, memory, and benchmark performance"
     ],
     "candidate_behavior": "upstream DS4.1 semantics with B12X sparse MLA, coherent ordinary-weight loading, and native Engram rows staged from disk; eligible small TP collectives use RoCEnante and larger collectives use NCCL",

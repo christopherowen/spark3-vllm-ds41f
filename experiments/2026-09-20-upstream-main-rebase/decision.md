@@ -1,6 +1,21 @@
 # Decision
 
-Status: **RoCEnante stripe-layout fix proven; immutable image qualification required**
+Status: **Patch 0022 rejected for cold-start memory; pre-weight JIT priming required**
+
+The patch-0022 immutable image completed native target and DSpark loading at
+98.1 GiB per rank and prepared the selected B12X weight and transport plans,
+but it is not promotable. With only 1.38--1.57 GiB host memory still available,
+the shared JIT warmup compiled 37 registered DeepSeek V4.1 indexer kernels.
+Each rank created the same 301 Triton cache files at the timestamp of the
+NVIDIA `NV_ERR_NO_MEMORY` wave. All three hosts subsequently recovered by
+reboot; no service or ancillary worker remains running.
+
+Patch 0022 therefore solved kernel ownership but not startup phase ordering.
+The next candidate must compile these configuration-derived SM121 kernels into
+a content-addressed cache before loading weights, fail closed on an unexpected
+cache miss during the resident-model launch, and explicitly prepare the two
+selected disk-Engram queries. The exact evidence is in
+`runs/launch-0be891cb05b7-indexer-jit-memory.json`.
 
 The source rebase is prepared and every local change is separated into a
 reviewable commit. Static checks pass. The native DS4.1 model now reaches B12X

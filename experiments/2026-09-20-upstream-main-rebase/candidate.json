@@ -96,18 +96,18 @@
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
   "image_digest": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
-  "last_qualified_image_digest": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
+  "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "the patch-0022 immutable image is byte-identical on all three nodes and passes bounded model-free qualification; it has not replaced or started the stopped patch-0021 service",
+  "deployment_status": "the patch-0022 immutable image passed bounded model-free qualification but failed cold TP3 startup with NVIDIA driver allocation failures during selected DS4.1 indexer JIT compilation; all candidate containers are stopped and all three recovered hosts are idle",
   "integration_status": {
-    "status": "the patch-0022 image changes warmup ownership only and retains the patch-0021 transport implementation; full three-rank runtime qualification remains required",
+    "status": "rejected for cold startup: model/backend registration selected the correct 37 DS4.1 indexer kernels, but compilation still ran after 98.1 GiB weight and B12X-plan residency; a pre-weight cache-priming phase and explicit Engram preparation are required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "image-and-model-free-qualified-pending-tp3",
+    "status": "rejected-cold-tp3-indexer-jit-memory",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
