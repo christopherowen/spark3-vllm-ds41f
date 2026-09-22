@@ -100,6 +100,9 @@ def _install() -> None:
 
 
 _install()
-if len(sys.argv) < 2 or sys.argv[1] != "serve":
-    sys.argv.insert(1, "serve")
-runpy.run_module("vllm.entrypoints.cli.main", run_name="__main__")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] != "serve":
+        sys.argv.insert(1, "serve")
+    runpy.run_module("vllm.entrypoints.cli.main", run_name="__main__")
