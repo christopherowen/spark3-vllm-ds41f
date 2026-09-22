@@ -117,7 +117,7 @@
   "image_digest": null,
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0024 is source-replay ready but unbuilt; launch is locked after guarded TP3 startup isolated the missing native 24-head fused-kernel instantiation, while the promoted configuration remains locked",
+  "deployment_status": "patch 0024 is source-replay ready but unbuilt; the image recipe now rebuilds only vLLM's stable CUDA extension for SM121 and verifies its 24-head dispatcher, while both candidate and promoted launches remain locked",
   "integration_status": {
     "status": "source-replay candidate: patch 0024 adds the exact native 24-head fused DeepSeek V4 QNorm/RoPE instantiation required by quality-preserving TP3 padding and its kernel regression; immutable image build, native test, and guarded cold/warm TP3 startup remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",

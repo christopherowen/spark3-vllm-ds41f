@@ -510,6 +510,13 @@ build, native regression, and model-free qualification complete. That image
 will receive a new cold-cache namespace; the complete 925-file patch-0023 cache
 is evidence, not an input to the patch-0024 cold test.
 
+Because the official base image provides precompiled vLLM native extensions,
+the candidate image now rebuilds only `_C_stable_libtorch` from the recorded
+patched source for SM121. The build stage is bounded to two compile jobs and one
+NVCC thread, installs only that component into the source overlay, and rejects
+the image unless the resulting binary contains the 24-head dispatcher. All
+other native libraries continue to come byte-for-byte from the pinned base.
+
 The startup pair is ordered and fail-closed:
 
 1. prove the qualification cache path is absent on all three nodes;
