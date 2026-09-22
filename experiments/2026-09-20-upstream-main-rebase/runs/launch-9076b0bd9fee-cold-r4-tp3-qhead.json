@@ -1,0 +1,78 @@
+{
+  "date": "2026-09-22",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:c6d531aa609f-b69feee3022c-d397d35a4e051",
+    "id": "sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3"
+  },
+  "cache_namespace": "/cache/qualification/patch0023-9076b0bd9fee-r4/jit",
+  "startup_protection": {
+    "container_memory_gib": 108,
+    "mem_available_guard_gib": 5,
+    "sample_interval_seconds": 0.1,
+    "cuda_graphs": "disabled"
+  },
+  "result": "deterministic_tp3_kernel_coverage_failure",
+  "observations": {
+    "pre_weight_jit_seconds": {
+      "dgx1": 33.27,
+      "dgx2": 33.72,
+      "dgx3": 32.35
+    },
+    "model_loading": {
+      "memory_gib_per_rank": 98.1,
+      "seconds": {
+        "dgx1": 124.876767,
+        "dgx2": 126.174056,
+        "dgx3": 115.743834
+      }
+    },
+    "prepared_b12x_plans_per_rank": {
+      "mxfp8": 226,
+      "moe": 43,
+      "rocenante_collectives": 1
+    },
+    "kv_cache": {
+      "memory_gib": 3.0,
+      "tokens": 1353553,
+      "maximum_160k_concurrency": 8.46,
+      "dynamic_memory_profiling_skipped": true
+    },
+    "model_selected_indexer_jit_completed": true,
+    "failure": {
+      "operation": "fused_deepseek_v4_qnorm_rope_kv_rope_quant_insert",
+      "num_heads_q_padded": 24,
+      "compiled_instantiations": [0, 8, 16, 32, 64, 128],
+      "head_exit_code": 1,
+      "oom_killed": false
+    },
+    "telemetry_minimum_mem_available_kib": {
+      "dgx1": 5961904,
+      "dgx2": 7077780,
+      "dgx3": 6745284
+    },
+    "maximum_swap_used_kib": {
+      "dgx1": 400500,
+      "dgx2": 24,
+      "dgx3": 0
+    },
+    "nvidia_nv_err_no_memory_current_boot": false,
+    "hosts_remained_reachable": true,
+    "coordinated_rollback_completed": true
+  },
+  "cache_state": {
+    "complete_for_patch_0023": true,
+    "eligible_as_patch_0024_cold_input": false,
+    "preserved_for_evidence": true,
+    "files": {
+      "dgx1": 925,
+      "dgx2": 925,
+      "dgx3": 925
+    },
+    "bytes": {
+      "dgx1": 13930058,
+      "dgx2": 13930326,
+      "dgx3": 13929649
+    }
+  },
+  "resolution": "Compile the existing fused-kernel template for 24 padded Q heads and add the exact TP3 kernel regression. Rebuild an immutable image and repeat cold/warm qualification from a new namespace without lowering the 5 GiB guard."
+}

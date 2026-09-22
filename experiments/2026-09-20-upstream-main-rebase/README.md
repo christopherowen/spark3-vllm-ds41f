@@ -489,14 +489,26 @@ KiB available before API readiness. It was again an explicit SIGKILL with no
 cgroup OOM, NVIDIA allocation error, or host loss. That incomplete cache remains
 evidence only; the receipt is `runs/launch-9076b0bd9fee-cold-r3-guarded.json`.
 
-The fourth cold attempt uses a fresh `patch0023-9076b0bd9fee-r4` namespace and
+The fourth cold attempt used a fresh `patch0023-9076b0bd9fee-r4` namespace and
 the repository's normal 5 GiB startup reserve, sampled at the stricter 100 ms
 cadence. This still preserves approximately 3.3--4 GiB more host/driver headroom
 than the 1.01--1.72 GiB trough associated with the previous control-plane loss.
-Its cold run must begin with the namespace absent on every rank; only a cold run
-that reaches API readiness may provide the cache for the warm run. A failure at
-this threshold stops the descending qualification ladder: startup memory
-behavior must be changed before another attempt.
+It passed every memory boundary with a 5,961,904 KiB telemetry minimum on dgx1,
+allocated the full 1,353,553-token KV cache, and completed the final indexer JIT
+warmup. Profile execution then failed deterministically because upstream's fused
+DeepSeek V4 QNorm/RoPE insertion kernel omitted a compiled instantiation for the
+24 padded Q heads produced by quality-preserving TP3 virtual-head geometry. The
+container exited 1 rather than being killed; no cgroup OOM, NVIDIA allocation
+error, or host loss occurred. The receipt is
+`runs/launch-9076b0bd9fee-cold-r4-tp3-qhead.json`.
+
+Patch 0024 adds only that existing template instantiation and extends the native
+kernel matrix with the exact 24-head shape. It changes no data type, layout,
+padding, or model arithmetic and is suitable for upstream submission. The
+candidate launch is locked until a fresh deterministic replay, immutable image
+build, native regression, and model-free qualification complete. That image
+will receive a new cold-cache namespace; the complete 925-file patch-0023 cache
+is evidence, not an input to the patch-0024 cold test.
 
 The startup pair is ordered and fail-closed:
 

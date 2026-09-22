@@ -55,9 +55,10 @@
         "62605500d1997ff302540d6505e26c5caba76031",
         "9de03517c6be50eef0d20fe2d6cf02c34151a01e",
         "6964357a771af30c341a008813ca7bba8810b2e4",
-        "c6d531aa609f83496a8471d157ef32e62895bd4b"
+        "c6d531aa609f83496a8471d157ef32e62895bd4b",
+        "6131c72e0f15fa9b87e8bfce6099c3564066b209"
       ],
-      "source_tree": "ab564f8dd3477f70b50b970e07250ff64256c2ac",
+      "source_tree": "76ee6f9a11a9e4fab4e18f8a27e797adb3eea55e",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -82,7 +83,8 @@
         "patches/vllm/0020-fix-b12x-synchronize-RoCEnante-plan-priming.patch",
         "patches/vllm/0021-fix-warmup-skip-ineligible-ll_bf16-routers.patch",
         "patches/vllm/0022-perf-warmup-register-only-selected-model-kernels.patch",
-        "patches/vllm/0023-fix-warmup-bound-pre-profile-memory-before-weight-re.patch"
+        "patches/vllm/0023-fix-warmup-bound-pre-profile-memory-before-weight-re.patch",
+        "patches/vllm/0024-fix-deepseek-v41-compile-TP3-fused-Q-head-geometry.patch"
       ]
     },
     {
@@ -112,19 +114,19 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3",
+  "image_digest": null,
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0023 is built, distributed byte-identically, and passes immutable model-free GB10 qualification; the dedicated candidate configuration is authorized for a guarded cold-cache then warm-cache TP3 startup pair with CUDA graphs disabled, while the promoted configuration remains locked",
+  "deployment_status": "patch 0024 is source-replay ready but unbuilt; launch is locked after guarded TP3 startup isolated the missing native 24-head fused-kernel instantiation, while the promoted configuration remains locked",
   "integration_status": {
-    "status": "immutable model-free qualified candidate: model/backend JIT registrations compile immediately after construction and before checkpoint residency; B12X discovery and preparation are incremental; MXFP8 trial activations are allocated only for the active plan; and scratch is reclaimed between units. All 55 focused tests pass under a 32 GiB GB10 cgroup; exact-image distribution is complete and guarded cold/warm TP3 startup remains required",
+    "status": "source-replay candidate: patch 0024 adds the exact native 24-head fused DeepSeek V4 QNorm/RoPE instantiation required by quality-preserving TP3 padding and its kernel regression; immutable image build, native test, and guarded cold/warm TP3 startup remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "passed-patch-0023-build-and-model-free-qualification; guarded-tp3-pending",
+    "status": "patch-0024-source-replay-pending-build-and-qualification",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
