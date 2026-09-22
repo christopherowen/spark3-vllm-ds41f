@@ -23,8 +23,8 @@
     },
     "deployment.launch_enabled": {
       "from": true,
-      "to": true,
-      "reason": "patch 0025 passes deterministic replay, immutable native/model-free gates, byte-identical distribution, healthy-host preflight, and exact launch-plan review; only this experimental config is enabled for the protected cold/warm pair"
+      "to": false,
+      "reason": "the protected patch 0025 cold run reached runtime warmup and exposed undersized speculative-decode scratch plus one driver allocation failure above the prior guard threshold; launch is locked until both are corrected"
     }
   },
   "source_delta": [
@@ -119,16 +119,16 @@
   "image_digest": "sha256:9e1e10e5a4289f9f702bfd2a61a094c16f336a5cd06c4c86f05c818fdf664d63",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0025 image sha256:9e1e10e5a428 passes the 12-case native TP3 matrix and 12 focused model-free regressions, including the SWA-only runtime correction, and is byte-identical on all three healthy ranks; only the experimental launch is enabled for the protected cold/warm pair, while promoted launch remains locked",
+  "deployment_status": "patch 0025 image sha256:9e1e10e5a428 safely completed cold compilation, model loading, B12X preparation, KV allocation, and the former SWA-only path, then stopped at runtime warmup because 40 speculative decode rows exceeded scratch max_batch 8; one dgx2 driver allocation failure proves the 5 GiB guard is insufficient, so experimental and promoted launches are locked",
   "integration_status": {
-    "status": "distributed immutable patch 0025 candidate: SWA-only layers no longer consume shared indexed-cache top-k output; exact source replay, native build, model-free gates, and byte-identical distribution pass, while guarded cold/warm TP3 startup remains required",
+    "status": "patch 0025 fixed the SWA-only indexed path and safely advanced cold startup to speculative runtime warmup; patch 0026 must size B12X decode scratch for expanded speculative rows and restore a proven driver-memory margin before cold/warm qualification resumes",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0025-image-passes-distributed-prelaunch-qualification-pending-cold-warm-startup",
+    "status": "patch-0025-cold-start-safely-found-speculative-decode-scratch-capacity-and-memory-margin-defects",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
