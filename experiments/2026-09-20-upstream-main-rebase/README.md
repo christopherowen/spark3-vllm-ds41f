@@ -449,15 +449,36 @@ tests on dgx1 under a 32 GiB memory/swap cap with networking disabled. No model
 weights or serving process were started. The receipt is
 `runs/build-9076b0bd9fee-validation.json`.
 
-Cluster startup is now fail-closed as well: a protected 5 GiB,
-quarter-second host-memory guard confirms its first sample before each rank is
+Cluster startup is now fail-closed as well: a protected startup host-memory
+guard confirms its first sample before each rank is
 allowed to launch, API readiness requires that guard to remain active, and only
 a healthy cluster switches to the 3 GiB steady guard. A candidate that repeats
 either observed trough is killed locally before it can exhaust driver and
-management headroom. The kill path has been exercised on all three nodes with a
-GPU-free 64 MiB smoke container and left no residual units or containers. Both
-deployment configurations remain launch-locked; the image build and model-free
-tests do not authorize a TP3 launch.
+management headroom. The repository default is 5 GiB at quarter-second
+intervals; this first qualification deliberately uses 10 GiB at 100 ms. The
+kill path has been exercised on all three nodes with a GPU-free 64 MiB smoke
+container and left no residual units or containers. The promoted configuration
+remains launch-locked. After the image was copied
+byte-for-byte to every rank and the owner authorized hardware qualification,
+the dedicated candidate configuration was opened for exactly one cold-cache and
+one warm-cache TP3 startup. Those starts use a new
+`patch0023-9076b0bd9fee` cache namespace, a 108 GiB container cap, a protected
+10 GiB startup guard sampled every 100 ms, and CUDA graphs disabled. The cold
+run must begin with that namespace absent on every rank; the warm run must reuse
+it unchanged.
+
+The startup pair is ordered and fail-closed:
+
+1. prove the qualification cache path is absent on all three nodes;
+2. start once from that cold state and require API readiness with every startup
+   guard still active;
+3. stop only the exact candidate containers, retaining the newly populated
+   cache and complete logs;
+4. prove the cache is non-empty on every rank, then start the identical image
+   and configuration again; and
+5. compare cold/warm elapsed time, compile/cache messages, minimum available
+   memory, container exits, driver errors, and API readiness before changing any
+   performance setting.
 
 ## Quality and safety gates
 

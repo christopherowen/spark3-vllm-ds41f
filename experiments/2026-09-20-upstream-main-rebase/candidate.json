@@ -115,9 +115,9 @@
   "image_digest": "sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0023 is built and passes immutable model-free GB10 qualification; both deployment configurations remain launch-locked pending exact-image distribution and one guarded TP3 eager startup with CUDA graphs disabled",
+  "deployment_status": "patch 0023 is built, distributed byte-identically, and passes immutable model-free GB10 qualification; the dedicated candidate configuration is authorized for a guarded cold-cache then warm-cache TP3 startup pair with CUDA graphs disabled, while the promoted configuration remains locked",
   "integration_status": {
-    "status": "immutable model-free qualified candidate: model/backend JIT registrations compile immediately after construction and before checkpoint residency; B12X discovery and preparation are incremental; MXFP8 trial activations are allocated only for the active plan; and scratch is reclaimed between units. All 55 focused tests pass under a 32 GiB GB10 cgroup; exact-image distribution and guarded TP3 startup remain required",
+    "status": "immutable model-free qualified candidate: model/backend JIT registrations compile immediately after construction and before checkpoint residency; B12X discovery and preparation are incremental; MXFP8 trial activations are allocated only for the active plan; and scratch is reclaimed between units. All 55 focused tests pass under a 32 GiB GB10 cgroup; exact-image distribution is complete and guarded cold/warm TP3 startup remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

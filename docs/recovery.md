@@ -84,10 +84,13 @@ is the startup guard above. After physical recovery, all three hosts passed the
 recovery-policy check and the guard's real SIGKILL path using a GPU-free, 64 MiB
 smoke container. Patch 0023 then built on dgx1 and passed all 55 focused tests
 from the immutable image under a 32 GiB cgroup, without loading weights. Exact
-evidence is recorded in the upstream-main rebase experiment. Both promoted and
-candidate configurations still set `deployment.launch_enabled` to false, so an
-applied start is rejected locally until the guarded TP3 qualification is
-deliberately opened.
+evidence is recorded in the upstream-main rebase experiment. The promoted
+configuration still sets `deployment.launch_enabled` to false. After
+the image, host, and kill-path gates passed, the dedicated patch-0023 candidate
+configuration was opened only for the guarded cold-cache/warm-cache TP3 startup
+pair. It uses a 108 GiB container cap, a protected 10 GiB startup threshold
+sampled every 100 ms, an isolated content-addressed JIT cache namespace, and no
+CUDA graphs.
 
 ## Kernel next-boot policy
 

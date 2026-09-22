@@ -27,16 +27,17 @@
     "build_imports": "candidate source, B12X loader, sparse MLA, RoCEnante, disk Engram, CUTLASS DSL 4.7.1, liburing, and NCCL 2.30.7 gates passed",
     "focused_vllm": "55 passed from the immutable image: model-selected JIT registration, active pre-weight warmup ordering, incremental B12X preparation, and lazy MXFP8 activation lifetime",
     "image_labels": "deployment revision, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "image_distribution": "dgx1, dgx2, and dgx3 report the exact image ID sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3 after two concurrent uncompressed streams over dgx1's ConnectX-7 links",
     "host_health": "dgx1 remained systemd-running with 125001039872 bytes MemAvailable, zero swap use, zero running containers, and no current-boot NV_ERR_NO_MEMORY entry after validation"
   },
   "safety": {
-    "cluster_launch_enabled": false,
+    "candidate_cluster_launch_enabled": true,
+    "promoted_cluster_launch_enabled": false,
     "startup_memguard_sigkill_smoke_passed_on_all_nodes": true,
-    "candidate_distributed": false,
+    "candidate_distributed": true,
     "tp3_started": false
   },
   "remaining": [
-    "copy this exact image digest to dgx2 and dgx3 before any coordinated run",
     "perform one guarded TP3 eager startup with CUDA graphs disabled and preserve per-rank memory telemetry",
     "verify native-weight output parity, 4x128K capacity, TTFT, throughput, and retained memory before promotion"
   ]
