@@ -62,6 +62,7 @@ tag=${CANDIDATE_TAG:-"vllm-ds41f-upstream-main:$vllm_short-$b12x_short-d$deploym
 
 exec docker buildx build \
   --platform linux/arm64 \
+  --network host \
   --load \
   --build-context "vllm-source=$source_root/vllm" \
   --build-context "b12x-source=$source_root/b12x" \
