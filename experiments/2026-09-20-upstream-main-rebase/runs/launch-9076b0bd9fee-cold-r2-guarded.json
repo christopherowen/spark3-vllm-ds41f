@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-22",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:c6d531aa609f-b69feee3022c-d397d35a4e051",
+    "id": "sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3"
+  },
+  "cache_namespace": "/cache/qualification/patch0023-9076b0bd9fee-r2/jit",
+  "startup_protection": {
+    "container_memory_gib": 108,
+    "mem_available_guard_gib": 8,
+    "sample_interval_seconds": 0.1,
+    "cuda_graphs": "disabled"
+  },
+  "result": "safe_guard_stop",
+  "observations": {
+    "pre_weight_jit_seconds": {
+      "dgx1": 34.32,
+      "dgx2": 32.49,
+      "dgx3": 32.9
+    },
+    "model_loading": {
+      "memory_gib_per_rank": 98.1,
+      "seconds": {
+        "dgx1": 130.188195,
+        "dgx2": 125.178992,
+        "dgx3": 116.533678
+      }
+    },
+    "prepared_b12x_plans_per_rank": {
+      "mxfp8": 226,
+      "moe": 43,
+      "rocenante_collectives": 1
+    },
+    "rocenante_first_routed_tensor_bytes": 245760,
+    "memguard_kill": {
+      "node": "dgx1",
+      "mem_available_kib": 8381748,
+      "threshold_kib": 8388608,
+      "exit_code": 137,
+      "oom_killed": false
+    },
+    "telemetry_minimum_mem_available_kib": {
+      "dgx1": 8445552,
+      "dgx2": 9112576,
+      "dgx3": 9111808
+    },
+    "maximum_swap_used_kib": {
+      "dgx1": 405684,
+      "dgx2": 0,
+      "dgx3": 0
+    },
+    "nvidia_nv_err_no_memory_current_boot": false,
+    "hosts_remained_reachable": true,
+    "coordinated_rollback_completed": true
+  },
+  "cache_state": {
+    "complete": false,
+    "preserved_for_evidence": true,
+    "files": {
+      "dgx1": 452,
+      "dgx2": 455,
+      "dgx3": 455
+    },
+    "bytes": {
+      "dgx1": 7479012,
+      "dgx2": 7533963,
+      "dgx3": 7533286
+    }
+  },
+  "conclusion": "The startup reached model-selected post-weight preparation and live RoCEnante dispatch, but the 8 GiB qualification guard stopped the head before memory profiling completed. The explicit guard again preserved every host without a driver allocation failure. This incomplete namespace is not a valid warm-cache input."
+}

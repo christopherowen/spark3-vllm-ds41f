@@ -471,12 +471,21 @@ all hosts stayed reachable, and no current-boot `NV_ERR_NO_MEMORY` was present.
 That incomplete cache is preserved as evidence and is not eligible for a warm
 test. The receipt is `runs/launch-9076b0bd9fee-cold-r1-guarded.json`.
 
-The second cold attempt uses a fresh `patch0023-9076b0bd9fee-r2` namespace and
-an 8 GiB startup guard sampled every 100 ms. This still leaves substantially
-more host/driver headroom than the 1.01--1.72 GiB trough associated with the
-previous control-plane loss. Its cold run must begin with the namespace absent
-on every rank; only a cold run that reaches API readiness may provide the cache
-for the warm run.
+The second cold attempt used a fresh `patch0023-9076b0bd9fee-r2` namespace and
+an 8 GiB startup guard sampled every 100 ms. All ranks completed JIT, checkpoint
+loading, draft-model loading, and preparation of 226 MXFP8, 43 MoE, and one
+RoCEnante plan. The head then reached live RoCEnante dispatch while compiling
+the required MHC post kernel, and the guard stopped it at 8,381,748 KiB
+available. It was again an explicit SIGKILL with no cgroup OOM, NVIDIA allocation
+error, or host loss. That incomplete cache is also preserved only as evidence;
+the receipt is `runs/launch-9076b0bd9fee-cold-r2-guarded.json`.
+
+The third cold attempt uses a fresh `patch0023-9076b0bd9fee-r3` namespace and a
+6 GiB startup guard sampled every 100 ms. This still preserves approximately
+4.3--5 GiB more host/driver headroom than the 1.01--1.72 GiB trough associated
+with the previous control-plane loss. Its cold run must begin with the namespace
+absent on every rank; only a cold run that reaches API readiness may provide the
+cache for the warm run.
 
 The startup pair is ordered and fail-closed:
 
