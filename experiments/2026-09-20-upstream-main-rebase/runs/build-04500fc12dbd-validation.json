@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "passed-local-immutable-model-free-qualification",
+  "timestamp": "2026-09-22T13:49:09+02:00",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:6131c72e0f15-b69feee3022c-d035350a4c857",
+    "id": "sha256:04500fc12dbd564245b84757cca46f1cfc148cbbe053eb8e892ea2016a137a72",
+    "size_bytes": 23195043650,
+    "deployment_revision": "035350a4c857e920d6db8911d3f2d3bc853c210d",
+    "vllm_patch_head": "6131c72e0f15fa9b87e8bfce6099c3564066b209",
+    "vllm_tree": "76ee6f9a11a9e4fab4e18f8a27e797adb3eea55e",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "test_environment": {
+    "host": "dgx1",
+    "gpu_visible": true,
+    "network": "disabled",
+    "memory_limit_gib": 32,
+    "memory_swap_limit_gib": 32,
+    "model_loaded": false,
+    "serving_container_started": false,
+    "test_containers_removed": true
+  },
+  "checks": {
+    "source_replay": "twenty-four vLLM and five B12X patches reproduced the recorded revisions and Git trees from exact upstream bases",
+    "native_build": "the pinned base image rebuilt only _C_stable_libtorch with two compile jobs and one NVCC thread; the resulting immutable image passed its source, binary dispatcher, import, CUTLASS DSL 4.7.1, liburing, and NCCL 2.30.7 gates",
+    "native_tp3_regression": "12 passed from the immutable image for interleaved Q layouts, including the exact n_heads=24 and q_head_padded=24 TP3 geometry",
+    "focused_patch_regressions": "11 passed from the immutable image: model/backend-selected registration, pre-weight ordering, incremental B12X preparation, lazy MXFP8 lifetime, and exact B12X/indexer geometry",
+    "broad_file_probe": "94 unrelated tests passed; 29 fixture errors and one offline stock-model lookup failure were excluded because --noconftest and --network none deliberately omit the full upstream integration harness",
+    "image_labels": "deployment revision, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "host_health": "dgx1 remained systemd-running with 121350996 KiB MemAvailable, 391724 KiB swap used, zero running containers, and no current-boot NV_ERR_NO_MEMORY entry after validation"
+  },
+  "safety": {
+    "candidate_cluster_launch_enabled": false,
+    "promoted_cluster_launch_enabled": false,
+    "startup_memguard_gib": 5,
+    "startup_memguard_interval_seconds": 0.1,
+    "candidate_distributed": false,
+    "tp3_started": false
+  },
+  "remaining": [
+    "copy this exact image uncompressed over dgx1's two ConnectX-7 links and verify byte-identical IDs and labels on dgx2 and dgx3",
+    "prove the fresh patch0024-04500fc12dbd-r1 qualification cache namespace is absent on all ranks",
+    "perform guarded cold and warm TP3 eager startups with per-rank telemetry and a deterministic API smoke request"
+  ]
+}
