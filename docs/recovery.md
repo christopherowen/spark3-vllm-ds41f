@@ -118,3 +118,20 @@ management and peer links after the reboot.
 The qualified candidate image is byte-identical on all three nodes as image ID
 `sha256:56820972a862a084c6d0d34dd8faa5ecc8a198b1ec276cb6cfd591fa983ef993`.
 No inference container was started as part of host recovery.
+
+## Watchdog and Plymouth consistency validation
+
+Recovery policy revision `188fa16780258c7d62f8ffead5b31fb15d2e557d` was
+applied sequentially to dgx1, dgx2, and dgx3 on 2026-09-22. Every node then
+passed `scripts/host-recovery check`, remained in systemd state `running` with
+zero failed units, and reported the same effective watchdog values: 30-second
+runtime watchdog, 10-minute reboot watchdog, and `/dev/watchdog0`.
+
+Every node also loaded the same Plymouth drop-in hash with a 40-second service
+bound, expected timeout status 124, and the repository-owned wait/quit command.
+The disabled `90-law-watchdog.conf.spark3-migrated` copies that existed only on
+dgx1 and dgx2 were removed after their directives were confirmed to be fully
+represented by the managed `95-spark-recovery` files. All compared recovery
+file hashes now match across the three hosts and no legacy copy remains. The
+drop-in is effective for the next boot; no reboot was performed during this
+live consistency change.
