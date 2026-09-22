@@ -2,7 +2,7 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-upstream-6e1e-b12x-b69f-qreplay-q",
+    "name": "dsv41-upstream-6e1e-b12x-b69f-nomultistream-q",
     "image": "vllm-ds41f-upstream-main:6e1e038b0910-b69feee3022c-d55aa3fd94c80",
     "expected_labels": {
       "org.opencontainers.image.revision": "55aa3fd94c804f1cecb252c8bb543b8369b75e1b",
@@ -110,7 +110,7 @@
     "VLLM_ENGINE_READY_TIMEOUT_S": "3600",
     "VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS": "900",
     "VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS": "1",
-    "VLLM_MULTI_STREAM_GEMM_TOKEN_THRESHOLD": "1024",
+    "VLLM_MULTI_STREAM_GEMM_TOKEN_THRESHOLD": "0",
     "VLLM_PLUGINS": "b12x_loader",
     "VLLM_ROCE_ALLGATHER_MAX_SIZE": "4MB",
     "VLLM_ROCE_ALLREDUCE_MAX_SIZE": "2MB",
