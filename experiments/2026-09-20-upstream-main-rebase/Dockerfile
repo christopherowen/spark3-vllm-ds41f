@@ -20,7 +20,15 @@ RUN apt-get update \
       git \
     && rm -rf /var/lib/apt/lists/*
 ENV TORCH_CUDA_ARCH_LIST=12.1a
-RUN set -eux; \
+RUN --mount=type=secret,id=github_token,required=false \
+    set -eu; \
+    if [ -s /run/secrets/github_token ]; then \
+      github_auth=$(printf 'x-access-token:%s' "$(cat /run/secrets/github_token)" \
+        | base64 | tr -d '\n'); \
+      export GIT_CONFIG_COUNT=1; \
+      export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader; \
+      export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $github_auth"; \
+    fi; \
     python_path=$(python3 -c 'import sys; print(":".join(sys.path))'); \
     cmake -S /workspace/vllm -B /tmp/vllm-native -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \

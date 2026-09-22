@@ -60,9 +60,18 @@ vllm_short=$(printf '%s' "$vllm_head" | cut -c1-12)
 b12x_short=$(printf '%s' "$b12x_head" | cut -c1-12)
 tag=${CANDIDATE_TAG:-"vllm-ds41f-upstream-main:$vllm_short-$b12x_short-d$deployment_short"}
 
+# GitHub may temporarily reject anonymous CMake FetchContent clones from a
+# shared egress address. When supplied, pass the token only through BuildKit's
+# ephemeral secret mount; it never becomes a build argument or image layer.
+set --
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  set -- --secret "id=github_token,env=GITHUB_TOKEN"
+fi
+
 exec docker buildx build \
   --platform linux/arm64 \
   --network host \
+  "$@" \
   --load \
   --build-context "vllm-source=$source_root/vllm" \
   --build-context "b12x-source=$source_root/b12x" \

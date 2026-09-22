@@ -257,9 +257,10 @@ experiments/2026-09-20-upstream-main-rebase/build-candidate
 
 The build uses the content-addressed ARM64 manifest in `Dockerfile`, resolves
 B12X dependencies normally, runs `pip check`, and refuses dirty or mismatched
-source trees. Build steps use the host network so CMake's immutable GitHub
-dependency fetches follow the same tested path as host-side source preparation
-instead of the intermittently failing Docker bridge. It does not stop, restart,
+source trees. Build steps use the host network so CMake's immutable dependency
+fetches follow the host's network path. If GitHub throttles anonymous clones,
+set `GITHUB_TOKEN`; `build-candidate` passes it through an ephemeral BuildKit
+secret mount, never a build argument or image layer. It does not stop, restart,
 or deploy the service. The current
 patch-0018 image and checks are recorded in
 `runs/build-811f3078cc1d-validation.json`. Earlier immutable receipts remain in
