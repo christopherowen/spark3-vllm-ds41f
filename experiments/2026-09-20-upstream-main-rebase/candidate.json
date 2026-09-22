@@ -24,7 +24,7 @@
     "deployment.launch_enabled": {
       "from": true,
       "to": false,
-      "reason": "the guarded cold test passed compilation, loading, B12X preparation, 2 GiB KV allocation, and patch 0026 warmup, then exposed upstream vLLM issue #56461: SM12x ratio-1 indexer pages contain 128 states while DeepGEMM accepts 64; launch is locked while the per-ratio page fix is prepared"
+      "reason": "the patch 0027 immutable image and per-ratio SM12x page regression pass; launch remains locked until the exact image, fresh cache namespace, guards, and host state are proven on every rank"
     }
   },
   "source_delta": [
@@ -120,10 +120,10 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:4c1660dc825ec17946c60ef90f019bed99d3f26ba662157401e8175519180822",
+  "image_digest": "sha256:64e2b8cf59256fa68f8de20460e2aec55d220999bc42b8c19dee6d9708538f0d",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0026 image sha256:4c1660dc825e safely completed fresh compilation, loading, B12X preparation, 2 GiB KV allocation, and the fixed 40-row speculative warmup, then failed closed on upstream vLLM issue #56461; patch 0027 applies the independently documented per-ratio SM12x indexer geometry and launch remains locked pending deterministic replay and an immutable image",
+  "deployment_status": "patch 0027 image sha256:64e2b8cf5925 passed exact-image regressions and is identical on all three ranks; launch remains locked pending a committed fresh-cache qualification configuration and final host/guard preflight",
   "integration_status": {
     "status": "patch 0026 is validated through its intended 40-row DSpark warmup; patch 0027 gives every SM12x ratio-1 and ratio-2 indexer page the 64 states accepted by DeepGEMM without globally changing the main cache page",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
@@ -132,7 +132,7 @@
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0027-source-and-ratio-specific-indexer-page-regression-pass-immutable-build-required",
+    "status": "patch-0027-immutable-image-and-ratio-specific-indexer-page-regressions-pass",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "result": "pass",
+  "image": {
+    "reference": "vllm-ds41f-upstream-main:6e1e038b0910-b69feee3022c-d55aa3fd94c80",
+    "id": "sha256:64e2b8cf59256fa68f8de20460e2aec55d220999bc42b8c19dee6d9708538f0d",
+    "size_bytes_on_build_host": 23195139726,
+    "repository_revision": "55aa3fd94c804f1cecb252c8bb543b8369b75e1b",
+    "vllm_patch_head": "6e1e038b0910ae1ed3da4e7cff24382815920c0b",
+    "vllm_tree": "08d9f83955056a65af7a1153bdcc4a747204ffff",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "build": {
+    "host": "dgx1",
+    "native_compile_jobs": 2,
+    "nvcc_threads": 1,
+    "result": "pass"
+  },
+  "validation": {
+    "container_network": "none",
+    "container_memory_bytes": 34359738368,
+    "sm12x_ratio_specific_indexer_pages": "1 passed",
+    "deepseek_v41_b12x": "14 passed",
+    "tp3_fused_q_interleaved_without_rope": "12 passed",
+    "related_indexer_tests": "21 passed, 1 offline-only model-lookup test deliberately deselected"
+  },
+  "distribution": {
+    "transport": "parallel docker save/load over the two direct ConnectX-7 links",
+    "dgx1": "sha256:64e2b8cf59256fa68f8de20460e2aec55d220999bc42b8c19dee6d9708538f0d",
+    "dgx2": "sha256:64e2b8cf59256fa68f8de20460e2aec55d220999bc42b8c19dee6d9708538f0d",
+    "dgx3": "sha256:64e2b8cf59256fa68f8de20460e2aec55d220999bc42b8c19dee6d9708538f0d"
+  },
+  "qualification_plan": {
+    "cache_namespace": "/cache/qualification/patch0027-64e2b8cf5925-r1/jit",
+    "kv_cache_memory_bytes": 2147483648,
+    "cold_then_warm": true,
+    "launch_enabled": false
+  }
+}
