@@ -21,6 +21,19 @@ import torch
 _ARM_FILE = "/tmp/spark3-nan-probe"
 
 
+class _NoPdlPlatform:
+    """Delegate every platform query except PDL capability."""
+
+    def __init__(self, delegate: Any) -> None:
+        self._delegate = delegate
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._delegate, name)
+
+    def is_arch_support_pdl(self) -> bool:
+        return False
+
+
 def _tensors(value: Any) -> Iterator[torch.Tensor]:
     if isinstance(value, torch.Tensor):
         yield value
@@ -129,6 +142,7 @@ def _wrap_sparse_entry(owner: type[Any]) -> None:
 
 
 def _install() -> None:
+    import vllm.models.common.ops.fused_qk_rmsnorm as fused_rmsnorm
     import vllm.models.deepseek_v41.nvidia.model as model
     from vllm.model_executor.layers.logits_processor import LogitsProcessor
     from vllm.model_executor.layers.vocab_parallel_embedding import (
@@ -137,6 +151,13 @@ def _install() -> None:
     from vllm.models.deepseek_v41.attention import DeepseekV4Attention
     from vllm.models.deepseek_v41.nvidia.b12x_attention import (
         DeepseekV41B12xAttention,
+    )
+
+    # The preceding MXFP8 producer selected on SM121 does not establish the
+    # programmatic grid dependency expected by this consumer.  Keep every
+    # other platform capability intact while testing the suspected RAW race.
+    fused_rmsnorm.current_platform = _NoPdlPlatform(
+        fused_rmsnorm.current_platform
     )
 
     _wrap_method(VocabParallelEmbedding, "forward", "embedding")
