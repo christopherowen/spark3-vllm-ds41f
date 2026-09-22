@@ -1,0 +1,12 @@
+{
+  "container": {
+    "name": "spark3-memguard-smoke"
+  },
+  "host": {
+    "memguard_gib": 122,
+    "memguard_interval_seconds": 1,
+    "startup_memguard_gib": 122,
+    "startup_memguard_interval_seconds": 0.25,
+    "startup_memguard_wait_seconds": 10
+  }
+}
