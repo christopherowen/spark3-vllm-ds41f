@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-23T01:26:30+02:00",
+  "result": "fail",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:67e0b2ada271-b69feee3022c-de7d44fd41ad6",
+    "id": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a"
+  },
+  "configuration": {
+    "mode": "target-only diagnostic",
+    "fresh_cache_namespace": "patch0028-5627de11-r1",
+    "model_runner": "V1",
+    "cudagraph_mode": "NONE",
+    "kv_cache_memory_bytes": 2147483648,
+    "startup_memguard_gib": 5,
+    "steady_memguard_gib": 3,
+    "dspark_workers": false
+  },
+  "startup": {
+    "api_ready": true,
+    "oom_killed": false,
+    "pre_weight_jit_seconds": {
+      "dgx1": 53.18,
+      "dgx2": 50.86,
+      "dgx3": 51.86
+    },
+    "model_memory_gib_per_rank": 95.08,
+    "selected_b12x_warmups_per_rank": {
+      "deepseek_v41_sparse_mla": 5,
+      "mxfp8": 210,
+      "moe": 40,
+      "rocenante": 1
+    },
+    "lowest_observed_available_mib": {
+      "dgx1": 8846,
+      "dgx2": 9849,
+      "dgx3": 9863
+    }
+  },
+  "request": {
+    "endpoint": "/v1/completions",
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "logprobs": 1,
+    "http_status": 500,
+    "elapsed_seconds": 0.443857
+  },
+  "first_non_finite_boundary": {
+    "stage": "layer-0 mhc_pre_delayed_tilelang input",
+    "shape": [5, 4, 5120],
+    "dtype": "torch.bfloat16",
+    "nan_count": 102400,
+    "inf_count": 0,
+    "interpretation": "the complete first tensor entering MHC pre-normalization is NaN before layer-0 B12X attention executes; the cache-record mismatch was real but is not the sole source of garbled output"
+  },
+  "shutdown": {
+    "all_containers_exited": true,
+    "all_exit_codes": 0,
+    "all_oom_killed": false,
+    "all_memguards_inactive": true,
+    "nodes_reachable": true
+  },
+  "remaining_gate": "isolate whether layer-0 hidden state is corrupted by input preparation, MHC state initialization, or the MHC pre-normalization kernel before authorizing another start"
+}
