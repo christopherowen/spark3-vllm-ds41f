@@ -2,7 +2,7 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-upstream-6e1e-b12x-b69f-targetonly-q",
+    "name": "dsv41-upstream-6e1e-b12x-b69f-nanprobe-q",
     "image": "vllm-ds41f-upstream-main:6e1e038b0910-b69feee3022c-d55aa3fd94c80",
     "expected_labels": {
       "org.opencontainers.image.revision": "55aa3fd94c804f1cecb252c8bb543b8369b75e1b",
@@ -25,7 +25,8 @@
       "--security-opt=label=disable",
       "--shm-size=16g",
       "--memory=108g",
-      "--memory-swap=108g"
+      "--memory-swap=108g",
+      "--entrypoint=/usr/bin/python3"
     ],
     "mounts": [
       [
@@ -41,6 +42,11 @@
       [
         "{home}/projects/spark3-vllm-ds41f/state/config.json",
         "/models/config.json",
+        "ro"
+      ],
+      [
+        "{home}/projects/spark3-vllm-ds41f/state/nan_probe.py",
+        "/opt/spark3/nan_probe.py",
         "ro"
       ],
       [
@@ -117,6 +123,7 @@
     "XDG_CACHE_HOME": "/cache/qualification/patch0027-64e2b8cf5925-r1/jit"
   },
   "serve_args": [
+    "/opt/spark3/nan_probe.py",
     "/models",
     "--served-model-name",
     "deepseek-v4.1-flash",
