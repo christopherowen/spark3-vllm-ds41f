@@ -118,19 +118,19 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:9e1e10e5a4289f9f702bfd2a61a094c16f336a5cd06c4c86f05c818fdf664d63",
+  "image_digest": "sha256:4c1660dc825ec17946c60ef90f019bed99d3f26ba662157401e8175519180822",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0025 image sha256:9e1e10e5a428 safely completed cold compilation, model loading, B12X preparation, KV allocation, and the former SWA-only path, then stopped at runtime warmup because 40 speculative decode rows exceeded scratch max_batch 8; patch 0026 bounds the decode plan at 40 rows and preserves the launch lock pending a fresh image and reduced-KV cold/warm qualification",
+  "deployment_status": "patch 0026 image sha256:4c1660dc825e is reproducibly labelled and passes its model-free adapter and native TP3 kernel gates; it remains launch-locked while the identical image is distributed and a fresh-cache 2 GiB KV cold/warm startup pair is prepared",
   "integration_status": {
-    "status": "patch 0026 sizes B12X decode scratch for vLLM's 40-row DSpark warmup at an 11.1 MiB incremental cost; immutable rebuild and reduced-KV cold/warm qualification remain required",
+    "status": "patch 0026 sizes B12X decode scratch for vLLM's 40-row DSpark warmup at an 11.1 MiB incremental cost; immutable image and model-free gates pass, with reduced-KV cold/warm qualification pending",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0026-source-and-model-free-regressions-pass-immutable-build-required",
+    "status": "patch-0026-immutable-image-model-free-and-native-tp3-gates-pass-cold-warm-required",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
