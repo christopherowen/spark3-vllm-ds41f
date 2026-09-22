@@ -35,7 +35,10 @@
   "host": {
     "home": "/home/swank",
     "memguard_gib": 3,
-    "memguard_interval_seconds": 2
+    "memguard_interval_seconds": 2,
+    "startup_memguard_gib": 5,
+    "startup_memguard_interval_seconds": 0.25,
+    "startup_memguard_wait_seconds": 120
   },
   "environment": {
     "B12X_COMPILE_CACHE_DIR": "/cache/jit/b12x/compile",
@@ -141,6 +144,7 @@
     "master_port": "29554"
   },
   "deployment": {
+    "launch_enabled": false,
     "repository": "https://github.com/christopherowen/spark3-vllm-ds41f.git",
     "branch": "main",
     "path": "{home}/projects/spark3-vllm-ds41f",

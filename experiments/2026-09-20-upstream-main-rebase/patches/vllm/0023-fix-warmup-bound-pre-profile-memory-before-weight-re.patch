@@ -1,0 +1,472 @@
+From c6d531aa609f83496a8471d157ef32e62895bd4b Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Tue, 22 Sep 2026 09:55:00 +0200
+Subject: [PATCH] fix(warmup): bound pre-profile memory before weight residency
+
+Upstream base: d05da62e9ccdf8e342b15bf6785d83224cc165af.
+
+Rationale: compile model-selected JIT registrations after construction but before checkpoint loading; stream B12X warmup discovery; allocate MXFP8 trial activations only while their individual plan is prepared; and reclaim accelerator scratch between plans. This prevents hundreds of serving-size preparation inputs and compiler transients from accumulating alongside resident DS4.1 weights.
+
+Quality implications: none. Kernel selection, compile keys, prepared plans, checkpoint values, execution paths, and arithmetic are unchanged; only startup phase ordering and temporary-input lifetime change.
+
+Tests: added active-registry/model-loader ordering, incremental B12X discovery, lazy MXFP8 trial allocation, and per-plan reclamation regressions. Python compilation, Ruff, formatting, and patch whitespace checks pass. The local environment lacks pytest and PyTorch, so target-image tests and guarded TP3 startup remain required.
+
+Upstream status: local candidate for vLLM; intended for upstream review after GB10 qualification.
+---
+ .../test_pre_weight_jit_warmup.py             | 78 +++++++++++++++++++
+ tests/model_executor/test_b12x_warmup.py      | 59 +++++++++++++-
+ tests/model_executor/test_jit_warmup.py       | 12 +++
+ .../kernels/linear/mxfp8/b12x.py              | 21 +++--
+ .../model_loader/base_loader.py               | 20 +++++
+ vllm/model_executor/warmup/b12x_warmup.py     | 41 +++++++---
+ vllm/model_executor/warmup/jit_warmup.py      | 14 ++++
+ 7 files changed, 227 insertions(+), 18 deletions(-)
+ create mode 100644 tests/model_executor/model_loader/test_pre_weight_jit_warmup.py
+
+diff --git a/tests/model_executor/model_loader/test_pre_weight_jit_warmup.py b/tests/model_executor/model_loader/test_pre_weight_jit_warmup.py
+new file mode 100644
+index 0000000000..2c78f9c8b6
+--- /dev/null
++++ b/tests/model_executor/model_loader/test_pre_weight_jit_warmup.py
+@@ -0,0 +1,78 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from types import SimpleNamespace
++from typing import Any, cast
++
++import torch.nn as nn
++
++import vllm.model_executor.model_loader.base_loader as base_loader
++from vllm.model_executor.model_loader.base_loader import BaseModelLoader
++from vllm.model_executor.warmup.jit_warmup import JitWarmupRegistry
++
++
++class _Loader(BaseModelLoader):
++    def download_model(self, model_config) -> None:
++        pass
++
++    def load_weights(self, model, model_config) -> None:
++        pass
++
++
++def test_create_model_warms_active_registry_before_return(monkeypatch) -> None:
++    events: list[str] = []
++    model = nn.Module()
++    config = SimpleNamespace(
++        kernel_config=SimpleNamespace(enable_jit_warmup=True),
++    )
++    registry = JitWarmupRegistry(config)
++    monkeypatch.setattr(
++        base_loader,
++        "initialize_model",
++        lambda **_: events.append("construct") or model,
++    )
++    monkeypatch.setattr(base_loader, "log_online_quantization", lambda *_: None)
++    monkeypatch.setattr(base_loader, "log_model_inspection", lambda *_: None)
++    monkeypatch.setattr(
++        base_loader,
++        "current_platform",
++        SimpleNamespace(is_cuda_alike=lambda: True, is_xpu=lambda: False),
++    )
++    monkeypatch.setattr(registry, "warmup", lambda: events.append("warmup"))
++    monkeypatch.setattr(
++        base_loader.torch.accelerator,
++        "synchronize",
++        lambda: events.append("synchronize"),
++    )
++    monkeypatch.setattr(
++        base_loader.torch.accelerator,
++        "empty_cache",
++        lambda: events.append("empty_cache"),
++    )
++    monkeypatch.setattr(base_loader.gc, "collect", lambda: events.append("gc"))
++
++    loader = _Loader(cast(Any, object()))
++    with registry.activate():
++        assert loader.create_model(config, cast(Any, object())) is model
++
++    assert events == ["construct", "warmup", "synchronize", "gc", "empty_cache"]
++
++
++def test_create_model_does_not_warm_when_disabled(monkeypatch) -> None:
++    model = nn.Module()
++    config = SimpleNamespace(
++        kernel_config=SimpleNamespace(enable_jit_warmup=False),
++    )
++    registry = JitWarmupRegistry(config)
++    monkeypatch.setattr(base_loader, "initialize_model", lambda **_: model)
++    monkeypatch.setattr(base_loader, "log_online_quantization", lambda *_: None)
++    monkeypatch.setattr(base_loader, "log_model_inspection", lambda *_: None)
++    monkeypatch.setattr(
++        registry,
++        "warmup",
++        lambda: (_ for _ in ()).throw(AssertionError("warmup must stay disabled")),
++    )
++
++    loader = _Loader(cast(Any, object()))
++    with registry.activate():
++        assert loader.create_model(config, cast(Any, object())) is model
+diff --git a/tests/model_executor/test_b12x_warmup.py b/tests/model_executor/test_b12x_warmup.py
+index f3d6b196ab..d010bede42 100644
+--- a/tests/model_executor/test_b12x_warmup.py
++++ b/tests/model_executor/test_b12x_warmup.py
+@@ -16,6 +16,7 @@ from vllm.model_executor.kernels.linear import (
+ )
+ from vllm.model_executor.warmup.b12x_warmup import (
+     _collect_warmup_units,
++    _compile_warmup_units,
+     b12x_prepare_weights,
+     b12x_warmup,
+ )
+@@ -140,6 +141,7 @@ def test_b12x_mxfp8_prepares_capacity_plan_before_profile(monkeypatch) -> None:
+     import vllm.model_executor.kernels.linear.mxfp8.b12x as b12x_mod
+ 
+     calls = []
++    allocations = []
+ 
+     class Plan:
+         token_counts = (1, 8)
+@@ -164,10 +166,22 @@ def test_b12x_mxfp8_prepares_capacity_plan_before_profile(monkeypatch) -> None:
+     )
+     import b12x.preparation
+ 
++    real_zeros = torch.zeros
++
++    def tracked_zeros(*args, **kwargs):
++        allocations.append(args[0])
++        return real_zeros(*args, **kwargs)
++
++    def prepare_default(request):
++        calls.append(("prepare", request))
++        for factory in request.prepare_calls.values():
++            factory(SimpleNamespace(run=lambda *args: None))
++
++    monkeypatch.setattr(b12x_mod.torch, "zeros", tracked_zeros)
+     monkeypatch.setattr(
+         b12x.preparation,
+         "prepare_default",
+-        lambda request: calls.append(("prepare", request)),
++        prepare_default,
+     )
+     packed_weight = SimpleNamespace(
+         in_features=128,
+@@ -183,6 +197,7 @@ def test_b12x_mxfp8_prepares_capacity_plan_before_profile(monkeypatch) -> None:
+         (1, 8),
+         torch.bfloat16,
+     )
++    assert allocations == []
+     unit.compile()
+ 
+     query = next(call for call in calls if call[0] == "query")
+@@ -191,7 +206,8 @@ def test_b12x_mxfp8_prepares_capacity_plan_before_profile(monkeypatch) -> None:
+     assert planned[2]["exact_m"] == (1,)
+     requested = next(call for call in calls if call[0] == "request")
+     assert set(requested[1]["prepare_calls"]) == {1, 8}
+-    assert calls[-1][0] == "prepare"
++    assert next(call for call in calls if call[0] == "prepare")
++    assert allocations == [(1, 128), (8, 128)]
+ 
+ 
+ def test_b12x_tensor_fp8_warmup_unit(monkeypatch) -> None:
+@@ -288,6 +304,36 @@ def test_b12x_warmup_deduplicates_registered_signatures(monkeypatch) -> None:
+     assert synchronized == [True]
+ 
+ 
++def test_b12x_warmup_discovers_and_compiles_units_incrementally() -> None:
++    events = []
++
++    class Provider:
++        def get_b12x_warmup_unit(self, layer, token_counts, output_dtype):
++            del token_counts, output_dtype
++            events.append(("discover", layer.name))
++            return B12xWarmupUnit(
++                name="fake",
++                key=(layer.name,),
++                compile=lambda: events.append(("compile", layer.name)),
++            )
++
++    provider = Provider()
++    layers = [
++        SimpleNamespace(name="first", b12x_warmup_provider=provider),
++        SimpleNamespace(name="second", b12x_warmup_provider=provider),
++    ]
++    model = SimpleNamespace(modules=lambda: iter(layers))
++
++    _compile_warmup_units(_collect_warmup_units(model, (1, 8), torch.bfloat16))
++
++    assert events == [
++        ("discover", "first"),
++        ("compile", "first"),
++        ("discover", "second"),
++        ("compile", "second"),
++    ]
++
++
+ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) -> None:
+     import vllm.model_executor.warmup.b12x_warmup as warmup_mod
+ 
+@@ -355,6 +401,7 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+         is_device_capability_family=lambda family: family == 120,
+     )
+     synchronized = []
++    emptied = []
+     monkeypatch.setattr(warmup_mod, "current_platform", platform)
+     monkeypatch.setattr(
+         warmup_mod,
+@@ -366,6 +413,11 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+         "synchronize",
+         lambda: synchronized.append(True),
+     )
++    monkeypatch.setattr(
++        warmup_mod.torch.accelerator,
++        "empty_cache",
++        lambda: emptied.append(True),
++    )
+ 
+     b12x_prepare_weights(worker)
+ 
+@@ -374,7 +426,8 @@ def test_b12x_prepares_only_weight_owned_plans_before_profiling(monkeypatch) ->
+         ("draft_weights", (1, 2, 4, 8, 32), torch.bfloat16),
+         ("distributed", (1, 2, 4, 8, 32), torch.bfloat16),
+     ]
+-    assert synchronized == [True]
++    assert synchronized == [True, True, True]
++    assert emptied == [True, True, True]
+ 
+ 
+ def test_b12x_warmup_includes_distributed_provider() -> None:
+diff --git a/tests/model_executor/test_jit_warmup.py b/tests/model_executor/test_jit_warmup.py
+index 92b402edb7..920c032855 100644
+--- a/tests/model_executor/test_jit_warmup.py
++++ b/tests/model_executor/test_jit_warmup.py
+@@ -591,6 +591,18 @@ def test_registry_records_only_inside_model_setup_context() -> None:
+     assert kernel.compiled == []
+ 
+ 
++def test_registry_can_warm_active_model_creation_phase() -> None:
++    registry = JitWarmupRegistry(_config())
++    kernel = RecordingToyKernel()
++
++    assert not JitWarmupRegistry.warmup_active()
++    with registry.activate():
++        kernel.register_warmup(3, _config())
++        assert JitWarmupRegistry.warmup_active()
++
++    assert kernel.compiled
++
++
+ def test_registry_records_features_only_inside_model_setup_context() -> None:
+     registry = JitWarmupRegistry(_config())
+ 
+diff --git a/vllm/model_executor/kernels/linear/mxfp8/b12x.py b/vllm/model_executor/kernels/linear/mxfp8/b12x.py
+index 4264dba3bc..3f875cf10b 100644
+--- a/vllm/model_executor/kernels/linear/mxfp8/b12x.py
++++ b/vllm/model_executor/kernels/linear/mxfp8/b12x.py
+@@ -3,6 +3,8 @@
+ 
+ from __future__ import annotations
+ 
++import weakref
++
+ import torch
+ 
+ from vllm.model_executor.layers.quantization.utils.mxfp8_utils import (
+@@ -155,13 +157,22 @@ class B12xMxfp8LinearKernel(Mxfp8LinearKernel):
+         from b12x.preparation import PreparedCall
+ 
+         def prepare_call(tokens: int):
+-            source = torch.zeros(
+-                (tokens, int(packed_weight.in_features)),
+-                dtype=output_dtype,
+-                device=device,
+-            )
++            source_ref: weakref.ReferenceType[torch.Tensor] | None = None
+ 
+             def factory(state):
++                nonlocal source_ref
++                # Allocate the trial activation only when this plan is being
++                # prepared. Warmup discovery may visit hundreds of layers;
++                # retaining every layer's serving-size source here can exhaust
++                # unified memory before compilation begins.
++                source = None if source_ref is None else source_ref()
++                if source is None:
++                    source = torch.zeros(
++                        (tokens, int(packed_weight.in_features)),
++                        dtype=output_dtype,
++                        device=device,
++                    )
++                    source_ref = weakref.ref(source)
+                 return PreparedCall(
+                     run=lambda: state.run(
+                         source,
+diff --git a/vllm/model_executor/model_loader/base_loader.py b/vllm/model_executor/model_loader/base_loader.py
+index 6f35646458..2383987969 100644
+--- a/vllm/model_executor/model_loader/base_loader.py
++++ b/vllm/model_executor/model_loader/base_loader.py
+@@ -1,5 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++import gc
++import time
+ from abc import ABC, abstractmethod
+ 
+ import torch
+@@ -48,6 +50,24 @@ class BaseModelLoader(ABC):
+             model_config=model_config,
+             prefix=prefix,
+         )
++        if vllm_config.kernel_config.enable_jit_warmup:
++            # Model/backend registrations are complete, but checkpoint payloads
++            # have not made the full parameter set resident yet. Compile this
++            # phase now so large-model startup does not combine compiler scratch
++            # with the resident weight and KV allocations.
++            from vllm.model_executor.warmup.jit_warmup import JitWarmupRegistry
++
++            started = time.perf_counter()
++            if JitWarmupRegistry.warmup_active():
++                if current_platform.is_cuda_alike() or current_platform.is_xpu():
++                    torch.accelerator.synchronize()
++                gc.collect()
++                if current_platform.is_cuda_alike() or current_platform.is_xpu():
++                    torch.accelerator.empty_cache()
++                logger.info(
++                    "Pre-weight JIT kernel warmup finished in %.2fs.",
++                    time.perf_counter() - started,
++                )
+         log_online_quantization(vllm_config)
+         log_model_inspection(model)
+         return model
+diff --git a/vllm/model_executor/warmup/b12x_warmup.py b/vllm/model_executor/warmup/b12x_warmup.py
+index a249b26c48..3bd8da679d 100644
+--- a/vllm/model_executor/warmup/b12x_warmup.py
++++ b/vllm/model_executor/warmup/b12x_warmup.py
+@@ -27,7 +27,7 @@ def _collect_warmup_units(
+     *,
+     provider_method: str = "get_b12x_warmup_unit",
+ ) -> Iterable[B12xWarmupUnit]:
+-    units: dict[object, B12xWarmupUnit] = {}
++    seen: set[object] = set()
+     for layer in model.modules():
+         provider = getattr(layer, "b12x_warmup_provider", None)
+         get_unit = getattr(provider, provider_method, None)
+@@ -35,15 +35,20 @@ def _collect_warmup_units(
+             continue
+         unit = get_unit(layer, token_counts, output_dtype)
+         assert isinstance(unit, B12xWarmupUnit)
+-        units.setdefault(unit.key, unit)
++        if unit.key in seen:
++            continue
++        seen.add(unit.key)
++        yield unit
+     for provider in extra_providers:
+         get_unit = getattr(provider, provider_method, None)
+         if not callable(get_unit):
+             continue
+         unit = get_unit(provider, token_counts, output_dtype)
+         assert isinstance(unit, B12xWarmupUnit)
+-        units.setdefault(unit.key, unit)
+-    return units.values()
++        if unit.key in seen:
++            continue
++        seen.add(unit.key)
++        yield unit
+ 
+ 
+ def _worker_model_roots(worker: "Worker") -> tuple[torch.nn.Module, ...]:
+@@ -65,7 +70,7 @@ def _collect_worker_warmup_units(
+     *,
+     provider_method: str = "get_b12x_warmup_unit",
+ ) -> Iterable[B12xWarmupUnit]:
+-    units: dict[object, B12xWarmupUnit] = {}
++    seen: set[object] = set()
+     for model in _worker_model_roots(worker):
+         for unit in _collect_warmup_units(
+             model,
+@@ -73,15 +78,20 @@ def _collect_worker_warmup_units(
+             output_dtype,
+             provider_method=provider_method,
+         ):
+-            units.setdefault(unit.key, unit)
++            if unit.key in seen:
++                continue
++            seen.add(unit.key)
++            yield unit
+     for provider in extra_providers:
+         get_unit = getattr(provider, provider_method, None)
+         if not callable(get_unit):
+             continue
+         unit = get_unit(provider, token_counts, output_dtype)
+         assert isinstance(unit, B12xWarmupUnit)
+-        units.setdefault(unit.key, unit)
+-    return units.values()
++        if unit.key in seen:
++            continue
++        seen.add(unit.key)
++        yield unit
+ 
+ 
+ def _distributed_warmup_providers() -> tuple[object, ...]:
+@@ -98,13 +108,21 @@ def _distributed_warmup_providers() -> tuple[object, ...]:
+ 
+ def _compile_warmup_units(
+     units: Iterable[B12xWarmupUnit],
++    *,
++    reclaim_scratch: bool = False,
+ ) -> Counter[str]:
+     warmed: Counter[str] = Counter()
+     with torch.inference_mode():
+         for unit in units:
+             unit.compile()
+             warmed[unit.name] += 1
+-        if warmed:
++            if reclaim_scratch:
++                # B12X plans retain their prepared state, but compiler and
++                # preparation temporaries do not need to accumulate across the
++                # hundreds of weight-owned plans on unified-memory systems.
++                torch.accelerator.synchronize()
++                torch.accelerator.empty_cache()
++        if warmed and not reclaim_scratch:
+             torch.accelerator.synchronize()
+     return warmed
+ 
+@@ -180,7 +198,10 @@ def b12x_prepare_weights(worker: "Worker") -> None:
+         _distributed_warmup_providers(),
+         provider_method="get_b12x_pre_profile_unit",
+     )
+-    for name, count in _compile_warmup_units(units).items():
++    for name, count in _compile_warmup_units(
++        units,
++        reclaim_scratch=True,
++    ).items():
+         logger.info_once(
+             "Prepared %d b12x %s plan(s) before memory profiling.",
+             count,
+diff --git a/vllm/model_executor/warmup/jit_warmup.py b/vllm/model_executor/warmup/jit_warmup.py
+index 62d4cf678c..400929ad3b 100644
+--- a/vllm/model_executor/warmup/jit_warmup.py
++++ b/vllm/model_executor/warmup/jit_warmup.py
+@@ -1092,6 +1092,20 @@ class JitWarmupRegistry:
+     def __len__(self) -> int:
+         return sum(len(registrations) for registrations in self._registrations.values())
+ 
++    @classmethod
++    def warmup_active(cls) -> bool:
++        """Compile registrations captured by the active model-construction phase.
++
++        Returns ``True`` when a registry was active. Model loaders use this hook
++        after constructing a model but before loading its weights, when compiler
++        processes have substantially more host-memory headroom.
++        """
++        registry = cls._active.get()
++        if registry is None:
++            return False
++        registry.warmup()
++        return True
++
+     def warmup(self) -> None:
+         """Expand registrations and compile each wrapper/key pair once."""
+         from tqdm import tqdm
+-- 
+2.54.0 (Apple Git-157)
+

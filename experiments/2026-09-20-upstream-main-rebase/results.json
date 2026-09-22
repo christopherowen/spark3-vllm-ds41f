@@ -1,5 +1,5 @@
 {
-  "status": "patch-0022-rejected-cold-start-indexer-jit-memory",
+  "status": "patch-0023-prepared-offline-hardware-qualification-paused",
   "runs": [],
   "static_checks": {
     "vllm_ruff": "passed",
@@ -7,7 +7,7 @@
     "vllm_py_compile": "passed",
     "vllm_ds41_b12x_adapter": "ruff, format, py_compile, and diff checks passed for sparse MLA, managed loading, and disk Engram; target runtime tests pending",
     "vllm_rocenante_adapter": "ruff, format, py_compile, and diff checks passed; target runtime tests pending",
-    "local_focused_pytest": "not run: cached Mac test environment lacks tblib, msgspec, and regex",
+    "local_focused_pytest": "not run for amended patch 0023: the local Mac Python lacks pytest and PyTorch; focused tests remain a target-image gate",
     "docker_build_check": "the rejected ea3a7e056cb1 build exposed missing compile-time liburing support before launch. Corrected image sha256:8649ec7238e36351b079ccf1fd170189c39a8e5d8f81c7e291a1f0910287018e passed GB10 imports, 8 focused vLLM tests, exact managed direct-I/O, 8 B12X Engram tests with production capabilities, native liburing linkage, and real serve-config construction",
     "vllm_virtual_head_unit_tests": "7 passed with Torch 2.13.0 using an isolated module import",
     "b12x_mhc_policy_tests": "2 passed",
@@ -15,8 +15,10 @@
     "b12x_ruff": "passed with unrelated upstream F401/F841 excluded",
     "b12x_py_compile": "passed",
     "diff_check": "passed",
-    "deterministic_source_preparer": "all twenty vLLM and five B12X patches replay from the exact base objects and match recorded Git tree identities 4138f6ad2f3f and a251f563557b",
+    "deterministic_source_preparer": "all twenty-three vLLM and five B12X patches replay from the exact base objects and match recorded Git tree identities ab564f8dd347 and a251f563557b, including amended patch 0023's incremental B12X discovery and lazy MXFP8 trial allocation",
     "repository_doctor": "configuration OK",
+    "host_memguard_tests": "4 host-independent tests pass: the guard confirms readiness before container creation and tracks its lifetime; a running candidate is killed immediately below threshold; low baseline memory rejects prelaunch without starting a container; and the wrapper confirms a protected prelaunch systemd unit with the configured wait and quarter-second sample interval",
+    "offline_launch_gate": "both promoted and experiment configurations have deployment.launch_enabled=false and cluster start --apply exits locally before rendering, repository checks, or remote-node preflight",
     "live_read_only_doctor": "promoted configuration matched before its workload was stopped; stopped promoted containers remain intact on all nodes",
     "candidate_configuration": "experiment cluster config passes repository doctor and real upstream vLLM parser/engine-config construction with only b12x_loader enabled",
     "candidate_distribution": "identical image ID on dgx1, dgx2, and dgx3; two concurrent uncompressed Docker streams traversed the two ConnectX-7 internal rails in 72 seconds",
@@ -98,7 +100,12 @@
     "model_owned_warmup_image": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df is byte-identical across all ranks and passes 55 model-free registration tests but is rejected for cold TP3 startup",
     "eighteenth_full_launch": "loaded target plus DSpark at 98.1 GiB per rank and prepared 226 MXFP8, 43 MoE, and one RoCEnante plan; MemAvailable fell to 1.38-1.57 GiB, then 37 selected indexer Triton groups compiled and coincident NVIDIA NV_ERR_NO_MEMORY failures caused all three hosts to recover by reboot",
     "indexer_jit_cache_evidence": "each rank created the same 301 cache files for 36 prefill-indexer and one uniform-decode kernel group with content digest 98aa77e4ed5a00c8ff72cbb72c0a2d1aafaf4ba831230cc5065c3327ea1aba3a",
-    "model_owned_warmup_conclusion": "model/backend registration fixed ownership but not phase ordering; prime the selected indexer cache before weight residency and fail closed on resident-model cache misses; explicitly prepare selected disk-Engram queries"
+    "model_owned_warmup_conclusion": "model/backend registration fixed ownership but not phase ordering; prime the selected indexer cache before weight residency and fail closed on resident-model cache misses; explicitly prepare selected disk-Engram queries",
+    "deferred_first_use_launch": "the same patch-0022 image with enable_jit_warmup=false omitted the eager 61-key sweep but compiled required mHC TileLang variants during the real profile pass after 98.1 GiB weight and B12X-plan residency; it reached 1,353,553 KV tokens, then all three control paths became unavailable before API readiness",
+    "deferred_first_use_memory": "minimum observed MemAvailable was 1.01 GiB on dgx1, 1.67 GiB on dgx2, and 1.72 GiB on dgx3; 9/3/3 NV_ERR_NO_MEMORY events were observed before control loss, with no observed kernel OOM kill",
+    "patch_0023_source_resolution": "active model/backend JIT registrations compile after model construction and before checkpoint payload residency; pre-profile B12X discovery yields and compiles one unit at a time; MXFP8 serving-size trial activations are allocated only while their plan is prepared; preparation synchronizes and releases allocator scratch after each retained plan; source head c6d531aa609f, tree ab564f8dd347",
+    "startup_guard_resolution": "cluster start pre-arms a protected 5 GiB quarter-second fail-closed memguard, requires its first successful memory sample before each docker run, verifies it remains active until API readiness, then switches to the 3 GiB steady guard; threshold violations kill the unqualified container immediately and restored rollback containers receive the same pre-launch protection",
+    "hardware_status": "all three nodes are unreachable and require physical recovery; no further node access, build, or launch is authorized until explicit owner resumption"
   },
   "summary": {
     "ttft_seconds": null,

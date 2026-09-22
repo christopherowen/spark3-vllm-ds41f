@@ -22,12 +22,23 @@ because dgx3 lacked the watchdog policy already present on dgx1 and dgx2.
 
 ## Prevention
 
-The inference-side cause is removed by upstream-main rebase patch 0021. Runtime
-warmup now follows the same SM121 eligibility decision as execution, avoiding
-the unused router compilation that consumed the final CUDA-visible headroom.
-The three-rank container remains capped at 112 GiB per node, the 3 GiB memguard
-is armed only after JIT startup, and TP2 full-model loading is prohibited by the
-hardware envelope.
+The original unused-router cause is removed by upstream-main rebase patch 0021.
+Runtime warmup now follows the same SM121 eligibility decision as execution.
+The three-rank container remains capped at 112 GiB per node and TP2 full-model
+loading is prohibited by the hardware envelope.
+
+The later patch-0022 qualification proved that a steady-state-only memguard was
+not sufficient: selected model kernels and B12X plans can exhaust driver and
+management headroom before API readiness. Every coordinated start now pre-arms
+a protected 5 GiB, quarter-second startup guard before `docker run`, waits for its
+first successful memory sample, and only then permits the rank to launch. The
+guard remains active throughout readiness and switches to the 3 GiB steady
+guard only after the API is healthy. Rollback containers receive the same
+pre-launch protection. A candidate that crosses the threshold is killed
+immediately rather than receiving a five-second graceful-stop window;
+protecting the host takes precedence over preserving an unqualified startup.
+The orchestrator no longer waits for a driver allocation failure or
+management-path loss.
 
 The host-side recovery policy under `host/recovery/` adds bounded recovery
 without changing inference arithmetic or kernel selection:
@@ -43,6 +54,31 @@ without changing inference arithmetic or kernel selection:
 
 The policy deliberately does not reboot for gateway loss, Internet loss, a
 single failed health check, or a generic hung task.
+
+## 2026-09-22 three-node qualification incident
+
+A patch-0022 recovery launch disabled the eager JIT registry sweep but left the
+startup memguard off under the old policy. The required profile forward pass
+then compiled model-selected TileLang mHC kernels after 98.1 GiB of weights and
+270 B12X plans were resident. Observed MemAvailable fell to 1.01--1.72 GiB and
+the NVIDIA driver reported allocation failures on every node. The runtime
+reached the intended 1,353,553-token KV allocation but never became ready; all
+three management paths subsequently became unavailable.
+
+The source correction is patch 0023. It drains the active model/backend JIT
+registry after construction and before checkpoint loading. It also fixes a
+separate, concrete preparation-lifetime bug: the collector constructed all 226
+MXFP8 units before compiling the first, and every unit retained its serving-size
+dummy activations. Discovery now streams one unit at a time, the dummy
+activations are created only inside that plan's preparation, and allocator
+scratch is reclaimed before moving to the next plan. The operational correction
+is the startup guard above. The hosts require physical recovery before these
+changes can be built or qualified, and no remote contact or recovery attempt is
+authorized during the recovery pause. Exact container evidence and the limits
+of the available diagnosis are recorded in the upstream-main rebase experiment.
+Both promoted and candidate configurations set `deployment.launch_enabled` to
+false, so an applied start is rejected locally until the owner explicitly
+reopens hardware qualification after physical recovery.
 
 ## Kernel next-boot policy
 

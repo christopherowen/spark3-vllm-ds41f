@@ -217,10 +217,37 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
         problems.append("exactly one node must be the API head")
     if cluster.get("promoted_baseline") != upstreams.get("generated_from_baseline"):
         problems.append("cluster and upstream locks name different baselines")
+    host = cluster.get("host", {})
+    for key in (
+        "memguard_gib",
+        "startup_memguard_gib",
+        "startup_memguard_wait_seconds",
+    ):
+        value = host.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            problems.append(f"host.{key} must be a positive integer")
+    for key in ("memguard_interval_seconds", "startup_memguard_interval_seconds"):
+        value = host.get(key)
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or value <= 0
+        ):
+            problems.append(f"host.{key} must be a positive number")
+    if (
+        isinstance(host.get("startup_memguard_gib"), int)
+        and isinstance(host.get("memguard_gib"), int)
+        and host["startup_memguard_gib"] <= host["memguard_gib"]
+    ):
+        problems.append(
+            "host.startup_memguard_gib must exceed host.memguard_gib"
+        )
     deployment = cluster.get("deployment", {})
     for key in ("repository", "branch", "path", "ready_url", "ready_timeout_seconds"):
         if not deployment.get(key):
             problems.append(f"deployment.{key} is not configured")
+    if not isinstance(deployment.get("launch_enabled"), bool):
+        problems.append("deployment.launch_enabled must be true or false")
     for name, source in upstreams["sources"].items():
         if not source.get("upstream"):
             problems.append(f"{name}: canonical upstream is not recorded")
@@ -657,6 +684,11 @@ def wait_for_api(cluster: dict, nodes: dict) -> None:
                     f"{node['name']}: {name} stopped before readiness "
                     f"({state_detail})\n{log_detail}"
                 )
+            if not memguard_is_active(cluster, nodes, node):
+                raise RuntimeError(
+                    f"{node['name']}: startup memguard is no longer active; "
+                    "refusing to continue an unguarded launch"
+                )
         if unavailable:
             time.sleep(10)
             continue
@@ -680,14 +712,36 @@ def wait_for_api(cluster: dict, nodes: dict) -> None:
     raise RuntimeError(f"API did not become ready within {timeout}s{suffix}")
 
 
-def start_memguards(cluster: dict, nodes: dict, cluster_config: str) -> None:
+def start_memguard(
+    cluster: dict,
+    nodes: dict,
+    node: dict,
+    cluster_config: str,
+    phase: str,
+    *,
+    prelaunch: bool = False,
+) -> None:
     script = f"{repository_path(cluster)}/scripts/memguard-start.sh"
+    arguments = [script, cluster_config, phase]
+    if prelaunch:
+        arguments.append("prelaunch")
+    result = run_ssh(nodes, node, *arguments)
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(
+            f"{node['name']}: cannot arm {phase} memguard: {detail}"
+        )
+    print(f"{node['name']}: {result.stdout.strip()}", flush=True)
+
+
+def start_memguards(
+    cluster: dict,
+    nodes: dict,
+    cluster_config: str,
+    phase: str,
+) -> None:
     for node in nodes["nodes"]:
-        result = run_ssh(nodes, node, script, cluster_config)
-        if result.returncode:
-            detail = result.stderr.strip() or result.stdout.strip()
-            raise RuntimeError(f"{node['name']}: cannot arm memguard: {detail}")
-        print(f"{node['name']}: {result.stdout.strip()}")
+        start_memguard(cluster, nodes, node, cluster_config, phase)
 
 
 def preserve_failed_start_logs(
@@ -735,6 +789,7 @@ def restore_containers(
     nodes: dict,
     backups: dict[str, str],
     started: list[dict],
+    cluster_config: str,
 ) -> None:
     name = cluster["container"]["name"]
     for node in nodes["nodes"]:
@@ -749,20 +804,44 @@ def restore_containers(
         if renamed.returncode:
             print(f"WARN: {node['name']}: could not restore container name", file=sys.stderr)
             continue
+        try:
+            start_memguard(
+                cluster,
+                nodes,
+                node,
+                cluster_config,
+                "startup",
+                prelaunch=True,
+            )
+        except RuntimeError as error:
+            print(
+                f"WARN: {error}; did not start restored container unguarded",
+                file=sys.stderr,
+            )
+            continue
         start_result = run_ssh(nodes, node, "docker", "start", name)
         if start_result.returncode:
+            stop_memguard(cluster, nodes, node)
             print(f"WARN: {node['name']}: could not restart previous container", file=sys.stderr)
+            continue
 
 
 def command_cluster_start(args: argparse.Namespace) -> int:
     cluster, nodes, upstreams = configuration(args)
     _, config_relative = cluster_config_path(args)
+    if args.apply and not cluster["deployment"]["launch_enabled"]:
+        print(
+            "ERROR: this cluster configuration is not authorized for launch",
+            file=sys.stderr,
+        )
+        return 1
     name = cluster["container"]["name"]
     order = deployment_order(nodes)
-    print("start plan (memory guards remain off until API readiness):")
+    print("start plan (fail-closed startup memory guards):")
     for node in order:
+        print(f"  {node['name']}: pre-arm startup memguard")
         print(f"  {node['name']}: {shlex.join(rendered_docker_command(cluster, node))}")
-    print("  wait for API/JIT readiness, then arm memguard on every node")
+    print("  wait for API/JIT readiness, then switch every node to steady memguard")
     if not args.apply:
         print("plan only; pass --apply to start the cluster")
         return 0
@@ -788,7 +867,7 @@ def command_cluster_start(args: argparse.Namespace) -> int:
             stop_memguard(cluster, nodes, node)
             if memguard_is_active(cluster, nodes, node):
                 raise RuntimeError(
-                    f"{node['name']}: memguard is still active; refusing JIT startup"
+                    f"{node['name']}: stale memguard is still active; refusing startup"
                 )
         if args.replace:
             for node in nodes["nodes"]:
@@ -805,6 +884,19 @@ def command_cluster_start(args: argparse.Namespace) -> int:
                     raise RuntimeError(f"{node['name']}: could not preserve {name}")
                 backups[node["name"]] = backup
         for node in order:
+            start_memguard(
+                cluster,
+                nodes,
+                node,
+                config_relative,
+                "startup",
+                prelaunch=True,
+            )
+            if not memguard_is_active(cluster, nodes, node):
+                raise RuntimeError(
+                    f"{node['name']}: pre-armed startup memguard is not active; "
+                    "refusing launch"
+                )
             result = run_ssh(nodes, node, *rendered_docker_command(cluster, node))
             if result.returncode:
                 detail = result.stderr.strip() or result.stdout.strip()
@@ -812,7 +904,7 @@ def command_cluster_start(args: argparse.Namespace) -> int:
             started.append(node)
             print(f"{node['name']}: launched {result.stdout.strip()}", flush=True)
         wait_for_api(cluster, nodes)
-        start_memguards(cluster, nodes, config_relative)
+        start_memguards(cluster, nodes, config_relative, "steady")
     except (RuntimeError, KeyboardInterrupt) as error:
         detail = str(error) if str(error) else "cluster start interrupted"
         print(f"ERROR: {detail}", file=sys.stderr)
@@ -826,11 +918,11 @@ def command_cluster_start(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
         print("rolling back containers started by this command", file=sys.stderr)
-        restore_containers(cluster, nodes, backups, started)
+        restore_containers(cluster, nodes, backups, started, config_relative)
         if backups:
             try:
                 wait_for_api(cluster, nodes)
-                start_memguards(cluster, nodes, config_relative)
+                start_memguards(cluster, nodes, config_relative, "steady")
             except RuntimeError as rollback_error:
                 print(f"WARN: rollback health check failed: {rollback_error}", file=sys.stderr)
         return 130 if isinstance(error, KeyboardInterrupt) else 1

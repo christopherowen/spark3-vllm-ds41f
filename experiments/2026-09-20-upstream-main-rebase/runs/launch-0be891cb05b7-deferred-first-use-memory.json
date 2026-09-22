@@ -1,0 +1,72 @@
+{
+  "date": "2026-09-22",
+  "candidate_image": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
+  "deployment_commit": "32efc0fe3a6f00d28a260ee77267d07dc2ee9b61",
+  "intended_variable": "disable the eager JIT registry sweep while preserving real model execution, B12X preparation, explicit KV allocation, and CUDA graphs",
+  "configuration": {
+    "kernel_config": {
+      "enable_jit_warmup": false
+    },
+    "tensor_parallel_size": 3,
+    "max_model_len": 160000,
+    "max_num_seqs": 8,
+    "max_num_batched_tokens": 8192,
+    "kv_cache_memory_bytes_per_rank": 3221225472,
+    "cudagraph_capture_sizes": [1, 2, 3, 4, 6, 8, 12, 16, 20, 24],
+    "startup_memguard": "not armed by the then-current orchestrator"
+  },
+  "observations": {
+    "model_load": "98.1 GiB per rank; rank-0 load completed in 89.58 seconds",
+    "b12x_preparation": {
+      "mxfp8_plans": 226,
+      "moe_plans": 43,
+      "rocenante_plans": 1
+    },
+    "minimum_observed_memavailable_kib": {
+      "dgx1": 1060484,
+      "dgx2": 1746320,
+      "dgx3": 1804192
+    },
+    "observed_nv_err_no_memory_before_control_loss": {
+      "dgx1": 9,
+      "dgx2": 3,
+      "dgx3": 3
+    },
+    "kernel_oom_kills_observed_before_control_loss": 0,
+    "first_use_compilation": [
+      "the real profile pass compiled model-selected mhc_pre_big_fuse_with_norm_tilelang variants sequentially",
+      "mhc_post_tilelang and mhc_fused_tilelang were also compiled",
+      "the eager 61-key registry progress sweep was absent, as intended"
+    ],
+    "distributed_execution": [
+      "RoCEnante all-reduce became live for a 245760-byte bfloat16 tensor",
+      "RoCEnante all-gather became live for a (24, 43136) bfloat16 shard"
+    ],
+    "kv_allocation": {
+      "tokens": 1353553,
+      "reported_160k_concurrency": 8.46
+    },
+    "graph_mode": "upstream overrode FULL_AND_PIECEWISE to FULL_DECODE_ONLY because the loaded model had neither a compiled submodule nor breakable CUDA graphs",
+    "outcome": [
+      "the API never became ready",
+      "all three management paths became unreachable after the profile/KV transition",
+      "dgx1 briefly recovered after 185 seconds and reported container exit 255 with OOMKilled=false",
+      "the final read-only reachability check found dgx1, dgx2, and dgx3 unreachable",
+      "no further remote recovery or launch was attempted"
+    ]
+  },
+  "analysis": [
+    "Disabling eager registry execution removed one unsafe compiler phase but did not remove compilation; the required profile forward pass still resolved uncached model-selected TileLang kernels after full weight and B12X-plan residency.",
+    "B12X preparation itself accumulated reclaimable accelerator scratch: MemAvailable fell near 1 GiB and driver allocations failed before later recovering near 9-10 GiB.",
+    "The old orchestration armed memguard only after API readiness, leaving exactly this startup interval unprotected.",
+    "The preserved container log ends after KV allocation and graph-mode selection, so the final control loss cannot be attributed more narrowly without the unavailable previous-boot journals."
+  ],
+  "decision": [
+    "reject the patch-0022 image and deferred-first-use configuration",
+    "do not launch another candidate until the hosts receive physical recovery and the owner explicitly resumes hardware work",
+    "compile captured model/backend JIT registrations before checkpoint weight residency",
+    "reclaim compiler scratch between pre-profile B12X units",
+    "pre-arm a protected fail-closed startup memguard before every container launch and monitor it through API readiness",
+    "require bounded build and single-node compilation checks before any future coordinated TP3 startup"
+  ]
+}

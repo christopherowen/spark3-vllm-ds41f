@@ -44,6 +44,13 @@ Report TTFT, per-stream and aggregate TPS, total wall time, prompt/decode token
 counts, and variability across complete runs. Performance is not accepted at the
 expense of model quality or silent request rejection.
 
+Every target-hardware startup must be fail-closed. Pre-arm the configured
+startup memory guard before each container launch, verify it remains active
+through API readiness, and reject the run on any driver allocation failure or
+guard stop. Do not repeat a coordinated launch after management-path loss until
+the failure is isolated with bounded tests and the owner explicitly authorizes
+new hardware work.
+
 ## Promotion
 
 A promotion commit must:

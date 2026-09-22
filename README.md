@@ -21,9 +21,10 @@ The active baseline was captured on 2026-09-20:
   tokens in the measured 3 GiB-per-rank cache;
 - one concurrent prefill, 8,192 batched tokens, and a 4 GiB host-memory guard.
 
-The subsequently promoted operational guard is 3 GiB and is armed only after
-JIT/autotuning startup completes. The immutable baseline retains the observed
-4 GiB value; `config/cluster.json` owns the current desired value.
+The immutable baseline retains the observed 4 GiB guard. Current orchestration
+uses a fail-closed 5 GiB startup threshold sampled every quarter-second, then switches
+to the promoted 3 GiB steady threshold only after API readiness;
+`config/cluster.json` owns both desired values.
 
 The machine-readable desired configuration is [config/cluster.json](config/cluster.json).
 The original live evidence is
@@ -72,11 +73,18 @@ checkout at that exact revision; it never copies a working tree or ignored files
 The only cleanliness exception is a repository-local writable runtime mount
 declared in `cluster.json` (currently `cache/`), which is preserved in place and
 never enters Git.
-`cluster start` preflights all three ranks, starts workers before the head, waits
-for API readiness, and only then arms a host-local memory guard on every Spark.
-Keeping the guards off during startup preserves the memory needed for JIT and
-autotuning. Mutating operations require an explicit `--apply`; replacing an
-existing service additionally requires `--replace`.
+`cluster start` preflights all three ranks, pre-arms a protected host-local
+startup memory guard, waits for its first successful memory sample, and only
+then starts workers before the head. Readiness fails if a guard exits or
+available host memory crosses its threshold. Only a healthy API switches every
+node to the lower steady-state guard. Mutating operations require an explicit
+`--apply`; replacing an existing
+service additionally requires `--replace`, and an experiment with
+`deployment.launch_enabled=false` refuses mutation locally.
+
+Both tracked cluster configurations are launch-disabled during the physical
+recovery pause. Re-enabling either one requires an explicit reviewed config
+change after the hosts have been power-cycled and inspected.
 
 The compatibility helpers in `scripts/` are thin wrappers around these commands.
 They contain no independent topology, credentials, or launch logic.

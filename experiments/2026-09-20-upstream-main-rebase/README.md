@@ -416,11 +416,40 @@ four-worker TileLang compile of 15 mHC variants, and drove dgx3 to zero availabl
 memory. The retry is rejected and recorded in
 `runs/launch-0be891cb05b7-warm-cache-parallel-jit-memory.json`.
 
-The next controlled recovery launch disables only `enable_jit_warmup`. This
-matches the effective pre-rebase startup behavior while retaining the populated
-disk caches, normal model execution, CUDA-graph capture, all B12X plans, native
-weights, and the 3 GiB KV allocation. It tests whether eager registry scheduling,
-rather than steady model execution, is the remaining fatal peak.
+The deferred-JIT recovery launch also failed and is rejected. It omitted the
+61-key registry sweep, but the required profile forward pass then compiled the
+same model-selected TileLang mHC kernels after 98.1 GiB of weights and all B12X
+plans were resident. B12X preparation itself fell to 1.01--1.72 GiB available
+and emitted driver allocation failures before reclaiming. The runtime reached a
+1,353,553-token KV allocation (8.46 complete 160K windows), but all three control
+paths subsequently became unavailable before API readiness. The preserved
+container evidence is in
+`runs/launch-0be891cb05b7-deferred-first-use-memory.json`; previous-boot kernel
+journals are unavailable, so the final control loss is not attributed more
+narrowly.
+
+Patch 0023 corrects both identified startup phases without changing model
+arithmetic. The active model/backend JIT registry is drained immediately after
+model construction and before checkpoint payloads become resident. It also
+fixes the concrete B12X preparation-lifetime regression found in the rebased
+source: discovery constructed all 226 MXFP8 units before compiling the first,
+and each unit retained serving-size dummy activations in its request closures.
+Discovery and compilation now proceed one unit at a time, MXFP8 trial
+activations are allocated only inside the active plan's preparation, and
+allocator scratch is reclaimed before the next plan. Its replay head is
+`c6d531aa609f83496a8471d157ef32e62895bd4b` with tree
+`ab564f8dd3477f70b50b970e07250ff64256c2ac`. Ruff, formatting, Python
+compilation, and patch whitespace checks pass. A fresh deterministic replay and
+the focused tests in the target image remain pending; the patch is intentionally
+unbuilt and unqualified while the hosts await physical recovery.
+
+Cluster startup is now fail-closed as well: a protected 5 GiB,
+quarter-second host-memory guard confirms its first sample before each rank is
+allowed to launch, API readiness requires that guard to remain active, and only
+a healthy cluster switches to the 3 GiB steady guard. A candidate that repeats
+either observed trough is killed locally before it can exhaust driver and
+management headroom. No further node contact, build, recovery action, or launch
+is authorized until physical recovery and an explicit owner decision.
 
 ## Quality and safety gates
 
@@ -439,6 +468,10 @@ rather than steady model execution, is the remaining fatal peak.
   adapter; a passing B12X topology unit test alone does not prove that the
   serving process uses it.
 - All three ranks must use one content-addressed image.
+- A protected startup memguard must confirm its first memory sample before
+  `docker run` and remain active through API readiness; an inactive guard or
+  less than 5 GiB MemAvailable kills and rejects the candidate rather than
+  waiting for driver allocation failure.
 - Before promotion, pass model-load, deterministic-output, long-context,
   CUDA-graph, RoCEnante, minimum-memory, and request-failure gates.
 - Preserve the current image and launch as the rollback target.

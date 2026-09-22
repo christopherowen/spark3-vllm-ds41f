@@ -1,6 +1,6 @@
 # Decision
 
-Status: **Patch 0022 retained; eager resident-model JIT rejected; deferred-JIT recovery candidate pending**
+Status: **Patch 0023 prepared offline; all patch-0022 launch modes rejected; hardware work paused**
 
 The patch-0022 immutable image completed native target and DSpark loading at
 98.1 GiB per rank and prepared the selected B12X weight and transport plans,
@@ -33,10 +33,38 @@ A warm-cache retry proved that the patch's model ownership is useful but that
 eager registry execution is itself unsafe in the resident-model phase. The
 rebased model occupied only 0.7 GiB more than the promoted runtime; B12X
 preparation/profile work and the 61-key eager sweep caused the large transient
-peaks. The next launch disables only `enable_jit_warmup`, allowing graph capture
-and real execution to resolve already-cached kernels incrementally. It is a
-recovery experiment, not a promotion, until startup, request execution, and
-runtime-JIT evidence pass.
+peaks.
+
+Disabling the eager sweep did not make startup safe. The real profile pass still
+compiled model-selected mHC TileLang kernels after weights and prepared plans
+were resident. B12X preparation reached 1.01--1.72 GiB MemAvailable and emitted
+driver allocation failures, the runtime admitted 1,353,553 KV tokens, and all
+three management paths then became unavailable before API readiness. The old
+orchestrator had no startup memguard. This failure is recorded in
+`runs/launch-0be891cb05b7-deferred-first-use-memory.json`.
+
+Patch 0023's first recovery configuration deliberately disables CUDA graphs and
+their capture-size regimes. Re-establishing a safe eager API is a separate gate
+from recovering decode performance; FULL_DECODE_ONLY can return only after the
+pre-weight and pre-profile phases pass with measured headroom under the guard.
+
+Patch 0023 moves captured model/backend JIT compilation into the gap after model
+construction and before checkpoint loading. Source inspection after the failed
+launch found a second concrete peak-memory cause: the B12X collector eagerly
+constructed every warmup unit, and each of the 226 MXFP8 units closed over all
+of its serving-size dummy activations before the first unit compiled. Patch 0023
+now streams unit discovery and compilation, allocates those trial activations
+only while their individual plan is prepared, and releases accelerator scratch
+between plans. The deployment orchestrator pre-arms a protected 5 GiB,
+quarter-second startup guard, requires its initial memory sample before launching
+each rank, verifies that it remains active through readiness, and only then
+installs the 3 GiB steady guard. Threshold violations kill the unqualified
+container immediately instead of allowing a five-second graceful-stop window.
+These changes are quality-neutral and pass offline Ruff, formatting, Python
+compilation, and patch-whitespace checks. The local Mac environment lacks the
+target Python dependencies, so focused pytest, image construction, and hardware
+qualification remain pending. No node contact, recovery attempt, image build,
+or launch may proceed until physical recovery and explicit owner authorization.
 
 The patch-0014 image completed checkpoint loading but proved that the MoE carry
 still targeted B12X's preceding API. Patch 0015 replaces that boundary with the

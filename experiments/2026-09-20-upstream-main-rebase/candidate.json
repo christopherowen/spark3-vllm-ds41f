@@ -10,6 +10,21 @@
       "from": 256,
       "to": 128,
       "reason": "128 is the exact common SM121 kernel page for the DeepSeek V4.1 indexer and B12X attention; BLHNC cannot split a padded 256-token manager page into dense 128-token kernel pages"
+    },
+    "kernel_config.enable_jit_warmup": {
+      "from": "post-weight or disabled",
+      "to": "enabled with patch-0023 pre-weight phase",
+      "reason": "compile only model/backend-registered kernels after construction and before checkpoint residency; the normal post-load drain remains a deduplicated catch-up for finalized KV-dependent registrations"
+    },
+    "compilation_config.cudagraph_mode": {
+      "from": "FULL_AND_PIECEWISE (implicitly overridden by upstream)",
+      "to": "NONE for the first guarded recovery boot",
+      "reason": "separate safe eager API recovery from graph-memory and performance qualification; after the pre-weight and B12X phases pass with measured headroom, test the upstream-selected FULL_DECODE_ONLY path as one isolated follow-up"
+    },
+    "deployment.launch_enabled": {
+      "from": true,
+      "to": false,
+      "reason": "the patch-0023 source is unbuilt and the hosts await physical recovery; cluster start must fail locally before contacting a node"
     }
   },
   "source_delta": [
@@ -39,9 +54,10 @@
         "8bf3113a54ae58db10397e77cd8f863944c008fe",
         "62605500d1997ff302540d6505e26c5caba76031",
         "9de03517c6be50eef0d20fe2d6cf02c34151a01e",
-        "6964357a771af30c341a008813ca7bba8810b2e4"
+        "6964357a771af30c341a008813ca7bba8810b2e4",
+        "c6d531aa609f83496a8471d157ef32e62895bd4b"
       ],
-      "source_tree": "f7e10aa21545cf60f41d72a2d39a8b0913efcdf2",
+      "source_tree": "ab564f8dd3477f70b50b970e07250ff64256c2ac",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -65,7 +81,8 @@
         "patches/vllm/0019-fix-b12x-prepare-RoCEnante-before-profiling.patch",
         "patches/vllm/0020-fix-b12x-synchronize-RoCEnante-plan-priming.patch",
         "patches/vllm/0021-fix-warmup-skip-ineligible-ll_bf16-routers.patch",
-        "patches/vllm/0022-perf-warmup-register-only-selected-model-kernels.patch"
+        "patches/vllm/0022-perf-warmup-register-only-selected-model-kernels.patch",
+        "patches/vllm/0023-fix-warmup-bound-pre-profile-memory-before-weight-re.patch"
       ]
     },
     {
@@ -95,19 +112,19 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
+  "image_digest": null,
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "the patch-0022 immutable image passed bounded model-free qualification but failed cold TP3 startup with NVIDIA driver allocation failures during selected DS4.1 indexer JIT compilation; all candidate containers are stopped and all three recovered hosts are idle",
+  "deployment_status": "patch 0023 is prepared offline but unbuilt and unqualified; patch 0022 failed both resident-model eager warmup and deferred first-use compilation, the three hosts require physical recovery, and no target-hardware contact is authorized during the recovery pause",
   "integration_status": {
-    "status": "rejected for cold startup: model/backend registration selected the correct 37 DS4.1 indexer kernels, but compilation still ran after 98.1 GiB weight and B12X-plan residency; a pre-weight cache-priming phase and explicit Engram preparation are required",
+    "status": "offline source candidate: model/backend JIT registrations compile immediately after construction and before checkpoint residency; B12X discovery and preparation are incremental; MXFP8 trial activations are allocated only for the active plan; and scratch is reclaimed between units. Build, bounded GB10 tests, and guarded TP3 startup remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "rejected-cold-tp3-indexer-jit-memory",
+    "status": "pending-patch-0023-build-and-guarded-qualification",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
