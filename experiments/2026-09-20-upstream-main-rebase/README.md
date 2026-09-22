@@ -531,6 +531,20 @@ separate post-readiness capacity step, never part of the cold-compilation test.
 The exact failure evidence is retained in
 `runs/launch-9e1e10e5a428-cold-specdecode-scratch.json`.
 
+The patch-0026 cold run then passed that 40-row speculative warmup and all
+earlier integration boundaries, including the reduced 2 GiB KV allocation. It
+failed closed at an independently reported upstream SM12x defect: ratio-1
+DeepSeek V4.1 indexer pages contained 128 states, while DeepGEMM's arch-12
+paged-MQA logits kernel accepts 64. This is vLLM issue #56461, not a B12X
+scratch regression. Patch 0027 follows the documented heterogeneous fix rather
+than globally shrinking the cache: ratio-1 indexer pages use 64 tokens and
+ratio-2 pages use 128 tokens, so both contain exactly 64 states; the main MLA
+cache retains its own 128-token page. The focused regression and 21 other
+indexer tests pass in the pinned image (one unrelated Hugging Face lookup test
+is unavailable under the deliberately offline test container). The cold-run
+telemetry, failure, and rollback are recorded in
+`runs/launch-4c1660dc825e-cold-indexer-page.json`.
+
 Because the official base image provides precompiled vLLM native extensions,
 the candidate image now rebuilds only `_C_stable_libtorch` from the recorded
 patched source for SM121. The build stage is bounded to two compile jobs and one

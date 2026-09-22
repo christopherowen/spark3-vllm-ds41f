@@ -56,7 +56,7 @@ prepare \
   vllm \
   https://github.com/vllm-project/vllm.git \
   d05da62e9ccdf8e342b15bf6785d83224cc165af \
-  bfac24036d10b390f7ffc791cf99e09c3b2c7a12 \
+  08d9f83955056a65af7a1153bdcc4a747204ffff \
   patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch \
   patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch \
   patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch \
@@ -82,7 +82,8 @@ prepare \
   patches/vllm/0023-fix-warmup-bound-pre-profile-memory-before-weight-re.patch \
   patches/vllm/0024-fix-deepseek-v41-compile-TP3-fused-Q-head-geometry.patch \
   patches/vllm/0025-fix-deepseek-v41-skip-indexed-path-for-B12X-SWA-only.patch \
-  patches/vllm/0026-fix-deepseek-v41-cover-B12X-speculative-warmup-rows.patch
+  patches/vllm/0026-fix-deepseek-v41-cover-B12X-speculative-warmup-rows.patch \
+  patches/vllm/0027-fix-deepseek-v41-use-64-state-SM12x-indexer-pages.patch
 
 prepare \
   b12x \

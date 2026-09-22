@@ -1,0 +1,99 @@
+From 6e1e038b0910ae1ed3da4e7cff24382815920c0b Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Tue, 22 Sep 2026 16:47:20 +0200
+Subject: [PATCH] fix(deepseek-v41): use 64-state SM12x indexer pages
+
+---
+ .../test_indexer_deepseek_v4_slot_mapping.py  | 33 +++++++++++++++++++
+ vllm/models/deepseek_v41/attention.py         | 11 ++++++-
+ vllm/v1/attention/backends/mla/indexer.py     |  7 ++++
+ 3 files changed, 50 insertions(+), 1 deletion(-)
+
+diff --git a/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py b/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
+index 48d600a77..8c59ed6c5 100644
+--- a/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
++++ b/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
+@@ -171,6 +171,39 @@ def test_indexer_preserves_deepseek_v41_mla_block_size():
+     )
+ 
+ 
++def test_deepseek_v41_sm12x_indexer_pages_hold_64_states(monkeypatch):
++    """Ratio-1 and ratio-2 pages must both fit DeepGEMM's SM12x kernel."""
++    import vllm.models.deepseek_v41.attention as attention
++    import vllm.v1.attention.backends.mla.indexer as indexer
++    from vllm.models.deepseek_v41.attention import DeepseekV4IndexerCache
++
++    for platform in (attention.current_platform, indexer.current_platform):
++        monkeypatch.setattr(platform, "is_cuda", lambda: True)
++        monkeypatch.setattr(
++            platform,
++            "is_device_capability_family",
++            lambda family: family == 120,
++        )
++
++    vllm_config = SimpleNamespace(
++        cache_config=SimpleNamespace(cache_dtype="nvfp4_ds_mla")
++    )
++    for ratio, expected_tokens in ((1, 64), (2, 128)):
++        cache = object.__new__(DeepseekV4IndexerCache)
++        cache.cache_config = SimpleNamespace(block_size=128)
++        cache.head_dim = 132
++        cache.dtype = torch.uint8
++        cache.compress_ratio = ratio
++        cache.sparse_logits = False
++
++        spec = cache.get_kv_cache_spec(vllm_config)
++        backend = cache.get_attn_backend()
++
++        assert spec.block_size == expected_tokens
++        assert spec.num_states == 64
++        assert select_common_block_size(spec.block_size, [backend]) == expected_tokens
++
++
+ def test_indexer_warmup_uses_registered_compress_ratio_and_non_pcp_alignment():
+     config = SimpleNamespace(
+         scheduler_config=SimpleNamespace(max_num_batched_tokens=8),
+diff --git a/vllm/models/deepseek_v41/attention.py b/vllm/models/deepseek_v41/attention.py
+index c914ebcc7..3e59ef8f1 100644
+--- a/vllm/models/deepseek_v41/attention.py
++++ b/vllm/models/deepseek_v41/attention.py
+@@ -1145,8 +1145,17 @@ class DeepseekV4IndexerCache(torch.nn.Module, AttentionLayerBase):
+             and not _use_v41_mxfp8_kv_record(vllm_config.cache_config.cache_dtype)
+             else 512
+         )
++        block_size = self.cache_config.block_size
++        if current_platform.is_cuda() and current_platform.is_device_capability_family(
++            120
++        ):
++            # DeepGEMM's arch-12 paged-MQA logits kernel accepts 64 states per
++            # page. Keep that state geometry for both V4.1 compression ratios:
++            # 64 tokens for ratio 1 and 128 tokens for ratio 2. This is an
++            # indexer-cache property; the main MLA cache keeps its own page.
++            block_size = 64 * max(1, self.compress_ratio)
+         return MLAAttentionSpec(
+-            block_size=self.cache_config.block_size,
++            block_size=block_size,
+             num_kv_heads=1,
+             head_size=self.head_dim,
+             dtype=self.dtype,
+diff --git a/vllm/v1/attention/backends/mla/indexer.py b/vllm/v1/attention/backends/mla/indexer.py
+index 771cb926c..1f7a027b2 100644
+--- a/vllm/v1/attention/backends/mla/indexer.py
++++ b/vllm/v1/attention/backends/mla/indexer.py
+@@ -267,6 +267,13 @@ class DeepseekV41IndexerBackend(DeepseekV4IndexerBackend):
+ 
+     @staticmethod
+     def get_supported_kernel_block_sizes() -> list[int | MultipleOf]:
++        if current_platform.is_cuda() and current_platform.is_device_capability_family(
++            120
++        ):
++            # DeepGEMM's arch-12 paged-MQA logits kernel supports 64 states per
++            # page. V4.1 ratio-1 and ratio-2 caches therefore use 64 and 128
++            # tokens respectively; both are physical kernel page sizes.
++            return [128, 64]
+         return [64 if current_platform.is_device_capability_family(90) else 128]
+ 
+ 
+-- 
+2.54.0 (Apple Git-157)
+

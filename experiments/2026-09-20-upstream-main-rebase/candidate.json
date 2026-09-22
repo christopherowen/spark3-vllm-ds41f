@@ -58,9 +58,10 @@
         "c6d531aa609f83496a8471d157ef32e62895bd4b",
         "6131c72e0f15fa9b87e8bfce6099c3564066b209",
         "891dfb6cb1f9e7fa61547081ba346dcec405a275",
-        "329631a979ddc91191a9f13ca3d0ac4efeb9d549"
+        "329631a979ddc91191a9f13ca3d0ac4efeb9d549",
+        "6e1e038b0910ae1ed3da4e7cff24382815920c0b"
       ],
-      "source_tree": "bfac24036d10b390f7ffc791cf99e09c3b2c7a12",
+      "source_tree": "08d9f83955056a65af7a1153bdcc4a747204ffff",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -88,7 +89,8 @@
         "patches/vllm/0023-fix-warmup-bound-pre-profile-memory-before-weight-re.patch",
         "patches/vllm/0024-fix-deepseek-v41-compile-TP3-fused-Q-head-geometry.patch",
         "patches/vllm/0025-fix-deepseek-v41-skip-indexed-path-for-B12X-SWA-only.patch",
-        "patches/vllm/0026-fix-deepseek-v41-cover-B12X-speculative-warmup-rows.patch"
+        "patches/vllm/0026-fix-deepseek-v41-cover-B12X-speculative-warmup-rows.patch",
+        "patches/vllm/0027-fix-deepseek-v41-use-64-state-SM12x-indexer-pages.patch"
       ]
     },
     {
@@ -121,16 +123,16 @@
   "image_digest": "sha256:4c1660dc825ec17946c60ef90f019bed99d3f26ba662157401e8175519180822",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0026 image sha256:4c1660dc825e safely completed fresh compilation, loading, B12X preparation, 2 GiB KV allocation, and the fixed 40-row speculative warmup, then failed closed on upstream vLLM issue #56461 when a ratio-1 indexer exposed 128 states to DeepGEMM's 64-state SM12x kernel; launch is locked pending a per-ratio page fix and a new immutable image",
+  "deployment_status": "patch 0026 image sha256:4c1660dc825e safely completed fresh compilation, loading, B12X preparation, 2 GiB KV allocation, and the fixed 40-row speculative warmup, then failed closed on upstream vLLM issue #56461; patch 0027 applies the independently documented per-ratio SM12x indexer geometry and launch remains locked pending deterministic replay and an immutable image",
   "integration_status": {
-    "status": "patch 0026 is validated through its intended 40-row DSpark warmup; the next integration boundary is the independently reported upstream SM12x ratio-1 indexer page defect (#56461)",
+    "status": "patch 0026 is validated through its intended 40-row DSpark warmup; patch 0027 gives every SM12x ratio-1 and ratio-2 indexer page the 64 states accepted by DeepGEMM without globally changing the main cache page",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0026-warmup-pass-upstream-sm12x-indexer-page-fix-required",
+    "status": "patch-0027-source-and-ratio-specific-indexer-page-regression-pass-immutable-build-required",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
