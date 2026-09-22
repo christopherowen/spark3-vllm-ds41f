@@ -2,7 +2,7 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-upstream-6e1e-b12x-b69f-nopdl-q",
+    "name": "dsv41-upstream-6e1e-b12x-b69f-stream-q",
     "image": "vllm-ds41f-upstream-main:6e1e038b0910-b69feee3022c-d55aa3fd94c80",
     "expected_labels": {
       "org.opencontainers.image.revision": "55aa3fd94c804f1cecb252c8bb543b8369b75e1b",

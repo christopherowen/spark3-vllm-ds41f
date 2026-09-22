@@ -21,19 +21,6 @@ import torch
 _ARM_FILE = "/tmp/spark3-nan-probe"
 
 
-class _NoPdlPlatform:
-    """Delegate every platform query except PDL capability."""
-
-    def __init__(self, delegate: Any) -> None:
-        self._delegate = delegate
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._delegate, name)
-
-    def is_arch_support_pdl(self) -> bool:
-        return False
-
-
 def _tensors(value: Any) -> Iterator[torch.Tensor]:
     if isinstance(value, torch.Tensor):
         yield value
@@ -142,7 +129,7 @@ def _wrap_sparse_entry(owner: type[Any]) -> None:
 
 
 def _install() -> None:
-    import vllm.models.common.ops.fused_qk_rmsnorm as fused_rmsnorm
+    import vllm.model_executor.kernels.linear.mxfp8.b12x as b12x_mxfp8
     import vllm.models.deepseek_v41.nvidia.model as model
     from vllm.model_executor.layers.logits_processor import LogitsProcessor
     from vllm.model_executor.layers.vocab_parallel_embedding import (
@@ -153,12 +140,37 @@ def _install() -> None:
         DeepseekV41B12xAttention,
     )
 
-    # The preceding MXFP8 producer selected on SM121 does not establish the
-    # programmatic grid dependency expected by this consumer.  Keep every
-    # other platform capability intact while testing the suspected RAW race.
-    fused_rmsnorm.current_platform = _NoPdlPlatform(
-        fused_rmsnorm.current_platform
-    )
+    # B12X accepts an optional launch stream, but its prepared MXFP8 path
+    # currently forwards ``None`` to the CuTe GEMM launcher.  Its Triton
+    # quantizer and the following vLLM kernels use PyTorch's current stream.
+    # Pass that stream explicitly to test whether the corrupt Q tensor is a
+    # producer/consumer race at this boundary rather than bad arithmetic.
+    def apply_mxfp8_on_current_stream(
+        layer: torch.nn.Module,
+        x: torch.Tensor,
+        bias: torch.Tensor | None,
+    ) -> torch.Tensor:
+        packed_weight = layer.b12x_mxfp8_packed_weight
+        plan = getattr(layer, "b12x_mxfp8_plan", None)
+        if plan is None or plan.prepared is None:
+            raise RuntimeError(
+                "b12x MXFP8 linear plan must be prepared before memory "
+                "profiling or capture"
+            )
+        input_2d = x.reshape(-1, x.shape[-1]).contiguous()
+        output_shape = [*x.shape[:-1], int(packed_weight.out_features)]
+        mxfp8 = b12x_mxfp8._import_b12x_mxfp8()
+        assert mxfp8 is not None
+        output = mxfp8.mm(
+            input_2d,
+            packed_weight,
+            plan=plan,
+            bias=bias,
+            stream=torch.cuda.current_stream(input_2d.device),
+        )
+        return output.view(*output_shape)
+
+    b12x_mxfp8._apply_b12x_mxfp8_packed_linear = apply_mxfp8_on_current_stream
 
     _wrap_method(VocabParallelEmbedding, "forward", "embedding")
     for method_name in (
