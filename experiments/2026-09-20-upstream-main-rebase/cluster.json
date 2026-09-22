@@ -2,13 +2,13 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-upstream-6131-b12x-b69f-startupq",
-    "image": "vllm-ds41f-upstream-main:6131c72e0f15-b69feee3022c-d035350a4c857",
+    "name": "dsv41-upstream-891d-b12x-b69f-startupq",
+    "image": "vllm-ds41f-upstream-main:891dfb6cb1f9-b69feee3022c-db1d7a0d67579",
     "expected_labels": {
-      "org.opencontainers.image.revision": "035350a4c857e920d6db8911d3f2d3bc853c210d",
+      "org.opencontainers.image.revision": "b1d7a0d675799f6c127bebe1c020123b07bec17e",
       "local.spark3.vllm.base": "d05da62e9ccdf8e342b15bf6785d83224cc165af",
-      "local.spark3.vllm.patch-head": "6131c72e0f15fa9b87e8bfce6099c3564066b209",
-      "local.spark3.vllm.tree": "76ee6f9a11a9e4fab4e18f8a27e797adb3eea55e",
+      "local.spark3.vllm.patch-head": "891dfb6cb1f9e7fa61547081ba346dcec405a275",
+      "local.spark3.vllm.tree": "387c6bddc41d1802a049f0904d1ed096604078c4",
       "local.spark3.b12x.base": "0f3a8cbfd1c11d27f04e3ab37a802d522f4f1c68",
       "local.spark3.b12x.patch-head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
       "local.spark3.b12x.tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
@@ -59,13 +59,13 @@
     "startup_memguard_wait_seconds": 120
   },
   "environment": {
-    "B12X_COMPILE_CACHE_DIR": "/cache/qualification/patch0024-04500fc12dbd-r1/jit/b12x/compile",
-    "B12X_CUTE_COMPILE_CACHE_DIR": "/cache/qualification/patch0024-04500fc12dbd-r1/jit/b12x/cute",
+    "B12X_COMPILE_CACHE_DIR": "/cache/qualification/patch0025-9e1e10e5a428-r1/jit/b12x/compile",
+    "B12X_CUTE_COMPILE_CACHE_DIR": "/cache/qualification/patch0025-9e1e10e5a428-r1/jit/b12x/cute",
     "B12X_DISK_BACKEND": "io_uring",
     "B12X_ROCE_GID_INDEX": "3",
     "B12X_ROCE_SPIN_LIMIT": "5000000",
     "CUDA_DEVICE_MAX_CONNECTIONS": "32",
-    "CUTE_DSL_CACHE_DIR": "/cache/qualification/patch0024-04500fc12dbd-r1/jit/cute-dsl",
+    "CUTE_DSL_CACHE_DIR": "/cache/qualification/patch0025-9e1e10e5a428-r1/jit/cute-dsl",
     "DSV41_INDEXER_PREFILL_FACTOR": "1",
     "GLOO_SOCKET_IFNAME": "enP7s7",
     "HF_HOME": "/cache/huggingface",
@@ -94,12 +94,12 @@
     "NCCL_SOCKET_IFNAME": "enP7s7",
     "OMP_NUM_THREADS": "8",
     "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True,garbage_collection_threshold:0.6",
-    "TORCHINDUCTOR_CACHE_DIR": "/cache/qualification/patch0024-04500fc12dbd-r1/jit/torchinductor",
+    "TORCHINDUCTOR_CACHE_DIR": "/cache/qualification/patch0025-9e1e10e5a428-r1/jit/torchinductor",
     "TORCH_NCCL_ASYNC_ERROR_HANDLING": "1",
     "TP_SOCKET_IFNAME": "enP7s7",
     "TRANSFORMERS_OFFLINE": "1",
-    "TRITON_CACHE_DIR": "/cache/qualification/patch0024-04500fc12dbd-r1/jit/triton",
-    "VLLM_CACHE_ROOT": "/cache/qualification/patch0024-04500fc12dbd-r1/jit/vllm",
+    "TRITON_CACHE_DIR": "/cache/qualification/patch0025-9e1e10e5a428-r1/jit/triton",
+    "VLLM_CACHE_ROOT": "/cache/qualification/patch0025-9e1e10e5a428-r1/jit/vllm",
     "VLLM_ENABLE_ROCE_ALLREDUCE": "1",
     "VLLM_ENGINE_READY_TIMEOUT_S": "3600",
     "VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS": "900",
@@ -114,7 +114,7 @@
     "VLLM_USE_MEGA_AOT_ARTIFACT": "1",
     "VLLM_USE_STANDALONE_COMPILE": "1",
     "VLLM_USE_V2_MODEL_RUNNER": "1",
-    "XDG_CACHE_HOME": "/cache/qualification/patch0024-04500fc12dbd-r1/jit"
+    "XDG_CACHE_HOME": "/cache/qualification/patch0025-9e1e10e5a428-r1/jit"
   },
   "serve_args": [
     "/models",

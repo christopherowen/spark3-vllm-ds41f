@@ -116,19 +116,19 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:04500fc12dbd564245b84757cca46f1cfc148cbbe053eb8e892ea2016a137a72",
+  "image_digest": "sha256:9e1e10e5a4289f9f702bfd2a61a094c16f336a5cd06c4c86f05c818fdf664d63",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0024 image sha256:04500fc12dbd safely completed cold compilation and weight loading, then stopped on a deterministic SWA-only B12X adapter defect without OOM or node loss; patch 0025 fixes the isolated path and passes its model-free regression, while experimental and promoted launches remain locked pending a new immutable image",
+  "deployment_status": "patch 0025 image sha256:9e1e10e5a428 passes the 12-case native TP3 matrix and 12 focused model-free regressions, including the SWA-only runtime correction, and is byte-identical on all three healthy ranks; experimental and promoted launches remain locked pending guarded cold/warm startup",
   "integration_status": {
-    "status": "patch 0024 prelaunch qualification passed and its protected cold run safely reached model execution; patch 0025 prevents SWA-only layers from consuming shared indexed-cache top-k output and now requires immutable-image and cold/warm TP3 qualification",
+    "status": "distributed immutable patch 0025 candidate: SWA-only layers no longer consume shared indexed-cache top-k output; exact source replay, native build, model-free gates, and byte-identical distribution pass, while guarded cold/warm TP3 startup remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0025-source-regression-passes-image-and-cold-warm-qualification-required",
+    "status": "patch-0025-image-passes-distributed-prelaunch-qualification-pending-cold-warm-startup",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

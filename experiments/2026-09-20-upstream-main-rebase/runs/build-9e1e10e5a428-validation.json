@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "status": "passed-distributed-immutable-prelaunch-qualification",
+  "timestamp": "2026-09-22T15:05:00+02:00",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:891dfb6cb1f9-b69feee3022c-db1d7a0d67579",
+    "id": "sha256:9e1e10e5a4289f9f702bfd2a61a094c16f336a5cd06c4c86f05c818fdf664d63",
+    "size_bytes": 23195062180,
+    "deployment_revision": "b1d7a0d675799f6c127bebe1c020123b07bec17e",
+    "vllm_patch_head": "891dfb6cb1f9e7fa61547081ba346dcec405a275",
+    "vllm_tree": "387c6bddc41d1802a049f0904d1ed096604078c4",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "test_environment": {
+    "host": "dgx1",
+    "gpu_visible": true,
+    "network": "disabled",
+    "memory_limit_gib": 32,
+    "memory_swap_limit_gib": 32,
+    "model_loaded": false,
+    "serving_container_started": false,
+    "test_containers_removed": true
+  },
+  "checks": {
+    "source_replay": "twenty-five vLLM and five B12X patches reproduced the recorded revisions and Git trees from exact upstream bases",
+    "native_build": "the pinned base image rebuilt only _C_stable_libtorch with two compile jobs and one NVCC thread; the resulting immutable image passed source, binary dispatcher, import, CUTLASS DSL 4.7.1, liburing, and NCCL 2.30.7 gates",
+    "native_tp3_regression": "12 passed from the immutable image for interleaved Q layouts, including exact n_heads=24 and q_head_padded=24 TP3 geometry",
+    "focused_patch_regressions": "12 passed from the immutable image: model/backend-selected registration, pre-weight ordering, incremental B12X preparation, lazy MXFP8 lifetime, exact B12X/indexer geometry, and the SWA-only indexed-cache exclusion",
+    "image_labels": "deployment revision, upstream bases, patch heads, and source trees exactly match the locked build inputs on all three nodes",
+    "image_distribution": "dgx1, dgx2, and dgx3 report the exact image ID sha256:9e1e10e5a4289f9f702bfd2a61a094c16f336a5cd06c4c86f05c818fdf664d63 after concurrent uncompressed streams over dgx1's verified 192.168.0.0/24 and 192.168.2.0/24 ConnectX-7 links",
+    "distributed_preflight": "all nodes report repository revision b1d7a0d67579, zero running containers, systemd running, no current-boot NV_ERR_NO_MEMORY, at least 115189560 KiB MemAvailable, and an absent patch0025-9e1e10e5a428-r1 cache namespace"
+  },
+  "safety": {
+    "candidate_cluster_launch_enabled": false,
+    "promoted_cluster_launch_enabled": false,
+    "startup_memguard_gib": 5,
+    "startup_memguard_interval_seconds": 0.1,
+    "candidate_distributed": true,
+    "tp3_started": false
+  },
+  "remaining": [
+    "perform guarded cold TP3 eager startup from the empty namespace and require API readiness plus a deterministic smoke request",
+    "stop only the exact candidate, preserve the completed compilation cache, then repeat a guarded warm startup and deterministic smoke request"
+  ]
+}
