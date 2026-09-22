@@ -56,7 +56,7 @@ prepare \
   vllm \
   https://github.com/vllm-project/vllm.git \
   d05da62e9ccdf8e342b15bf6785d83224cc165af \
-  e9b991925cc431c79a52fa0fd920c75532d6887a \
+  8c657dad6d3eb6d5f6a33ff87058fd3e745f0c4c \
   patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch \
   patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch \
   patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch \

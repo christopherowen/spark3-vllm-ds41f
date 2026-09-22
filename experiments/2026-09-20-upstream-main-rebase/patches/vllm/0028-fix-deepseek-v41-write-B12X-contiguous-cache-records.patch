@@ -1,16 +1,16 @@
-From 5e544847e63dce5cf4767ac3da3595e6fb351c20 Mon Sep 17 00:00:00 2001
+From 67e0b2ada271f75b2f9f0de473889a0f99b2062c Mon Sep 17 00:00:00 2001
 From: Christopher Owen <root@your.mom>
 Date: Tue, 22 Sep 2026 23:35:52 +0200
 Subject: [PATCH] fix(deepseek-v41): write B12X contiguous cache records
 
 ---
- tests/models/test_deepseek_v41_b12x.py        | 119 ++++++++++++
+ tests/models/test_deepseek_v41_b12x.py        | 122 ++++++++++++
  vllm/models/deepseek_v41/attention.py         |  11 +-
- .../deepseek_v41/nvidia/b12x_attention.py     | 179 +++++++++++++++++-
- 3 files changed, 305 insertions(+), 4 deletions(-)
+ .../deepseek_v41/nvidia/b12x_attention.py     | 185 +++++++++++++++++-
+ 3 files changed, 314 insertions(+), 4 deletions(-)
 
 diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
-index f3ebe4fe9..35acb2d2b 100644
+index f3ebe4fe9..3adedb94e 100644
 --- a/tests/models/test_deepseek_v41_b12x.py
 +++ b/tests/models/test_deepseek_v41_b12x.py
 @@ -63,8 +63,11 @@ def test_b12x_backend_requires_current_prepared_api(monkeypatch) -> None:
@@ -35,7 +35,7 @@ index f3ebe4fe9..35acb2d2b 100644
      monkeypatch.setattr(b12x_attention.DeepseekV4Attention, "__init__", initialize_base)
      monkeypatch.setattr(
          b12x_attention, "get_b12x_compressed_sparse_mla", lambda: current
-@@ -152,6 +158,119 @@ def test_flatten_cache_preserves_packed_page_storage() -> None:
+@@ -152,6 +158,122 @@ def test_flatten_cache_preserves_packed_page_storage() -> None:
          _flatten_cache(cache.to(torch.bfloat16), name="test cache")
  
  
@@ -46,8 +46,11 @@ index f3ebe4fe9..35acb2d2b 100644
 +
 +    def forward(self, positions, query, key=None):
 +        self.positions.append(positions.clone())
++        assert query.ndim == 3
 +        query.add_(1)
 +        if key is not None:
++            assert key.ndim == 3
++            assert key.shape[-2] == 1
 +            key.add_(2)
 +        return query, key
 +
@@ -185,7 +188,7 @@ index 3e59ef8f1..5f40b79eb 100644
          # Override point: the ROCm layer preshuffles this weight in place, so
          # it cannot go through fused_wqa_wkv directly.
 diff --git a/vllm/models/deepseek_v41/nvidia/b12x_attention.py b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
-index 3315bd2d4..5950d2452 100644
+index 3315bd2d4..673be97f5 100644
 --- a/vllm/models/deepseek_v41/nvidia/b12x_attention.py
 +++ b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
 @@ -97,7 +97,13 @@ class DeepseekV41B12xBackend(DeepseekV4SparseMLABackend):
@@ -311,7 +314,7 @@ index 3315bd2d4..5950d2452 100644
          )
          return B12xWarmupUnit(
              name="DeepSeek V4.1 sparse MLA",
-@@ -515,6 +576,118 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+@@ -515,6 +576,124 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
                  )
              )
  
@@ -382,8 +385,13 @@ index 3315bd2d4..5950d2452 100644
 +        )
 +        if swa is None:
 +            raise RuntimeError("DeepSeek V4.1 B12X SWA metadata is missing")
-+        q, rotated_kv = self.rotary_emb(positions, q, kv)
++        # DeepSeek's rotary module broadcasts its [tokens, 1, rope] table
++        # across an explicit head axis.  The shared latent has no head axis,
++        # so expose its single replicated head while applying RoPE and remove
++        # that axis before handing the row to B12X's cache writer.
++        q, rotated_kv = self.rotary_emb(positions, q, kv.unsqueeze(-2))
 +        assert rotated_kv is not None
++        rotated_kv = rotated_kv.squeeze(-2)
 +        plans = self._ensure_plans()
 +        self._write_b12x_cache(
 +            rotated_kv,
@@ -411,8 +419,9 @@ index 3315bd2d4..5950d2452 100644
 +        cache_positions = positions.div(
 +            self.compress_ratio, rounding_mode="floor"
 +        ).mul_(self.compress_ratio)
-+        rotated = latent.clone()
++        rotated = latent.clone().unsqueeze(-2)
 +        rotated, _ = self.rotary_emb(cache_positions, rotated)
++        rotated = rotated.squeeze(-2)
 +        plans = self._ensure_plans()
 +        if plans.indexed_writer is None:
 +            raise RuntimeError("DeepSeek V4.1 B12X indexed writer is missing")

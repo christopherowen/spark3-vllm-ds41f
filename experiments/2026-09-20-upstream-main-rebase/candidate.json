@@ -60,9 +60,9 @@
         "891dfb6cb1f9e7fa61547081ba346dcec405a275",
         "329631a979ddc91191a9f13ca3d0ac4efeb9d549",
         "6e1e038b0910ae1ed3da4e7cff24382815920c0b",
-        "5e544847e63dce5cf4767ac3da3595e6fb351c20"
+        "67e0b2ada271f75b2f9f0de473889a0f99b2062c"
       ],
-      "source_tree": "e9b991925cc431c79a52fa0fd920c75532d6887a",
+      "source_tree": "8c657dad6d3eb6d5f6a33ff87058fd3e745f0c4c",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -122,19 +122,20 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:b9c4e1264f2f7fa1d0de93b3db0e452e732e754608595b654f38e65f6e4df2a7",
+  "image_digest": null,
+  "failed_image_digest": "sha256:b9c4e1264f2f7fa1d0de93b3db0e452e732e754608595b654f38e65f6e4df2a7",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0028 corrects the proven vLLM-planar versus B12X-contiguous V4.1 cache-record mismatch; immutable image b9c4e126 is present identically on all three nodes, but a guarded target-only semantic smoke is still required before promotion",
+  "deployment_status": "patch 0028 corrects the proven cache-record mismatch and now adapts 2-D latent rows to DeepSeek RoPE's explicit singleton-head contract; the prior image reached guarded readiness but failed before attention on that shape boundary, so a replacement image and semantic smoke are required",
   "integration_status": {
-    "status": "patch 0028 routes both SWA MXFP8 and indexed NVFP4 writes through B12X's prepared contiguous-record writers; the rebuilt image passes identity/import gates and semantic qualification remains pending",
+    "status": "patch 0028 routes both SWA MXFP8 and indexed NVFP4 writes through B12X's prepared contiguous-record writers and preserves an explicit singleton head while applying RoPE; corrected source tests pass and rebuilt-image semantic qualification remains pending",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0028-immutable-image-and-prepared-writer-regressions-pass-semantic-pending",
+    "status": "patch-0028-source-and-rotary-shape-regressions-pass-rebuild-pending",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

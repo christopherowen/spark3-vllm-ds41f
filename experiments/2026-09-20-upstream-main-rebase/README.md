@@ -604,8 +604,16 @@ per token. Shape validation therefore could not detect the mismatch. Patch
 backend regressions proving that RoPE is applied before publication, the
 compressor's concurrent indexer input is not mutated, and the selected cache
 is flattened only at the explicit B12X boundary. The B12X writer's real SM121
-dynamic-row and CUDA-graph tests pass for both record types. A rebuilt image
-and guarded semantic smoke remain required before promotion.
+dynamic-row and CUDA-graph tests pass for both record types.
+
+The first rebuilt image reached guarded API readiness on all three ranks, then
+the first five-token request failed before attention: the replacement SWA
+writer passed a two-dimensional latent row beside three-dimensional Q to the
+DeepSeek rotary module. That module broadcasts over an explicit head axis.
+Patch 0028 now exposes the latent as a single replicated head for RoPE and
+removes that axis before the B12X write; its unit double rejects the previously
+accepted shape. Image `b9c4e126` is recorded as failed, launch is locked, and a
+replacement image plus guarded semantic smoke remain required before promotion.
 
 ## Quality and safety gates
 
