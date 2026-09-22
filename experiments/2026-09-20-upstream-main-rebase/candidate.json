@@ -23,8 +23,8 @@
     },
     "deployment.launch_enabled": {
       "from": true,
-      "to": true,
-      "reason": "the patch-0024 image passes native and model-free qualification and is distributed byte-identically to all three healthy nodes; only this experimental configuration is enabled for the fail-closed guarded cold/warm startup pair"
+      "to": false,
+      "reason": "the protected patch-0024 cold startup safely exposed an SWA-only B12X adapter defect; launch stays fail-closed while patch 0025 is prepared and qualified"
     }
   },
   "source_delta": [
@@ -56,9 +56,10 @@
         "9de03517c6be50eef0d20fe2d6cf02c34151a01e",
         "6964357a771af30c341a008813ca7bba8810b2e4",
         "c6d531aa609f83496a8471d157ef32e62895bd4b",
-        "6131c72e0f15fa9b87e8bfce6099c3564066b209"
+        "6131c72e0f15fa9b87e8bfce6099c3564066b209",
+        "891dfb6cb1f9e7fa61547081ba346dcec405a275"
       ],
-      "source_tree": "76ee6f9a11a9e4fab4e18f8a27e797adb3eea55e",
+      "source_tree": "387c6bddc41d1802a049f0904d1ed096604078c4",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -84,7 +85,8 @@
         "patches/vllm/0021-fix-warmup-skip-ineligible-ll_bf16-routers.patch",
         "patches/vllm/0022-perf-warmup-register-only-selected-model-kernels.patch",
         "patches/vllm/0023-fix-warmup-bound-pre-profile-memory-before-weight-re.patch",
-        "patches/vllm/0024-fix-deepseek-v41-compile-TP3-fused-Q-head-geometry.patch"
+        "patches/vllm/0024-fix-deepseek-v41-compile-TP3-fused-Q-head-geometry.patch",
+        "patches/vllm/0025-fix-deepseek-v41-skip-indexed-path-for-B12X-SWA-only.patch"
       ]
     },
     {
@@ -117,16 +119,16 @@
   "image_digest": "sha256:04500fc12dbd564245b84757cca46f1cfc148cbbe053eb8e892ea2016a137a72",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0024 image sha256:04500fc12dbd passes the 12-case native TP3 kernel matrix and all 11 exact patch-0022/0023 model-free regressions and is byte-identical on every rank; the experimental launch is enabled only for the guarded cold/warm pair, while the promoted launch remains locked",
+  "deployment_status": "patch 0024 image sha256:04500fc12dbd safely completed cold compilation and weight loading, then stopped on a deterministic SWA-only B12X adapter defect without OOM or node loss; patch 0025 fixes the isolated path and passes its model-free regression, while experimental and promoted launches remain locked pending a new immutable image",
   "integration_status": {
-    "status": "distributed immutable candidate: patch 0024 adds the exact native 24-head fused DeepSeek V4 QNorm/RoPE instantiation required by quality-preserving TP3 padding; image build, native/model-free tests, and byte-identical distribution pass, while guarded cold/warm TP3 startup remains required",
+    "status": "patch 0024 prelaunch qualification passed and its protected cold run safely reached model execution; patch 0025 prevents SWA-only layers from consuming shared indexed-cache top-k output and now requires immutable-image and cold/warm TP3 qualification",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0024-image-passes-distributed-prelaunch-qualification-pending-cold-warm-startup",
+    "status": "patch-0025-source-regression-passes-image-and-cold-warm-qualification-required",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

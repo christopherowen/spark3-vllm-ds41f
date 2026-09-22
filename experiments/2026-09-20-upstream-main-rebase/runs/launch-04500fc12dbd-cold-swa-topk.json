@@ -1,0 +1,69 @@
+{
+  "date": "2026-09-22",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:6131c72e0f15-b69feee3022c-d035350a4c857",
+    "id": "sha256:04500fc12dbd564245b84757cca46f1cfc148cbbe053eb8e892ea2016a137a72"
+  },
+  "cache_namespace": "/cache/qualification/patch0024-04500fc12dbd-r1/jit",
+  "startup_protection": {
+    "container_memory_gib": 108,
+    "mem_available_guard_gib": 5,
+    "sample_interval_seconds": 0.1,
+    "cuda_graphs": "disabled"
+  },
+  "result": "deterministic_swa_only_indexed_path_failure",
+  "observations": {
+    "pre_weight_jit_completed": true,
+    "model_loading": {
+      "memory_gib_per_rank": 98.1
+    },
+    "prepared_b12x_plans_per_rank": {
+      "mxfp8": 226,
+      "moe": 43,
+      "rocenante_collectives": 1
+    },
+    "kv_cache": {
+      "memory_gib": 3.0,
+      "tokens": 1353553,
+      "maximum_160k_concurrency": 8.46,
+      "dynamic_memory_profiling_skipped": true
+    },
+    "failure": {
+      "component": "DeepseekV41B12xAttention.forward_mqa",
+      "layer_mode": "swa_only",
+      "exception": "ZeroDivisionError: integer division or modulo by zero",
+      "cause": "the shared top-k indexer buffer selected the indexed-cache path even though compress_ratio was zero and the layer had no compressed cache",
+      "head_exit_code": 1,
+      "oom_killed": false
+    },
+    "telemetry_minimum_mem_available_kib": {
+      "dgx1": 5718552,
+      "dgx2": 6643888,
+      "dgx3": 6910040
+    },
+    "maximum_swap_used_kib": {
+      "dgx1": 472736,
+      "dgx2": 28,
+      "dgx3": 0
+    },
+    "nvidia_nv_err_no_memory_current_boot": false,
+    "hosts_remained_reachable": true,
+    "coordinated_rollback_completed": true
+  },
+  "cache_state": {
+    "compilation_completed": true,
+    "eligible_as_patch_0025_cold_input": false,
+    "preserved_for_evidence": true,
+    "files": {
+      "dgx1": 925,
+      "dgx2": 925,
+      "dgx3": 925
+    },
+    "bytes": {
+      "dgx1": 13930054,
+      "dgx2": 13930322,
+      "dgx3": 13929645
+    }
+  },
+  "resolution": "Patch 0025 treats compress_ratio == 0 as an SWA-only runtime contract, ignores any shared indexer output for that layer, and adds a model-free regression that passed inside the patch-0024 immutable image. Build a new immutable image and repeat cold/warm qualification from a new namespace without lowering the 5 GiB guard."
+}
