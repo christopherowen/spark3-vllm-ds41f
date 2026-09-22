@@ -122,20 +122,20 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
+  "image_digest": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
   "failed_image_digest": "sha256:b9c4e1264f2f7fa1d0de93b3db0e452e732e754608595b654f38e65f6e4df2a7",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0028 corrects the proven cache-record mismatch and now adapts 2-D latent rows to DeepSeek RoPE's explicit singleton-head contract; the prior image reached guarded readiness but failed before attention on that shape boundary, so a replacement image and semantic smoke are required",
+  "deployment_status": "the corrected patch 0028 image is built, runtime-tested, and present with identical identity on all three nodes; launch remains locked until its guarded target-only semantic smoke passes",
   "integration_status": {
-    "status": "patch 0028 routes both SWA MXFP8 and indexed NVFP4 writes through B12X's prepared contiguous-record writers and preserves an explicit singleton head while applying RoPE; corrected source tests pass and rebuilt-image semantic qualification remains pending",
+    "status": "patch 0028 routes both SWA MXFP8 and indexed NVFP4 writes through B12X's prepared contiguous-record writers and preserves an explicit singleton head while applying RoPE; source and rebuilt-image regression tests pass and guarded semantic qualification remains pending",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0028-source-and-rotary-shape-regressions-pass-rebuild-pending",
+    "status": "patch-0028-image-built-distributed-and-runtime-regressions-pass-semantic-smoke-pending",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

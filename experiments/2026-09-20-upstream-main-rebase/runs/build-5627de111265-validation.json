@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-23T01:15:04+02:00",
+  "result": "pass",
+  "builder": "dgx1",
+  "deployment_commit": "e7d44fd41ad64abb78d15623c58cc0c26211c145",
+  "source_root": "/home/swank/projects/spark3-vllm-ds41f/.work/build/patch0028-67e0-6271ddf",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:67e0b2ada271-b69feee3022c-de7d44fd41ad6",
+    "id": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
+    "size_bytes": 23195232061,
+    "base_manifest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
+  },
+  "sources": {
+    "vllm_head": "67e0b2ada271f75b2f9f0de473889a0f99b2062c",
+    "vllm_tree": "8c657dad6d3eb6d5f6a33ff87058fd3e745f0c4c",
+    "b12x_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "build_bounds": {
+    "cmake_jobs": 2,
+    "nvcc_threads": 1
+  },
+  "gates": {
+    "prepared_source_identity": "pass",
+    "native_extension_build": "pass",
+    "dependency_delta": "pass",
+    "candidate_imports": "pass",
+    "cutlass_dependency": "pass",
+    "prepared_writer_unit_tests": "pass-before-build",
+    "prepared_writer_sm121_graph_replay": "pass-before-build",
+    "rebuilt_image_writer_unit_tests": "pass",
+    "three_node_image_identity": "pass"
+  },
+  "distribution": {
+    "method": "parallel uncompressed docker save/load over dgx1 ConnectX-7 peer links",
+    "dgx1_to_dgx2": "192.168.0.2",
+    "dgx1_to_dgx3": "192.168.2.2",
+    "node_image_ids": {
+      "dgx1": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
+      "dgx2": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
+      "dgx3": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a"
+    }
+  },
+  "github_dependency_auth": "ephemeral BuildKit secret mount; absent from image layers and build arguments",
+  "remaining_gate": "guarded three-rank target-only semantic smoke"
+}

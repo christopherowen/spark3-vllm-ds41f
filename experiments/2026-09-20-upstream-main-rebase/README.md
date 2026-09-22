@@ -617,7 +617,9 @@ DeepSeek rotary module. That module broadcasts over an explicit head axis.
 Patch 0028 now exposes the latent as a single replicated head for RoPE and
 removes that axis before the B12X write; its unit double rejects the previously
 accepted shape. Image `b9c4e126` is recorded as failed, launch is locked, and a
-replacement image plus guarded semantic smoke remain required before promotion.
+replacement image (`5627de11`) has passed the focused runtime regressions and
+is present identically on all three nodes. Its guarded semantic smoke remains
+required before promotion.
 
 ## Quality and safety gates
 
