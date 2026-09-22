@@ -1,0 +1,72 @@
+{
+  "date": "2026-09-22",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:c6d531aa609f-b69feee3022c-d397d35a4e051",
+    "id": "sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3"
+  },
+  "cache_namespace": "/cache/qualification/patch0023-9076b0bd9fee-r3/jit",
+  "startup_protection": {
+    "container_memory_gib": 108,
+    "mem_available_guard_gib": 6,
+    "sample_interval_seconds": 0.1,
+    "cuda_graphs": "disabled"
+  },
+  "result": "safe_guard_stop",
+  "observations": {
+    "pre_weight_jit_seconds": {
+      "dgx1": 31.58,
+      "dgx2": 31.21,
+      "dgx3": 33.81
+    },
+    "model_loading_memory_gib_per_rank": 98.1,
+    "prepared_b12x_plans_per_rank": {
+      "mxfp8": 226,
+      "moe": 43,
+      "rocenante_collectives": 1
+    },
+    "rocenante_all_reduce_live": true,
+    "rocenante_all_gather_live": true,
+    "kv_cache": {
+      "memory_gib": 3.0,
+      "tokens": 1353553,
+      "maximum_160k_concurrency": 8.46,
+      "dynamic_memory_profiling_skipped": true
+    },
+    "model_selected_indexer_jit_seconds": 1.74,
+    "memguard_kill": {
+      "node": "dgx1",
+      "mem_available_kib": 6283992,
+      "threshold_kib": 6291456,
+      "exit_code": 137,
+      "oom_killed": false
+    },
+    "telemetry_minimum_mem_available_kib": {
+      "dgx1": 6325640,
+      "dgx2": 6982928,
+      "dgx3": 6770936
+    },
+    "maximum_swap_used_kib": {
+      "dgx1": 401384,
+      "dgx2": 0,
+      "dgx3": 0
+    },
+    "nvidia_nv_err_no_memory_current_boot": false,
+    "hosts_remained_reachable": true,
+    "coordinated_rollback_completed": true
+  },
+  "cache_state": {
+    "complete": false,
+    "preserved_for_evidence": true,
+    "files": {
+      "dgx1": 795,
+      "dgx2": 925,
+      "dgx3": 925
+    },
+    "bytes": {
+      "dgx1": 12319602,
+      "dgx2": 13930326,
+      "dgx3": 13929649
+    }
+  },
+  "conclusion": "The startup passed static KV allocation and completed the final logged model-selected JIT warmup, but the 6 GiB qualification guard stopped the head before API readiness. The next attempt may use the normal 5 GiB startup reserve with 100 ms sampling; do not lower it further without changing startup memory behavior."
+}

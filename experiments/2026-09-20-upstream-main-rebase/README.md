@@ -480,12 +480,23 @@ available. It was again an explicit SIGKILL with no cgroup OOM, NVIDIA allocatio
 error, or host loss. That incomplete cache is also preserved only as evidence;
 the receipt is `runs/launch-9076b0bd9fee-cold-r2-guarded.json`.
 
-The third cold attempt uses a fresh `patch0023-9076b0bd9fee-r3` namespace and a
-6 GiB startup guard sampled every 100 ms. This still preserves approximately
-4.3--5 GiB more host/driver headroom than the 1.01--1.72 GiB trough associated
-with the previous control-plane loss. Its cold run must begin with the namespace
-absent on every rank; only a cold run that reaches API readiness may provide the
-cache for the warm run.
+The third cold attempt used a fresh `patch0023-9076b0bd9fee-r3` namespace and a
+6 GiB startup guard sampled every 100 ms. It passed the second attempt's limit,
+made both RoCEnante collectives live, allocated the fixed 3 GiB KV cache with
+1,353,553-token capacity, skipped dynamic memory profiling, and completed the
+model-selected indexer JIT warmup. The head then crossed the guard at 6,283,992
+KiB available before API readiness. It was again an explicit SIGKILL with no
+cgroup OOM, NVIDIA allocation error, or host loss. That incomplete cache remains
+evidence only; the receipt is `runs/launch-9076b0bd9fee-cold-r3-guarded.json`.
+
+The fourth cold attempt uses a fresh `patch0023-9076b0bd9fee-r4` namespace and
+the repository's normal 5 GiB startup reserve, sampled at the stricter 100 ms
+cadence. This still preserves approximately 3.3--4 GiB more host/driver headroom
+than the 1.01--1.72 GiB trough associated with the previous control-plane loss.
+Its cold run must begin with the namespace absent on every rank; only a cold run
+that reaches API readiness may provide the cache for the warm run. A failure at
+this threshold stops the descending qualification ladder: startup memory
+behavior must be changed before another attempt.
 
 The startup pair is ordered and fail-closed:
 
