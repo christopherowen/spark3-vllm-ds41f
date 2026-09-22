@@ -22,9 +22,9 @@
       "reason": "separate safe eager API recovery from graph-memory and performance qualification; after the pre-weight and B12X phases pass with measured headroom, test the upstream-selected FULL_DECODE_ONLY path as one isolated follow-up"
     },
     "deployment.launch_enabled": {
-      "from": false,
-      "to": true,
-      "reason": "the exact patch 0026 image passed model-free adapter and native TP3 gates, is byte-identical on all three nodes, and now has an absent dedicated cache namespace for the guarded 2 GiB KV cold/warm qualification pair"
+      "from": true,
+      "to": false,
+      "reason": "the guarded cold test passed compilation, loading, B12X preparation, 2 GiB KV allocation, and patch 0026 warmup, then exposed upstream vLLM issue #56461: SM12x ratio-1 indexer pages contain 128 states while DeepGEMM accepts 64; launch is locked while the per-ratio page fix is prepared"
     }
   },
   "source_delta": [
@@ -121,16 +121,16 @@
   "image_digest": "sha256:4c1660dc825ec17946c60ef90f019bed99d3f26ba662157401e8175519180822",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0026 image sha256:4c1660dc825e is reproducibly labelled, passes its model-free adapter and native TP3 kernel gates, is identical on all nodes, and is authorized only through the experimental configuration for a guarded fresh-cache 2 GiB KV cold/warm startup pair",
+  "deployment_status": "patch 0026 image sha256:4c1660dc825e safely completed fresh compilation, loading, B12X preparation, 2 GiB KV allocation, and the fixed 40-row speculative warmup, then failed closed on upstream vLLM issue #56461 when a ratio-1 indexer exposed 128 states to DeepGEMM's 64-state SM12x kernel; launch is locked pending a per-ratio page fix and a new immutable image",
   "integration_status": {
-    "status": "patch 0026 sizes B12X decode scratch for vLLM's 40-row DSpark warmup at an 11.1 MiB incremental cost; immutable image and model-free gates pass, with reduced-KV cold/warm qualification pending",
+    "status": "patch 0026 is validated through its intended 40-row DSpark warmup; the next integration boundary is the independently reported upstream SM12x ratio-1 indexer page defect (#56461)",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0026-immutable-image-model-free-and-native-tp3-gates-pass-cold-warm-required",
+    "status": "patch-0026-warmup-pass-upstream-sm12x-indexer-page-fix-required",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

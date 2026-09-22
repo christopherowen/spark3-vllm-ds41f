@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "status": "failed-closed-at-upstream-sm12x-indexer-page",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:329631a979dd-b69feee3022c-d079134b48684",
+    "id": "sha256:4c1660dc825ec17946c60ef90f019bed99d3f26ba662157401e8175519180822",
+    "launch_revision": "efa2196f28df19cb9a07f370242e17e7ac0e2913"
+  },
+  "configuration": {
+    "cache_namespace": "/cache/qualification/patch0026-4c1660dc825e-r1/jit",
+    "kv_cache_memory_bytes": 2147483648,
+    "kv_cache_tokens": 902350,
+    "maximum_160k_concurrency": 5.64,
+    "block_size": 128
+  },
+  "progress": [
+    "completed fresh pre-weight JIT compilation",
+    "loaded 98.1 GiB target model and DSpark draft on all ranks",
+    "prepared 226 MXFP8, 43 MoE, 4 sparse MLA, and 1 RoCEnante signature groups",
+    "allocated the fixed 2 GiB KV cache without an NVIDIA driver allocation error",
+    "passed patch 0026's 40-row speculative decode warmup scratch boundary"
+  ],
+  "failure": {
+    "file": "vllm/v1/attention/backends/mla/indexer.py",
+    "operation": "get_paged_mqa_logits_metadata",
+    "message": "block_kv == 32 or block_kv == 64",
+    "cause": "DeepseekV41IndexerBackend selects a 128-token page on SM12x; ratio-1 layers therefore expose 128 states to a DeepGEMM kernel that supports 64 states on arch 12",
+    "upstream_issue": "https://github.com/vllm-project/vllm/issues/56461",
+    "classification": "independently reported upstream SM12x integration defect",
+    "oom": false,
+    "nvidia_allocation_error": false
+  },
+  "telemetry": {
+    "dgx1": {
+      "min_available_kib": 6011628,
+      "max_swap_used_kib": 476336
+    },
+    "dgx2": {
+      "min_available_kib": 7594876,
+      "max_swap_used_kib": 300
+    },
+    "dgx3": {
+      "min_available_kib": 7676104,
+      "max_swap_used_kib": 636
+    }
+  },
+  "rollback": "the fail-closed launcher preserved complete per-rank logs, removed candidate containers, and disarmed every memory guard; all hosts remained reachable",
+  "next": "use 64 states per SM12x indexer page: 64 tokens for ratio-1 layers and 128 tokens for ratio-2 layers, retaining the heterogeneous cache geometry instead of globally shrinking the main cache page"
+}
