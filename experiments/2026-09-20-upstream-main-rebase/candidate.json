@@ -23,8 +23,8 @@
     },
     "deployment.launch_enabled": {
       "from": true,
-      "to": false,
-      "reason": "the protected patch-0024 cold startup safely exposed an SWA-only B12X adapter defect; launch stays fail-closed while patch 0025 is prepared and qualified"
+      "to": true,
+      "reason": "patch 0025 passes deterministic replay, immutable native/model-free gates, byte-identical distribution, healthy-host preflight, and exact launch-plan review; only this experimental config is enabled for the protected cold/warm pair"
     }
   },
   "source_delta": [
@@ -119,7 +119,7 @@
   "image_digest": "sha256:9e1e10e5a4289f9f702bfd2a61a094c16f336a5cd06c4c86f05c818fdf664d63",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0025 image sha256:9e1e10e5a428 passes the 12-case native TP3 matrix and 12 focused model-free regressions, including the SWA-only runtime correction, and is byte-identical on all three healthy ranks; experimental and promoted launches remain locked pending guarded cold/warm startup",
+  "deployment_status": "patch 0025 image sha256:9e1e10e5a428 passes the 12-case native TP3 matrix and 12 focused model-free regressions, including the SWA-only runtime correction, and is byte-identical on all three healthy ranks; only the experimental launch is enabled for the protected cold/warm pair, while promoted launch remains locked",
   "integration_status": {
     "status": "distributed immutable patch 0025 candidate: SWA-only layers no longer consume shared indexed-cache top-k output; exact source replay, native build, model-free gates, and byte-identical distribution pass, while guarded cold/warm TP3 startup remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
