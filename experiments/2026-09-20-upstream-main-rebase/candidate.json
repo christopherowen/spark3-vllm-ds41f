@@ -112,19 +112,19 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
+  "image_digest": "sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0023 is prepared offline but unbuilt and unqualified; patch 0022 failed both resident-model eager warmup and deferred first-use compilation, the three hosts require physical recovery, and no target-hardware contact is authorized during the recovery pause",
+  "deployment_status": "patch 0023 is built and passes immutable model-free GB10 qualification; both deployment configurations remain launch-locked pending exact-image distribution and one guarded TP3 eager startup with CUDA graphs disabled",
   "integration_status": {
-    "status": "offline source candidate: model/backend JIT registrations compile immediately after construction and before checkpoint residency; B12X discovery and preparation are incremental; MXFP8 trial activations are allocated only for the active plan; and scratch is reclaimed between units. Build, bounded GB10 tests, and guarded TP3 startup remain required",
+    "status": "immutable model-free qualified candidate: model/backend JIT registrations compile immediately after construction and before checkpoint residency; B12X discovery and preparation are incremental; MXFP8 trial activations are allocated only for the active plan; and scratch is reclaimed between units. All 55 focused tests pass under a 32 GiB GB10 cgroup; exact-image distribution and guarded TP3 startup remain required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "pending-patch-0023-build-and-guarded-qualification",
+    "status": "passed-patch-0023-build-and-model-free-qualification; guarded-tp3-pending",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

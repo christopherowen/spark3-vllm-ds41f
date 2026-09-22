@@ -1,6 +1,6 @@
 # Decision
 
-Status: **Patch 0023 prepared offline; all patch-0022 launch modes rejected; hardware work paused**
+Status: **Patch 0023 image passes model-free GB10 gates; guarded TP3 qualification remains locked**
 
 The patch-0022 immutable image completed native target and DSpark loading at
 98.1 GiB per rank and prepared the selected B12X weight and transport plans,
@@ -60,11 +60,15 @@ quarter-second startup guard, requires its initial memory sample before launchin
 each rank, verifies that it remains active through readiness, and only then
 installs the 3 GiB steady guard. Threshold violations kill the unqualified
 container immediately instead of allowing a five-second graceful-stop window.
-These changes are quality-neutral and pass offline Ruff, formatting, Python
-compilation, and patch-whitespace checks. The local Mac environment lacks the
-target Python dependencies, so focused pytest, image construction, and hardware
-qualification remain pending. No node contact, recovery attempt, image build,
-or launch may proceed until physical recovery and explicit owner authorization.
+These changes are quality-neutral and pass Ruff, formatting, Python
+compilation, and patch-whitespace checks. After physical recovery, exact source
+replay produced immutable image
+`sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3`.
+All 55 focused patch-0022/0023 tests pass from that image on dgx1 under a 32 GiB
+memory/swap cap, with no model load or serving process. The startup guard's
+actual SIGKILL path also passes on all three nodes using a GPU-free, 64 MiB
+smoke container. This clears image construction and model-free qualification;
+it does not clear the launch lock or the remaining guarded TP3 gate.
 
 The patch-0014 image completed checkpoint loading but proved that the MoE carry
 still targeted B12X's preceding API. Patch 0015 replaces that boundary with the

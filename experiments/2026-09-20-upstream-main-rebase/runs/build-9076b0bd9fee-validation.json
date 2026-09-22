@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "status": "passed-immutable-model-free-qualification",
+  "timestamp": "2026-09-22T11:42:36+02:00",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:c6d531aa609f-b69feee3022c-d397d35a4e051",
+    "id": "sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3",
+    "size_bytes": 23240883375,
+    "deployment_revision": "397d35a4e051142a3e1ee5c8052ab7272804adaf",
+    "vllm_patch_head": "c6d531aa609f83496a8471d157ef32e62895bd4b",
+    "vllm_tree": "ab564f8dd3477f70b50b970e07250ff64256c2ac",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "test_environment": {
+    "host": "dgx1",
+    "gpu_visible": true,
+    "network": "disabled",
+    "memory_limit_gib": 32,
+    "memory_swap_limit_gib": 32,
+    "model_loaded": false,
+    "serving_container_started": false,
+    "test_container_removed": true
+  },
+  "checks": {
+    "source_replay": "twenty-three vLLM and five B12X patches reproduced the recorded revisions and Git trees from exact upstream bases",
+    "build_imports": "candidate source, B12X loader, sparse MLA, RoCEnante, disk Engram, CUTLASS DSL 4.7.1, liburing, and NCCL 2.30.7 gates passed",
+    "focused_vllm": "55 passed from the immutable image: model-selected JIT registration, active pre-weight warmup ordering, incremental B12X preparation, and lazy MXFP8 activation lifetime",
+    "image_labels": "deployment revision, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "host_health": "dgx1 remained systemd-running with 125001039872 bytes MemAvailable, zero swap use, zero running containers, and no current-boot NV_ERR_NO_MEMORY entry after validation"
+  },
+  "safety": {
+    "cluster_launch_enabled": false,
+    "startup_memguard_sigkill_smoke_passed_on_all_nodes": true,
+    "candidate_distributed": false,
+    "tp3_started": false
+  },
+  "remaining": [
+    "copy this exact image digest to dgx2 and dgx3 before any coordinated run",
+    "perform one guarded TP3 eager startup with CUDA graphs disabled and preserve per-rank memory telemetry",
+    "verify native-weight output parity, 4x128K capacity, TTFT, throughput, and retained memory before promotion"
+  ]
+}

@@ -439,17 +439,25 @@ activations are allocated only inside the active plan's preparation, and
 allocator scratch is reclaimed before the next plan. Its replay head is
 `c6d531aa609f83496a8471d157ef32e62895bd4b` with tree
 `ab564f8dd3477f70b50b970e07250ff64256c2ac`. Ruff, formatting, Python
-compilation, and patch whitespace checks pass. A fresh deterministic replay and
-the focused tests in the target image remain pending; the patch is intentionally
-unbuilt and unqualified while the hosts await physical recovery.
+compilation, and patch whitespace checks pass. The fresh deterministic replay
+was built as immutable image
+`sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3`.
+Its OCI labels exactly match deployment revision `397d35a4e051`, the recorded
+vLLM and B12X heads, and both source trees. The finished image passed all 55
+focused registration, ordering, incremental-preparation, and activation-lifetime
+tests on dgx1 under a 32 GiB memory/swap cap with networking disabled. No model
+weights or serving process were started. The receipt is
+`runs/build-9076b0bd9fee-validation.json`.
 
 Cluster startup is now fail-closed as well: a protected 5 GiB,
 quarter-second host-memory guard confirms its first sample before each rank is
 allowed to launch, API readiness requires that guard to remain active, and only
 a healthy cluster switches to the 3 GiB steady guard. A candidate that repeats
 either observed trough is killed locally before it can exhaust driver and
-management headroom. No further node contact, build, recovery action, or launch
-is authorized until physical recovery and an explicit owner decision.
+management headroom. The kill path has been exercised on all three nodes with a
+GPU-free 64 MiB smoke container and left no residual units or containers. Both
+deployment configurations remain launch-locked; the image build and model-free
+tests do not authorize a TP3 launch.
 
 ## Quality and safety gates
 

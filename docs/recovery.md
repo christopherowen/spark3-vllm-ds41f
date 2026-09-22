@@ -72,13 +72,14 @@ MXFP8 units before compiling the first, and every unit retained its serving-size
 dummy activations. Discovery now streams one unit at a time, the dummy
 activations are created only inside that plan's preparation, and allocator
 scratch is reclaimed before moving to the next plan. The operational correction
-is the startup guard above. The hosts require physical recovery before these
-changes can be built or qualified, and no remote contact or recovery attempt is
-authorized during the recovery pause. Exact container evidence and the limits
-of the available diagnosis are recorded in the upstream-main rebase experiment.
-Both promoted and candidate configurations set `deployment.launch_enabled` to
-false, so an applied start is rejected locally until the owner explicitly
-reopens hardware qualification after physical recovery.
+is the startup guard above. After physical recovery, all three hosts passed the
+recovery-policy check and the guard's real SIGKILL path using a GPU-free, 64 MiB
+smoke container. Patch 0023 then built on dgx1 and passed all 55 focused tests
+from the immutable image under a 32 GiB cgroup, without loading weights. Exact
+evidence is recorded in the upstream-main rebase experiment. Both promoted and
+candidate configurations still set `deployment.launch_enabled` to false, so an
+applied start is rejected locally until the guarded TP3 qualification is
+deliberately opened.
 
 ## Kernel next-boot policy
 
