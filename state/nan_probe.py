@@ -11,6 +11,7 @@ from __future__ import annotations
 import functools
 import os
 import runpy
+import sys
 from collections.abc import Iterator
 from typing import Any
 
@@ -99,4 +100,5 @@ def _install() -> None:
 
 
 _install()
+sys.argv.insert(1, "serve")
 runpy.run_module("vllm.entrypoints.cli.main", run_name="__main__")
