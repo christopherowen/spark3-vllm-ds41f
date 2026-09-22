@@ -1,0 +1,435 @@
+From 5e544847e63dce5cf4767ac3da3595e6fb351c20 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Tue, 22 Sep 2026 23:35:52 +0200
+Subject: [PATCH] fix(deepseek-v41): write B12X contiguous cache records
+
+---
+ tests/models/test_deepseek_v41_b12x.py        | 119 ++++++++++++
+ vllm/models/deepseek_v41/attention.py         |  11 +-
+ .../deepseek_v41/nvidia/b12x_attention.py     | 179 +++++++++++++++++-
+ 3 files changed, 305 insertions(+), 4 deletions(-)
+
+diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
+index f3ebe4fe9..35acb2d2b 100644
+--- a/tests/models/test_deepseek_v41_b12x.py
++++ b/tests/models/test_deepseek_v41_b12x.py
+@@ -63,8 +63,11 @@ def test_b12x_backend_requires_current_prepared_api(monkeypatch) -> None:
+     )
+ 
+     current = SimpleNamespace(
++        CacheWriterQuery=lambda **kwargs: kwargs,
+         invocation_from_descriptors=lambda **kwargs: kwargs,
+         is_supported=lambda: True,
++        plan_cache_writer=lambda *args, **kwargs: None,
++        write_cache=lambda *args, **kwargs: None,
+     )
+     monkeypatch.setattr(
+         b12x_attention, "get_b12x_compressed_sparse_mla", lambda: current
+@@ -127,6 +130,9 @@ def test_b12x_self_warmup_provider_is_not_a_child_module(monkeypatch) -> None:
+         attention._o_proj_block_size = 128
+ 
+     current = SimpleNamespace(invocation_from_descriptors=lambda **kwargs: kwargs)
++    current.CacheWriterQuery = lambda **kwargs: kwargs
++    current.plan_cache_writer = lambda *args, **kwargs: None
++    current.write_cache = lambda *args, **kwargs: None
+     monkeypatch.setattr(b12x_attention.DeepseekV4Attention, "__init__", initialize_base)
+     monkeypatch.setattr(
+         b12x_attention, "get_b12x_compressed_sparse_mla", lambda: current
+@@ -152,6 +158,119 @@ def test_flatten_cache_preserves_packed_page_storage() -> None:
+         _flatten_cache(cache.to(torch.bfloat16), name="test cache")
+ 
+ 
++class _RecordingRotary(torch.nn.Module):
++    def __init__(self) -> None:
++        super().__init__()
++        self.positions = []
++
++    def forward(self, positions, query, key=None):
++        self.positions.append(positions.clone())
++        query.add_(1)
++        if key is not None:
++            key.add_(2)
++        return query, key
++
++
++class _RecordingMLA:
++    def __init__(self) -> None:
++        self.writes = []
++
++    def write_cache(self, kv, cache, slot_mapping, **kwargs):
++        self.writes.append((kv.clone(), cache, slot_mapping.clone(), kwargs))
++
++
++def test_b12x_writes_swa_in_its_contiguous_record_layout(monkeypatch) -> None:
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention._b12x = _RecordingMLA()
++    attention.rotary_emb = _RecordingRotary()
++    attention.swa_cache_layer = SimpleNamespace(
++        prefix="model.layers.0.swa",
++        block_size=32,
++        kv_cache=torch.empty((2, 32, 528), dtype=torch.uint8),
++    )
++    attention._ensure_plans = lambda: SimpleNamespace(swa_writer="swa-plan")
++    slots = torch.tensor([7, 8], dtype=torch.int64)
++    monkeypatch.setattr(
++        b12x_attention,
++        "get_forward_context",
++        lambda: SimpleNamespace(
++            attn_metadata={
++                attention.swa_cache_layer.prefix: SimpleNamespace(slot_mapping=slots)
++            }
++        ),
++    )
++    q = torch.zeros((2, 24, 512), dtype=torch.bfloat16)
++    kv = torch.zeros((2, 512), dtype=torch.bfloat16)
++
++    actual = attention._fused_qnorm_rope_kv_insert(
++        q,
++        kv,
++        torch.tensor([3, 4], dtype=torch.int64),
++        b12x_attention.get_forward_context().attn_metadata,
++    )
++
++    assert actual is q
++    assert torch.equal(q, torch.ones_like(q))
++    write_kv, write_cache, write_slots, kwargs = attention._b12x.writes[0]
++    assert torch.equal(write_kv, torch.full_like(kv, 2))
++    assert write_cache.shape == (2, 32 * 528)
++    assert torch.equal(write_slots, slots)
++    assert kwargs == {
++        "plan": "swa-plan",
++        "page_size": 32,
++        "cache_kind": "swa",
++        "cache_format": "deepseek_v41",
++    }
++
++
++def test_b12x_writes_rotated_compressed_rows_without_mutating_indexer_input(
++    monkeypatch,
++) -> None:
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention._b12x = _RecordingMLA()
++    attention.rotary_emb = _RecordingRotary()
++    attention.compress_ratio = 2
++    attention.compressor = SimpleNamespace(k_cache_prefix="model.layers.1.attn")
++    attention.is_kv_source = True
++    attention.kv_cache = torch.empty((2, 64, 288), dtype=torch.uint8)
++    attention._vllm_config = SimpleNamespace(
++        cache_config=SimpleNamespace(block_size=128)
++    )
++    attention._ensure_plans = lambda: SimpleNamespace(indexed_writer="indexed-plan")
++    slots = torch.tensor([-1, 7, -1, 8], dtype=torch.int64)
++    monkeypatch.setattr(
++        b12x_attention,
++        "get_forward_context",
++        lambda: SimpleNamespace(
++            attn_metadata={
++                attention.compressor.k_cache_prefix: SimpleNamespace(slot_mapping=slots)
++            }
++        ),
++    )
++    latent = torch.zeros((4, 512), dtype=torch.bfloat16)
++    positions = torch.tensor([0, 1, 2, 3], dtype=torch.int64)
++
++    attention._insert_compressed_cache(latent, positions)
++
++    assert torch.equal(latent, torch.zeros_like(latent))
++    assert torch.equal(
++        attention.rotary_emb.positions[0],
++        torch.tensor([0, 0, 2, 2], dtype=torch.int64),
++    )
++    write_kv, write_cache, write_slots, kwargs = attention._b12x.writes[0]
++    assert torch.equal(write_kv, torch.ones_like(write_kv))
++    assert write_cache.shape == (2, 64 * 288)
++    assert torch.equal(write_slots, slots)
++    assert kwargs == {
++        "plan": "indexed-plan",
++        "page_size": 64,
++        "cache_kind": "indexed",
++        "cache_format": "deepseek_v41",
++    }
++
++
+ def test_b12x_swa_only_layer_ignores_shared_indexer_output(monkeypatch) -> None:
+     attention = object.__new__(DeepseekV41B12xAttention)
+     torch.nn.Module.__init__(attention)
+diff --git a/vllm/models/deepseek_v41/attention.py b/vllm/models/deepseek_v41/attention.py
+index 3e59ef8f1..5f40b79eb 100644
+--- a/vllm/models/deepseek_v41/attention.py
++++ b/vllm/models/deepseek_v41/attention.py
+@@ -823,7 +823,7 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+         if compressor is not None:
+             indexer_result, _ = maybe_execute_in_parallel(
+                 prepare_indexer,
+-                lambda: compressor.insert_cache(latent, positions, self.rotary_emb),
++                lambda: self._insert_compressed_cache(latent, positions),
+                 self.ln_events[0],
+                 self.ln_events[1],
+                 aux_stream,
+@@ -843,6 +843,15 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+             attn_out,
+         )
+ 
++    def _insert_compressed_cache(
++        self,
++        latent: torch.Tensor | None,
++        positions: torch.Tensor,
++    ) -> None:
++        """Publish a compressed latent through the selected backend's layout."""
++        assert self.compressor is not None
++        self.compressor.insert_cache(latent, positions, self.rotary_emb)
++
+     def _fused_wqa_wkv_gemm(self, hidden_states: torch.Tensor) -> torch.Tensor:
+         # Override point: the ROCm layer preshuffles this weight in place, so
+         # it cannot go through fused_wqa_wkv directly.
+diff --git a/vllm/models/deepseek_v41/nvidia/b12x_attention.py b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+index 3315bd2d4..5950d2452 100644
+--- a/vllm/models/deepseek_v41/nvidia/b12x_attention.py
++++ b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+@@ -97,7 +97,13 @@ class DeepseekV41B12xBackend(DeepseekV4SparseMLABackend):
+         module = get_b12x_compressed_sparse_mla()
+         if module is None:
+             return "Install the current B12X source tree"
+-        if not callable(getattr(module, "invocation_from_descriptors", None)):
++        required_api = (
++            "CacheWriterQuery",
++            "invocation_from_descriptors",
++            "plan_cache_writer",
++            "write_cache",
++        )
++        if any(not callable(getattr(module, name, None)) for name in required_api):
+             return "B12X_DSV41 requires B12X's prepared-plan API"
+         if not module.is_supported():
+             return "B12X compressed sparse MLA is not supported on this device"
+@@ -122,6 +128,8 @@ class DeepseekV41B12xSWABackend(DeepseekSparseSWABackend):
+ class _PlanSet:
+     decode: Any
+     extend: Any
++    swa_writer: Any
++    indexed_writer: Any | None
+     decode_rows: int
+     extend_rows: int
+     decode_swa_width: int
+@@ -130,6 +138,7 @@ class _PlanSet:
+ 
+ 
+ _PLAN_CACHE: dict[tuple[Any, ...], Any] = {}
++_WRITER_PLAN_CACHE: dict[tuple[Any, ...], Any] = {}
+ 
+ 
+ def _alignment(tensor: torch.Tensor) -> int:
+@@ -213,8 +222,14 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+                 "nvfp4_ds_mla so its MXFP8/NVFP4 cache ABI is unambiguous."
+             )
+         self._b12x = get_b12x_compressed_sparse_mla()
+-        if self._b12x is None or not callable(
+-            getattr(self._b12x, "invocation_from_descriptors", None)
++        required_api = (
++            "CacheWriterQuery",
++            "invocation_from_descriptors",
++            "plan_cache_writer",
++            "write_cache",
++        )
++        if self._b12x is None or any(
++            not callable(getattr(self._b12x, name, None)) for name in required_api
+         ):
+             raise RuntimeError(
+                 "DeepSeek V4.1 B12X requires the current prepared-plan API; "
+@@ -328,6 +343,31 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+         _PLAN_CACHE[cache_key] = plan
+         return plan
+ 
++    def _writer_plan(
++        self,
++        *,
++        cache_kind: str,
++        page_size: int,
++        max_rows: int,
++        device: torch.device,
++    ) -> Any:
++        mla = self._b12x
++        assert mla is not None
++        key = (str(device), cache_kind, page_size, max_rows, "int64")
++        plan = _WRITER_PLAN_CACHE.get(key)
++        if plan is None:
++            plan = mla.plan_cache_writer(
++                mla.CacheWriterQuery(
++                    max_rows=max_rows,
++                    page_size=page_size,
++                    cache_kind=cache_kind,
++                    slot_dtype="int64",
++                ),
++                device=device,
++            )
++            _WRITER_PLAN_CACHE[key] = plan
++        return plan
++
+     def _ensure_plans(self) -> _PlanSet:
+         if self._plans is not None:
+             return self._plans
+@@ -367,6 +407,23 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+             1,
+             self._vllm_config.cache_config.block_size // max(self.compress_ratio, 1),
+         )
++        max_writer_rows = max(decode_rows, extend_rows)
++        swa_writer = self._writer_plan(
++            cache_kind="swa",
++            page_size=self.swa_cache_layer.block_size,
++            max_rows=max_writer_rows,
++            device=swa_cache.device,
++        )
++        indexed_writer = (
++            self._writer_plan(
++                cache_kind="indexed",
++                page_size=indexed_page_size,
++                max_rows=max_writer_rows,
++                device=swa_cache.device,
++            )
++            if self.compressor is not None
++            else None
++        )
+         decode = self._plan(
+             mode="decode",
+             rows=decode_rows,
+@@ -388,6 +445,8 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+         self._plans = _PlanSet(
+             decode=decode,
+             extend=extend,
++            swa_writer=swa_writer,
++            indexed_writer=indexed_writer,
+             decode_rows=decode_rows,
+             extend_rows=extend_rows,
+             decode_swa_width=decode_swa_width,
+@@ -422,6 +481,8 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+             "DSV41_MLA",
+             plans.decode,
+             plans.extend,
++            plans.swa_writer,
++            plans.indexed_writer,
+         )
+         return B12xWarmupUnit(
+             name="DeepSeek V4.1 sparse MLA",
+@@ -515,6 +576,118 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+                 )
+             )
+ 
++        writer_plans = [("swa", plans.swa_writer, swa_cache)]
++        if plans.indexed_writer is not None:
++            assert indexed_cache is not None
++            writer_plans.append(("indexed", plans.indexed_writer, indexed_cache))
++        for cache_kind, plan, cache in writer_plans:
++            if plan.prepared is not None:
++                continue
++
++            def prepare_writer(
++                state,
++                *,
++                cache=cache,
++            ):
++                kv = torch.zeros(
++                    (1, self.head_dim), dtype=torch.bfloat16, device=cache.device
++                )
++                slots = torch.full((1,), -1, dtype=torch.int64, device=cache.device)
++                return PreparedCall(
++                    run=lambda: state.run(kv, cache, slots),
++                    output=kv,
++                    owners=(kv, slots),
++                )
++
++            prepare_default(
++                plan.request(
++                    name=f"{self.prefix}.b12x_mla.{cache_kind}_writer",
++                    prepare_call=prepare_writer,
++                )
++            )
++
++    def _write_b12x_cache(
++        self,
++        kv: torch.Tensor,
++        cache: torch.Tensor,
++        slot_mapping: torch.Tensor,
++        *,
++        cache_kind: str,
++        page_size: int,
++        plan: Any,
++    ) -> None:
++        mla = self._b12x
++        assert mla is not None
++        mla.write_cache(
++            kv,
++            _flatten_cache(cache, name=f"DeepSeek V4.1 {cache_kind} cache"),
++            slot_mapping,
++            plan=plan,
++            page_size=page_size,
++            cache_kind=cache_kind,
++            cache_format="deepseek_v41",
++        )
++
++    def _fused_qnorm_rope_kv_insert(
++        self,
++        q: torch.Tensor,
++        kv: torch.Tensor,
++        positions: torch.Tensor,
++        attn_metadata: Any,
++    ) -> torch.Tensor:
++        if not isinstance(attn_metadata, dict):
++            return super()._fused_qnorm_rope_kv_insert(q, kv, positions, attn_metadata)
++        swa = cast(
++            "DeepseekSparseSWAMetadata | None",
++            attn_metadata.get(self.swa_cache_layer.prefix),
++        )
++        if swa is None:
++            raise RuntimeError("DeepSeek V4.1 B12X SWA metadata is missing")
++        q, rotated_kv = self.rotary_emb(positions, q, kv)
++        assert rotated_kv is not None
++        plans = self._ensure_plans()
++        self._write_b12x_cache(
++            rotated_kv,
++            self.swa_cache_layer.kv_cache,
++            swa.slot_mapping,
++            cache_kind="swa",
++            page_size=self.swa_cache_layer.block_size,
++            plan=plans.swa_writer,
++        )
++        return q
++
++    def _insert_compressed_cache(
++        self,
++        latent: torch.Tensor | None,
++        positions: torch.Tensor,
++    ) -> None:
++        if latent is None:
++            return
++        compressor = self.compressor
++        assert compressor is not None
++        context = get_forward_context()
++        if not isinstance(context.attn_metadata, dict):
++            return
++        metadata = context.attn_metadata[compressor.k_cache_prefix]
++        cache_positions = positions.div(
++            self.compress_ratio, rounding_mode="floor"
++        ).mul_(self.compress_ratio)
++        rotated = latent.clone()
++        rotated, _ = self.rotary_emb(cache_positions, rotated)
++        plans = self._ensure_plans()
++        if plans.indexed_writer is None:
++            raise RuntimeError("DeepSeek V4.1 B12X indexed writer is missing")
++        self._write_b12x_cache(
++            rotated,
++            self._compressed_kv_cache(),
++            metadata.slot_mapping,
++            cache_kind="indexed",
++            page_size=(
++                self._vllm_config.cache_config.block_size // self.compress_ratio
++            ),
++            plan=plans.indexed_writer,
++        )
++
+     def _run_attention(
+         self,
+         *,
+-- 
+2.54.0 (Apple Git-157)
+

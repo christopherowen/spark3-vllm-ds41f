@@ -1,0 +1,48 @@
+{
+  "candidate": {
+    "image": "vllm-ds41f-upstream-main:6e1e038b0910-b69feee3022c-d55aa3fd94c80",
+    "digest": "sha256:64e2b8cf59256fa68f8de20460e2aec55d220999bc42b8c19dee6d9708538f0d",
+    "vllm_patch_head": "6e1e038b0910ae1ed3da4e7cff24382815920c0b",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1"
+  },
+  "request": {
+    "endpoint": "/v1/completions",
+    "prompt": "1 + 1 =",
+    "prompt_tokens": 5,
+    "temperature": 0,
+    "max_tokens": 4
+  },
+  "observations": {
+    "sequential_query_preparation": "finite on all three tensor-parallel ranks",
+    "first_nonfinite_boundary": "layer 0 SWA cache decoded by B12X reference attention",
+    "reference_output": {
+      "shape": [5, 24, 512],
+      "nan_elements_per_rank": 61440,
+      "total_elements_per_rank": 61440
+    },
+    "native_output": "nonfinite in the same layer on every rank",
+    "attention_unit_tests": "24-head dual-cache and 8-head SWA-only prepared tests pass",
+    "exact_geometry_test": "24-head SWA-only, attention sink, 8192-row declared capacity, one-row preparation and four live rows passes"
+  },
+  "root_cause": {
+    "vllm_layout": "within each page, all 512-byte token payloads precede the page's 16-byte-per-token MXFP8 scale plane; NVFP4 similarly uses a payload plane followed by a scale plane",
+    "b12x_layout": "each token is one contiguous 528-byte MXFP8 SWA or 288-byte NVFP4 indexed record",
+    "why_validation_missed_it": "both layouts allocate the same total bytes per page, so dtype, page width, stride and capacity checks all pass",
+    "failure_mode": "B12X interprets payload bytes as scale bytes, yielding nonfinite decoded KV rows and fully NaN reference attention"
+  },
+  "correction": {
+    "patch": "0028-fix-deepseek-v41-write-B12X-contiguous-cache-records.patch",
+    "vllm_patch_head": "5e544847e63dce5cf4767ac3da3595e6fb351c20",
+    "strategy": "use B12X's existing prepared writers for both cache kinds; keep the upstream model, RoPE, compressor, allocator and attention metadata",
+    "focused_tests": [
+      "four model-free B12X adapter tests pass in the pinned image",
+      "B12X SWA and indexed prepared-writer dynamic-row/CUDA-graph tests pass on one memory-capped SM121"
+    ]
+  },
+  "safety": {
+    "startup_guards": "active on all nodes through API readiness",
+    "minimum_observed_available_memory_gib": "greater than 15 during the diagnostic startup",
+    "shutdown": "all exact candidate containers stopped; all guards inactive; all nodes remained reachable"
+  },
+  "qualification": "source correction prepared; rebuilt-image semantic smoke required"
+}

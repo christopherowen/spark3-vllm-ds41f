@@ -592,6 +592,21 @@ generation correctness passes. The launch is locked while correctness is
 isolated between the target-only and DSpark paths. Full evidence is in
 `runs/launch-64e2b8cf5925-cold-warm.json`.
 
+Layerwise finite-value probes then isolated the first corruption to layer 0's
+SWA attention input cache. Query projection, normalization, RoPE preparation,
+and the checkpoint values remained finite; both the B12X kernel and an
+independent reference decoder returned NaNs from the live cache. The two
+projects used incompatible byte layouts with an identical page size: vLLM's
+V4.1 writers place every token payload before the page's scale plane, while
+B12X reads and writes one contiguous 528-byte MXFP8 or 288-byte NVFP4 record
+per token. Shape validation therefore could not detect the mismatch. Patch
+0028 routes both cache kinds through B12X's existing prepared writers and adds
+backend regressions proving that RoPE is applied before publication, the
+compressor's concurrent indexer input is not mutated, and the selected cache
+is flattened only at the explicit B12X boundary. The B12X writer's real SM121
+dynamic-row and CUDA-graph tests pass for both record types. A rebuilt image
+and guarded semantic smoke remain required before promotion.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its
