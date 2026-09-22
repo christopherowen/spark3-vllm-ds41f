@@ -22,9 +22,9 @@
       "reason": "separate safe eager API recovery from graph-memory and performance qualification; after the pre-weight and B12X phases pass with measured headroom, test the upstream-selected FULL_DECODE_ONLY path as one isolated follow-up"
     },
     "deployment.launch_enabled": {
-      "from": true,
-      "to": false,
-      "reason": "patch 0026 corrects the speculative-decode scratch bound, but launch remains locked until its immutable image passes model-free gates and a reduced-KV cold/warm qualification pair"
+      "from": false,
+      "to": true,
+      "reason": "the exact patch 0026 image passed model-free adapter and native TP3 gates, is byte-identical on all three nodes, and now has an absent dedicated cache namespace for the guarded 2 GiB KV cold/warm qualification pair"
     }
   },
   "source_delta": [
@@ -121,7 +121,7 @@
   "image_digest": "sha256:4c1660dc825ec17946c60ef90f019bed99d3f26ba662157401e8175519180822",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0026 image sha256:4c1660dc825e is reproducibly labelled and passes its model-free adapter and native TP3 kernel gates; it remains launch-locked while the identical image is distributed and a fresh-cache 2 GiB KV cold/warm startup pair is prepared",
+  "deployment_status": "patch 0026 image sha256:4c1660dc825e is reproducibly labelled, passes its model-free adapter and native TP3 kernel gates, is identical on all nodes, and is authorized only through the experimental configuration for a guarded fresh-cache 2 GiB KV cold/warm startup pair",
   "integration_status": {
     "status": "patch 0026 sizes B12X decode scratch for vLLM's 40-row DSpark warmup at an 11.1 MiB incremental cost; immutable image and model-free gates pass, with reduced-KV cold/warm qualification pending",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
