@@ -2,7 +2,7 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-upstream-6e1e-b12x-b69f-blocking-q",
+    "name": "dsv41-upstream-6e1e-b12x-b69f-wide-eager-q",
     "image": "vllm-ds41f-upstream-main:6e1e038b0910-b69feee3022c-d55aa3fd94c80",
     "expected_labels": {
       "org.opencontainers.image.revision": "55aa3fd94c804f1cecb252c8bb543b8369b75e1b",
@@ -71,7 +71,6 @@
     "B12X_ROCE_GID_INDEX": "3",
     "B12X_ROCE_SPIN_LIMIT": "5000000",
     "CUDA_DEVICE_MAX_CONNECTIONS": "32",
-    "CUDA_LAUNCH_BLOCKING": "1",
     "CUTE_DSL_CACHE_DIR": "/cache/qualification/patch0027-64e2b8cf5925-r1/jit/cute-dsl",
     "DSV41_INDEXER_PREFILL_FACTOR": "1",
     "GLOO_SOCKET_IFNAME": "enP7s7",
@@ -120,7 +119,7 @@
     "VLLM_USE_FLASHINFER_SAMPLER": "1",
     "VLLM_USE_MEGA_AOT_ARTIFACT": "1",
     "VLLM_USE_STANDALONE_COMPILE": "1",
-    "VLLM_USE_V2_MODEL_RUNNER": "1",
+    "VLLM_USE_V2_MODEL_RUNNER": "0",
     "XDG_CACHE_HOME": "/cache/qualification/patch0027-64e2b8cf5925-r1/jit"
   },
   "serve_args": [
