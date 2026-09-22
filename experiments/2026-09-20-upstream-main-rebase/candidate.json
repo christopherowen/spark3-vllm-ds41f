@@ -24,7 +24,7 @@
     "deployment.launch_enabled": {
       "from": true,
       "to": false,
-      "reason": "the patch 0027 immutable image and per-ratio SM12x page regression pass; launch remains locked until the exact image, fresh cache namespace, guards, and host state are proven on every rank"
+      "reason": "guarded cold and warm startup pass, but deterministic chat smokes return garbled/repetitive tokens; launch is locked until target-only versus DSpark correctness is isolated"
     }
   },
   "source_delta": [
@@ -123,9 +123,9 @@
   "image_digest": "sha256:64e2b8cf59256fa68f8de20460e2aec55d220999bc42b8c19dee6d9708538f0d",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0027 image sha256:64e2b8cf5925 passed exact-image regressions and is identical on all three ranks; launch remains locked pending a committed fresh-cache qualification configuration and final host/guard preflight",
+  "deployment_status": "patch 0027 image sha256:64e2b8cf5925 safely reaches API readiness from both empty and populated compile caches, but deterministic chat smokes produce garbled/repetitive tokens; launch is locked and the candidate must not be promoted until target-only versus DSpark correctness is isolated",
   "integration_status": {
-    "status": "patch 0026 is validated through its intended 40-row DSpark warmup; patch 0027 gives every SM12x ratio-1 and ratio-2 indexer page the 64 states accepted by DeepGEMM without globally changing the main cache page",
+    "status": "patch 0027 clears the SM12x indexer startup failure and completes guarded cold/warm startup, but end-to-end generation correctness still fails",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,

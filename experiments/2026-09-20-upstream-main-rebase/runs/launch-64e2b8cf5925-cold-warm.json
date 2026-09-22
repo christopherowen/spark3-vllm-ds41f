@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "result": "startup_pass_inference_correctness_fail",
+  "image": {
+    "reference": "vllm-ds41f-upstream-main:6e1e038b0910-b69feee3022c-d55aa3fd94c80",
+    "id": "sha256:64e2b8cf59256fa68f8de20460e2aec55d220999bc42b8c19dee6d9708538f0d",
+    "vllm_patch_head": "6e1e038b0910ae1ed3da4e7cff24382815920c0b",
+    "b12x_patch_head": "b69feee3022c05fa840833a80dd4010156cf7fe1"
+  },
+  "configuration": {
+    "deployment_commit": "f5975d61f2da85a485c54d6c89813d05d858054f",
+    "cache_namespace": "/cache/qualification/patch0027-64e2b8cf5925-r1/jit",
+    "kv_cache_memory_bytes": 2147483648,
+    "max_model_len": 160000,
+    "max_num_seqs": 8,
+    "cudagraph_mode": "NONE",
+    "startup_guard_gib": 5,
+    "steady_guard_gib": 3
+  },
+  "cold": {
+    "cache_initially_absent_on_all_ranks": true,
+    "container_started_at": "2026-09-22T15:40:49.735017348Z",
+    "first_successful_readiness_poll_at": "2026-09-22T15:45:38.533042145Z",
+    "readiness_elapsed_seconds": 288.798,
+    "pre_weight_jit_seconds": 34.86,
+    "main_weight_load_seconds": 44.53,
+    "draft_weight_load_seconds": 3.24,
+    "reported_model_load_seconds": 187.541724,
+    "reported_model_memory_gib": 98.1,
+    "engine_init_seconds": 36.01,
+    "b12x_plans": {
+      "mxfp8": 226,
+      "moe": 43,
+      "rocenante": 1
+    },
+    "kv_cache_tokens": 520817,
+    "max_160k_concurrency": 3.26,
+    "minimum_available_kib": {
+      "dgx1": 5919072,
+      "dgx2": 7194968,
+      "dgx3": 7353632
+    },
+    "maximum_swap_used_kib": {
+      "dgx1": 482880,
+      "dgx2": 300,
+      "dgx3": 636
+    },
+    "cache_files_per_rank": 1358,
+    "cache_bytes": {
+      "dgx1": 32658377,
+      "dgx2": 32658645,
+      "dgx3": 32657968
+    },
+    "api_ready": true,
+    "semantic_smoke": "fail: normal temperature-zero completion and chat requests returned garbled/repetitive care tokens"
+  },
+  "warm": {
+    "same_image_configuration_and_cache_namespace": true,
+    "container_started_at": "2026-09-22T15:51:21.032895604Z",
+    "first_successful_readiness_poll_at": "2026-09-22T15:54:40.439258379Z",
+    "readiness_elapsed_seconds": 199.406,
+    "pre_weight_jit_seconds": 31.84,
+    "main_weight_load_seconds": 43.8,
+    "draft_weight_load_seconds": 3.22,
+    "reported_model_load_seconds": 135.616471,
+    "reported_model_memory_gib": 98.1,
+    "engine_init_seconds": 13.68,
+    "kv_cache_tokens": 520817,
+    "max_160k_concurrency": 3.26,
+    "minimum_available_kib": {
+      "dgx1": 6493724,
+      "dgx2": 7647064,
+      "dgx3": 7916320
+    },
+    "maximum_swap_used_kib": {
+      "dgx1": 413432,
+      "dgx2": 296,
+      "dgx3": 632
+    },
+    "cache_files_per_rank": 1358,
+    "api_ready": true,
+    "semantic_smoke": "fail: the same normal temperature-zero chat prompt again returned garbled/repetitive care tokens"
+  },
+  "warm_vs_cold": {
+    "readiness_seconds_saved": 89.392,
+    "readiness_percent_faster": 31.0,
+    "reported_model_load_seconds_saved": 51.925,
+    "reported_model_load_percent_faster": 27.7,
+    "engine_init_seconds_saved": 22.33,
+    "engine_init_percent_faster": 62.0,
+    "pre_weight_jit_seconds_saved": 3.02,
+    "pre_weight_jit_percent_faster": 8.7
+  },
+  "safety": {
+    "all_nodes_remained_reachable": true,
+    "all_containers_exited_zero": true,
+    "all_containers_oom_killed": false,
+    "new_nv_err_no_memory_events": 0,
+    "auxiliary_vllm_or_application_workers_started": false,
+    "cold_and_warm_container_logs_preserved_on_each_rank": true,
+    "launch_relocked_after_test": true
+  },
+  "disposition": "Do not promote or serve traffic. Preserve the candidate image, caches, telemetry, and logs; next isolate target-only native-weight correctness from the DSpark speculative path before performance or capacity tuning."
+}

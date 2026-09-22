@@ -572,6 +572,24 @@ reports cache file count and bytes without placing mutable runtime artifacts in
 Git. Summary parsing rejects incomplete rows so an interrupted `docker inspect`
 cannot be mistaken for a zero-memory sample.
 
+Patch 0027 completed both guarded startup tests. The empty-cache run reached API
+readiness in 288.798 seconds and the populated-cache run in 199.406 seconds, a
+31.0% improvement. Warm reuse reduced reported model loading from 187.542 to
+135.616 seconds and engine initialization from 36.01 to 13.68 seconds, but the
+pre-weight JIT phase changed only from 34.86 to 31.84 seconds because TileLang
+still invoked the MHC compilation path. Every rank stayed reachable, exited
+cleanly, reported no OOM kill or `NV_ERR_NO_MEMORY`, and retained complete
+telemetry and container logs. The 5 GiB startup guard was material: dgx1 reached
+5,919,072 KiB available during the cold run.
+
+This candidate is not qualified for inference or promotion. Temperature-zero
+chat smokes on both cold and warm starts returned garbled and repetitive tokens
+despite valid HTTP responses and usage accounting. The temporary 2 GiB safety
+cache also exposed 520,817 tokens, or 3.26 simultaneous 160K requests, so it is
+not the final four-by-128K capacity configuration. The launch is locked while
+generation correctness is isolated between the target-only and DSpark paths.
+Full evidence is in `runs/launch-64e2b8cf5925-cold-warm.json`.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its
