@@ -1,6 +1,6 @@
 # Decision
 
-Status: **Patch 0022 rejected for cold-start memory; pre-weight JIT priming required**
+Status: **Patch 0022 retained; eager resident-model JIT rejected; deferred-JIT recovery candidate pending**
 
 The patch-0022 immutable image completed native target and DSpark loading at
 98.1 GiB per rank and prepared the selected B12X weight and transport plans,
@@ -28,6 +28,15 @@ The first candidate image was built and distributed but deliberately not
 launched because its probe revealed missing downstream loader contracts. It is
 superseded by this source revision. The promoted containers are stopped but
 retained for rollback.
+
+A warm-cache retry proved that the patch's model ownership is useful but that
+eager registry execution is itself unsafe in the resident-model phase. The
+rebased model occupied only 0.7 GiB more than the promoted runtime; B12X
+preparation/profile work and the 61-key eager sweep caused the large transient
+peaks. The next launch disables only `enable_jit_warmup`, allowing graph capture
+and real execution to resolve already-cached kernels incrementally. It is a
+recovery experiment, not a promotion, until startup, request execution, and
+runtime-JIT evidence pass.
 
 The patch-0014 image completed checkpoint loading but proved that the MoE carry
 still targeted B12X's preceding API. Patch 0015 replaces that boundary with the

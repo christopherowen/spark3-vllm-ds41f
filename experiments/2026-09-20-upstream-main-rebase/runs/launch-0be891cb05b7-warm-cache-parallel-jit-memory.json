@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "candidate_image": "sha256:0be891cb05b710b4b4cd67a057b1fd4d4dd41967006c654da80d354d71daa3df",
+  "deployment_commit": "df4d058d43e153d923001f5ffd32d1f00bedb11e",
+  "outcome": "rejected: a second launch with persisted compiler caches still exhausted host and NVIDIA-driver memory during eager JIT warmup",
+  "service_scope": "only the three TP3 inference ranks were started; no Strix, auxiliary, reranking, scanner, or workload-worker container ran",
+  "controlled_variable": "reuse the persistent caches produced by the preceding cold launch without changing image, model, KV allocation, graph sizes, or serving configuration",
+  "observations": {
+    "model_memory_gib_per_rank": 98.1,
+    "b12x_prepared_plans_per_rank": {
+      "mxfp8": 226,
+      "moe": 43,
+      "rocenante": 1
+    },
+    "registered_jit_keys_per_rank": 61,
+    "first_reported_jit_group": "MHCPreNormKernel (15 keys)",
+    "memory_sequence": [
+      "approximately 16-17 GiB MemAvailable after checkpoint loading",
+      "0.80-1.68 GiB MemAvailable with NV_ERR_NO_MEMORY while B12X preparation/profile work completed",
+      "approximately 10 GiB MemAvailable after profile transients were reclaimed",
+      "zero MemAvailable on dgx3 while eager JIT warmup processed the registered mHC group"
+    ],
+    "nv_err_no_memory_events": {
+      "dgx1": 59,
+      "dgx2": 50,
+      "dgx3": 50
+    },
+    "recovery_boots": {
+      "dgx1": "2026-09-22 07:47:55 CEST",
+      "dgx2": "2026-09-22 07:35:39 CEST",
+      "dgx3": "2026-09-22 07:30:55 CEST"
+    }
+  },
+  "comparison_with_promoted_runtime": {
+    "model_memory_gib_per_rank": {
+      "promoted": 97.4,
+      "rebased": 98.1
+    },
+    "jit_warmup": {
+      "promoted": "finished in 0.00 seconds",
+      "rebased": "61 registered keys, including a four-worker TileLang par_compile of 15 mHC keys"
+    },
+    "b12x_warmup": {
+      "promoted": "one MXFP8 and one MoE signature",
+      "rebased": "226 weight-owned MXFP8 plans, 43 MoE plans, and one RoCEnante plan"
+    }
+  },
+  "conclusion": "The 0.7 GiB weight-residency increase is not the dominant regression. Eager preparation leaves reclaimable transient state until the profile, and the subsequent parallel model-owned JIT sweep recreates excessive compiler peak memory even from populated disk caches. Retain patch 0022 ownership, but do not run its eager registry sweep with resident weights on unified-memory Spark. The next controlled launch disables only enable_jit_warmup; persistent cache contents, normal model execution, CUDA graphs, B12X plans, weights, and KV capacity remain unchanged."
+}

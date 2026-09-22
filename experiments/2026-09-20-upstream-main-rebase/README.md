@@ -406,6 +406,22 @@ before weight residency and treat any resident-model cache miss as a failure.
 The evidence is recorded in
 `runs/launch-0be891cb05b7-indexer-jit-memory.json`.
 
+A controlled retry retained the exact image and configuration but reused the
+compiler caches written by the cold attempt. Checkpoint loading left 16--17 GiB
+available, proving the 0.7 GiB model-residency increase over the promoted image
+is not the dominant regression. B12X preparation/profile work nevertheless
+reached 0.80--1.68 GiB and emitted driver allocation failures before reclaiming
+to about 10 GiB. The eager registry then processed 61 keys, beginning with a
+four-worker TileLang compile of 15 mHC variants, and drove dgx3 to zero available
+memory. The retry is rejected and recorded in
+`runs/launch-0be891cb05b7-warm-cache-parallel-jit-memory.json`.
+
+The next controlled recovery launch disables only `enable_jit_warmup`. This
+matches the effective pre-rebase startup behavior while retaining the populated
+disk caches, normal model execution, CUDA-graph capture, all B12X plans, native
+weights, and the 3 GiB KV allocation. It tests whether eager registry scheduling,
+rather than steady model execution, is the remaining fatal peak.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its

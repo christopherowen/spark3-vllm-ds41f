@@ -162,6 +162,8 @@
     "b12x",
     "--moe-backend",
     "b12x",
+    "--kernel-config",
+    "{\"enable_jit_warmup\":false}",
     "--speculative-config",
     "{\"method\":\"dspark\",\"num_speculative_tokens\":3,\"draft_tensor_parallel_size\":1,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":false}",
     "--jit-monitor-mode",
