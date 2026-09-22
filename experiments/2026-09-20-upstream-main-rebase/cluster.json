@@ -2,7 +2,7 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-upstream-6e1e-b12x-b69f-startupq",
+    "name": "dsv41-upstream-6e1e-b12x-b69f-targetonly-q",
     "image": "vllm-ds41f-upstream-main:6e1e038b0910-b69feee3022c-d55aa3fd94c80",
     "expected_labels": {
       "org.opencontainers.image.revision": "55aa3fd94c804f1cecb252c8bb543b8369b75e1b",
@@ -163,8 +163,6 @@
     "b12x",
     "--kernel-config",
     "{\"enable_jit_warmup\":true}",
-    "--speculative-config",
-    "{\"method\":\"dspark\",\"num_speculative_tokens\":3,\"draft_tensor_parallel_size\":1,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":false}",
     "--jit-monitor-mode",
     "warn",
     "--compilation-config",
@@ -191,7 +189,7 @@
     "master_port": "29554"
   },
   "deployment": {
-    "launch_enabled": false,
+    "launch_enabled": true,
     "repository": "https://github.com/christopherowen/spark3-vllm-ds41f.git",
     "branch": "main",
     "path": "{home}/projects/spark3-vllm-ds41f",
