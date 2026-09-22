@@ -128,6 +128,80 @@ def _wrap_sparse_entry(owner: type[Any]) -> None:
     setattr(owner, "_sparse_indexer_and_attn", checked)
 
 
+def _wrap_b12x_attention(owner: type[Any]) -> None:
+    """Compare layer-0 B12X output with its reference on the live cache."""
+    original = getattr(owner, "_run_attention")
+
+    @functools.wraps(original)
+    def checked(self: Any, *args: Any, **kwargs: Any) -> Any:
+        prefix = getattr(self, "prefix", type(self).__name__)
+        armed = os.path.exists(_ARM_FILE) and getattr(self, "layer_id", None) == 0
+        expected = None
+        if armed:
+            from b12x.attention._shared.mla.compressed_reference import (
+                compressed_sparse_mla_reference,
+            )
+            from vllm.models.deepseek_v41.nvidia.b12x_attention import (
+                _flatten_cache,
+            )
+
+            q = kwargs["q"]
+            indices = kwargs["swa_indices"]
+            lengths = kwargs["swa_lengths"]
+            sink = self.attn_sink
+            cache = _flatten_cache(
+                self.swa_cache_layer.kv_cache,
+                name="DeepSeek V4.1 SWA cache",
+            )
+            expected = compressed_sparse_mla_reference(
+                q,
+                cache,
+                indices,
+                lengths,
+                swa_page_size=self.swa_cache_layer.block_size,
+                cache_format="deepseek_v41",
+                sm_scale=self.scale,
+                attn_sink=sink,
+            )
+            _check(f"{prefix}.b12x_reference.output", expected)
+            valid = indices >= 0
+            valid_indices = indices[valid]
+            print(
+                "spark3 NaN probe: live layer-0 B12X inputs "
+                f"q={tuple(q.shape)} rows={int(q.shape[0])} "
+                f"swa_width={int(indices.shape[1])} "
+                f"lengths={lengths.detach().cpu().tolist()} "
+                f"valid_indices={int(valid.sum().item())} "
+                f"index_min={int(valid_indices.min().item()) if valid_indices.numel() else -1} "
+                f"index_max={int(valid_indices.max().item()) if valid_indices.numel() else -1} "
+                f"sink_finite={int(torch.isfinite(sink).sum().item())}/{sink.numel()} "
+                f"reference_finite={int(torch.isfinite(expected).sum().item())}/{expected.numel()}",
+                flush=True,
+            )
+
+        _check(f"{prefix}.b12x_run_attention.input", (args, kwargs))
+        result = original(self, *args, **kwargs)
+        output = kwargs["output"]
+        if armed:
+            torch.cuda.synchronize(output.device)
+            finite = torch.isfinite(output)
+            if not bool(finite.all().item()):
+                assert expected is not None
+                raise RuntimeError(
+                    "spark3 NaN probe: B12X native output is non-finite while "
+                    f"the live-cache reference is finite; shape={tuple(output.shape)}, "
+                    f"native_nan={int(torch.isnan(output).sum().item())}, "
+                    f"native_inf={int(torch.isinf(output).sum().item())}, "
+                    f"reference_nan={int(torch.isnan(expected).sum().item())}, "
+                    f"reference_inf={int(torch.isinf(expected).sum().item())}"
+                )
+        _check(f"{prefix}.b12x_run_attention.mutated", (args, kwargs))
+        _check(f"{prefix}.b12x_run_attention.output", result)
+        return result
+
+    setattr(owner, "_run_attention", checked)
+
+
 def _install() -> None:
     import vllm.models.deepseek_v41.nvidia.model as model
     from vllm.model_executor.layers.logits_processor import LogitsProcessor
@@ -152,12 +226,7 @@ def _install() -> None:
             method_name.removeprefix("_"),
         )
     _wrap_sparse_entry(DeepseekV4Attention)
-    _wrap_method(
-        DeepseekV41B12xAttention,
-        "_run_attention",
-        "b12x_run_attention",
-        check_mutated_inputs=True,
-    )
+    _wrap_b12x_attention(DeepseekV41B12xAttention)
     _wrap_method(
         DeepseekV41B12xAttention,
         "forward_mqa",
