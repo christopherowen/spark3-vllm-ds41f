@@ -24,6 +24,13 @@ _ARM_FILE = "/tmp/spark3-nan-probe"
 def _tensors(value: Any) -> Iterator[torch.Tensor]:
     if isinstance(value, torch.Tensor):
         yield value
+    elif (
+        type(value).__name__ == "QuantizedActivation"
+        and hasattr(value, "data")
+        and hasattr(value, "scale")
+    ):
+        yield from _tensors(value.data)
+        yield from _tensors(value.scale)
     elif isinstance(value, dict):
         for item in value.values():
             yield from _tensors(item)
@@ -50,7 +57,13 @@ def _check(stage: str, value: Any) -> None:
         )
 
 
-def _wrap_method(owner: type[Any], method_name: str, label: str) -> None:
+def _wrap_method(
+    owner: type[Any],
+    method_name: str,
+    label: str,
+    *,
+    check_mutated_inputs: bool = False,
+) -> None:
     original = getattr(owner, method_name)
 
     @functools.wraps(original)
@@ -58,6 +71,8 @@ def _wrap_method(owner: type[Any], method_name: str, label: str) -> None:
         prefix = getattr(self, "prefix", type(self).__name__)
         _check(f"{prefix}.{label}.input", (args, kwargs))
         output = original(self, *args, **kwargs)
+        if check_mutated_inputs:
+            _check(f"{prefix}.{label}.mutated", (args, kwargs))
         _check(f"{prefix}.{label}.output", output)
         return output
 
@@ -84,8 +99,41 @@ def _install() -> None:
         VocabParallelEmbedding,
     )
     from vllm.models.deepseek_v41.attention import DeepseekV4Attention
+    from vllm.models.deepseek_v41.nvidia.b12x_attention import (
+        DeepseekV41B12xAttention,
+    )
 
     _wrap_method(VocabParallelEmbedding, "forward", "embedding")
+    for method_name in (
+        "_run_parallel_input_projections",
+        "_split_qkv_and_norm",
+        "_wq_b_proj",
+        "_fused_qnorm_rope_kv_insert",
+    ):
+        _wrap_method(
+            DeepseekV4Attention,
+            method_name,
+            method_name.removeprefix("_"),
+        )
+    _wrap_method(
+        DeepseekV4Attention,
+        "_sparse_indexer_and_attn",
+        "sparse_indexer_and_attn",
+        check_mutated_inputs=True,
+    )
+    _wrap_method(
+        DeepseekV41B12xAttention,
+        "_run_attention",
+        "b12x_run_attention",
+        check_mutated_inputs=True,
+    )
+    _wrap_method(
+        DeepseekV41B12xAttention,
+        "forward_mqa",
+        "b12x_forward_mqa",
+        check_mutated_inputs=True,
+    )
+    _wrap_method(DeepseekV41B12xAttention, "_o_proj", "o_proj")
     _wrap_method(DeepseekV4Attention, "forward", "attention")
     _wrap_method(model.DeepseekV4MoE, "forward", "moe")
     _wrap_method(model.DeepseekV4DecoderLayer, "forward", "decoder")
