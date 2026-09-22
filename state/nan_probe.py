@@ -92,6 +92,42 @@ def _wrap_function(module: Any, function_name: str) -> None:
     setattr(module, function_name, checked)
 
 
+def _wrap_sparse_entry(owner: type[Any]) -> None:
+    """Reconstruct layer-0 Q sequentially at the eager attention boundary."""
+    original = getattr(owner, "_sparse_indexer_and_attn")
+
+    @functools.wraps(original)
+    def checked(self: Any, *args: Any, **kwargs: Any) -> Any:
+        prefix = getattr(self, "prefix", type(self).__name__)
+        if os.path.exists(_ARM_FILE) and getattr(self, "layer_id", None) == 0:
+            hidden_states = args[0]
+            positions = args[6]
+            qr_kv = self._fused_wqa_wkv_gemm(hidden_states)
+            _check(f"{prefix}.diagnostic_fused_wqa_wkv.output", qr_kv)
+            qr, qr_scale, kv = self._split_qkv_and_norm(qr_kv)
+            _check(f"{prefix}.diagnostic_split_qkv_norm.output", (qr, qr_scale, kv))
+            q = self._wq_b_proj(qr, qr_scale).view(
+                -1, self.n_local_heads, self.head_dim
+            )
+            _check(f"{prefix}.diagnostic_wq_b.output", q)
+            from vllm.forward_context import get_forward_context
+
+            q = self._fused_qnorm_rope_kv_insert(
+                q,
+                kv,
+                positions,
+                get_forward_context().attn_metadata,
+            )
+            _check(f"{prefix}.diagnostic_q_rope_kv_insert.output", q)
+        _check(f"{prefix}.sparse_indexer_and_attn.input", (args, kwargs))
+        output = original(self, *args, **kwargs)
+        _check(f"{prefix}.sparse_indexer_and_attn.mutated", (args, kwargs))
+        _check(f"{prefix}.sparse_indexer_and_attn.output", output)
+        return output
+
+    setattr(owner, "_sparse_indexer_and_attn", checked)
+
+
 def _install() -> None:
     import vllm.models.deepseek_v41.nvidia.model as model
     from vllm.model_executor.layers.logits_processor import LogitsProcessor
@@ -115,12 +151,7 @@ def _install() -> None:
             method_name,
             method_name.removeprefix("_"),
         )
-    _wrap_method(
-        DeepseekV4Attention,
-        "_sparse_indexer_and_attn",
-        "sparse_indexer_and_attn",
-        check_mutated_inputs=True,
-    )
+    _wrap_sparse_entry(DeepseekV4Attention)
     _wrap_method(
         DeepseekV41B12xAttention,
         "_run_attention",
