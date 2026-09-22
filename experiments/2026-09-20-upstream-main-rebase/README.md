@@ -480,6 +480,12 @@ The startup pair is ordered and fail-closed:
    memory, container exits, driver errors, and API readiness before changing any
    performance setting.
 
+Each rank runs `scripts/startup-telemetry` as a protected transient service for
+the duration of a startup. It samples host `MemAvailable`, swap use, and exact
+container state twice per second into the ignored qualification directory, then
+reports cache file count and bytes without placing mutable runtime artifacts in
+Git.
+
 ## Quality and safety gates
 
 - Keep the stopped promoted containers intact until the candidate passes its

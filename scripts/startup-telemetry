@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+action=${1:-}
+config_relative=${2:-experiments/2026-09-20-upstream-main-rebase/cluster.json}
+phase=${3:-}
+
+if [[ "$action" != start && "$action" != stop && "$action" != summary ]]; then
+  echo "usage: $0 <start|stop|summary> <cluster-config> <cold|warm>" >&2
+  exit 2
+fi
+if [[ "$phase" != cold && "$phase" != warm ]]; then
+  echo "telemetry phase must be cold or warm" >&2
+  exit 2
+fi
+if [[ "$config_relative" = /* ]]; then
+  echo "cluster config must be relative to the repository root" >&2
+  exit 1
+fi
+config_path=$(realpath "$repo_root/$config_relative")
+case "$config_path" in
+  "$repo_root"/*) ;;
+  *)
+    echo "cluster config must remain inside the repository" >&2
+    exit 1
+    ;;
+esac
+
+name=$(jq -er '.container.name' "$config_path")
+home=$(jq -er '.host.home' "$config_path")
+container_cache=$(jq -er '.environment.XDG_CACHE_HOME' "$config_path")
+host_cache=$(jq -er '
+  .container.mounts[]
+  | select(.[1] == "/cache" and .[2] == "rw")
+  | .[0]
+' "$config_path")
+host_cache=${host_cache//\{home\}/$home}
+case "$container_cache" in
+  /cache/*/jit) ;;
+  *)
+    echo "XDG_CACHE_HOME must be an isolated /cache/.../jit path" >&2
+    exit 1
+    ;;
+esac
+
+relative_cache=${container_cache#/cache/}
+run_root="$host_cache/${relative_cache%/jit}"
+telemetry_dir="$run_root/telemetry"
+output="$telemetry_dir/$phase-$(hostname).tsv"
+unit="$name-$phase-telemetry.service"
+
+case "$action" in
+  start)
+    if [[ -e "$output" ]]; then
+      echo "refusing to overwrite telemetry: $output" >&2
+      exit 1
+    fi
+    mkdir -p "$telemetry_dir"
+    sudo -n systemctl stop "$unit" >/dev/null 2>&1 || true
+    sudo -n systemctl reset-failed "$unit" >/dev/null 2>&1 || true
+    sudo -n systemd-run --quiet \
+      --unit="${unit%.service}" \
+      --collect \
+      --property=Type=simple \
+      --property="User=$(id -un)" \
+      --property="WorkingDirectory=$repo_root" \
+      --property=OOMScoreAdjust=-1000 \
+      --property=MemoryMin=32M \
+      --setenv="CONTAINER_NAME=$name" \
+      --setenv="OUTPUT_PATH=$output" \
+      --setenv=SAMPLE_INTERVAL=0.5 \
+      "$repo_root/scripts/startup-telemetry-sample.sh"
+    for _ in {1..50}; do
+      if [[ -s "$output" ]] && sudo -n systemctl is-active --quiet "$unit"; then
+        echo "startup telemetry active: $output"
+        exit 0
+      fi
+      sleep 0.1
+    done
+    echo "startup telemetry did not become active" >&2
+    exit 1
+    ;;
+  stop)
+    sudo -n systemctl stop "$unit" >/dev/null 2>&1 || true
+    if sudo -n systemctl is-active --quiet "$unit"; then
+      echo "startup telemetry remains active: $unit" >&2
+      exit 1
+    fi
+    echo "startup telemetry stopped: $output"
+    ;;
+  summary)
+    if [[ ! -s "$output" ]]; then
+      echo "telemetry is unavailable: $output" >&2
+      exit 1
+    fi
+    awk -F '\t' '
+      NR == 1 || /^#/ { next }
+      samples == 0 { first = $1; min_available = $2; max_swap = $3 }
+      {
+        samples++
+        last = $1
+        if ($2 < min_available) min_available = $2
+        if ($3 > max_swap) max_swap = $3
+      }
+      END {
+        printf "samples=%d elapsed_ms=%d min_available_kib=%d max_swap_used_kib=%d\n", samples, last - first, min_available, max_swap
+      }
+    ' "$output"
+    cache_path="$host_cache/$relative_cache"
+    if [[ -d "$cache_path" ]]; then
+      printf 'cache_files=%s cache_bytes=%s\n' \
+        "$(find "$cache_path" -type f | wc -l)" \
+        "$(du -sb "$cache_path" | cut -f1)"
+    else
+      echo "cache_files=0 cache_bytes=0"
+    fi
+    ;;
+esac
