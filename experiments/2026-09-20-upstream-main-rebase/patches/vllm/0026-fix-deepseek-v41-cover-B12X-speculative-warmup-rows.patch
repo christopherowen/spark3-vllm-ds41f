@@ -1,0 +1,189 @@
+From 329631a979ddc91191a9f13ca3d0ac4efeb9d549 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Tue, 22 Sep 2026 15:36:09 +0200
+Subject: [PATCH] fix(deepseek-v41): cover B12X speculative warmup rows
+
+---
+ tests/models/test_deepseek_v41_b12x.py        | 82 +++++++++++++++++++
+ .../deepseek_v41/nvidia/b12x_attention.py     | 45 +++++++---
+ 2 files changed, 117 insertions(+), 10 deletions(-)
+
+diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
+index 0a39ad045..f3ebe4fe9 100644
+--- a/tests/models/test_deepseek_v41_b12x.py
++++ b/tests/models/test_deepseek_v41_b12x.py
+@@ -19,6 +19,7 @@ from vllm.models.deepseek_v41.attention import _use_v41_mxfp8_kv_record
+ from vllm.models.deepseek_v41.nvidia.b12x_attention import (
+     DeepseekV41B12xAttention,
+     DeepseekV41B12xBackend,
++    _decode_plan_row_capacity,
+     _flatten_cache,
+ )
+ from vllm.models.deepseek_v41.nvidia.engram import ParallelEngramEmbedding
+@@ -190,6 +191,87 @@ def test_b12x_swa_only_layer_ignores_shared_indexer_output(monkeypatch) -> None:
+     assert calls[0]["indexed_cache"] is None
+ 
+ 
++def test_b12x_decode_plan_covers_dspark_warmup_rows() -> None:
++    config = SimpleNamespace(
++        speculative_config=SimpleNamespace(
++            num_speculative_tokens=3,
++            parallel_drafting=False,
++        ),
++        scheduler_config=SimpleNamespace(max_num_seqs=8),
++        compilation_config=SimpleNamespace(max_cudagraph_capture_size=0),
++    )
++
++    # Serving decode is 8 * (1 + 3) = 32 rows. Kernel warmup deliberately
++    # exercises one additional row per request, for 8 * 5 = 40.
++    assert _decode_plan_row_capacity(config) == 40
++
++
++def test_b12x_decode_plan_keeps_larger_graph_capacity() -> None:
++    config = SimpleNamespace(
++        speculative_config=None,
++        scheduler_config=SimpleNamespace(max_num_seqs=8),
++        compilation_config=SimpleNamespace(max_cudagraph_capture_size=64),
++    )
++
++    assert _decode_plan_row_capacity(config) == 64
++
++
++def test_b12x_decode_caps_use_row_capacity_not_request_count() -> None:
++    recorded_caps = []
++
++    class FakeMLA:
++        @staticmethod
++        def Caps(**kwargs):
++            return SimpleNamespace(**kwargs)
++
++        @staticmethod
++        def invocation_from_descriptors(**kwargs):
++            return kwargs
++
++        @staticmethod
++        def plan(caps, *, invocation):
++            del invocation
++            recorded_caps.append(caps)
++            return caps
++
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention._b12x = FakeMLA()
++    attention.n_local_heads = 24
++    attention.head_dim = 512
++    attention.max_model_len = 131072
++    attention.swa_cache_layer = SimpleNamespace(block_size=128)
++    attention._vllm_config = SimpleNamespace(
++        scheduler_config=SimpleNamespace(max_num_seqs=8),
++        cache_config=SimpleNamespace(block_size=128),
++    )
++    cache = torch.empty((2, 128), dtype=torch.uint8)
++
++    attention._plan(
++        mode="decode",
++        rows=40,
++        swa_width=3328,
++        swa_cache=cache,
++        indexed_cache=None,
++        indexed_width=0,
++        indexed_page_size=1,
++    )
++    attention._plan(
++        mode="extend",
++        rows=8192,
++        swa_width=32768,
++        swa_cache=cache,
++        indexed_cache=None,
++        indexed_width=0,
++        indexed_page_size=1,
++    )
++
++    assert recorded_caps[0].max_batch == 40
++    assert recorded_caps[0].decode_row_capacity == 40
++    assert recorded_caps[1].max_batch == 8
++    assert recorded_caps[1].decode_row_capacity is None
++
++
+ def test_disk_engram_routes_immutable_checkpoint_ranges() -> None:
+     class DiskTable:
+         def __init__(self) -> None:
+diff --git a/vllm/models/deepseek_v41/nvidia/b12x_attention.py b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+index 3ff78288f..3315bd2d4 100644
+--- a/vllm/models/deepseek_v41/nvidia/b12x_attention.py
++++ b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+@@ -154,6 +154,32 @@ def _flatten_cache(cache: torch.Tensor, *, name: str) -> torch.Tensor:
+     return cache.view(cache.shape[0], -1)
+ 
+ 
++def _decode_plan_row_capacity(vllm_config: VllmConfig) -> int:
++    """Bound every decode-shaped batch exercised before serving.
++
++    Ordinary speculative decode uses ``1 + speculative_tokens`` rows per
++    request (twice the speculative width for parallel drafting).  vLLM's
++    kernel warmup deliberately adds one more row per request so the synthetic
++    prefill is distinct from a uniform decode.  DSpark can still present that
++    non-causal warmup through the decode-shaped SWA metadata, so prepare the
++    small decode plan for both shapes before weights are resident.
++    """
++    spec_config = vllm_config.speculative_config
++    speculative_tokens = (
++        0 if spec_config is None else int(spec_config.num_speculative_tokens)
++    )
++    spec_multiplier = (
++        2 if spec_config is not None and spec_config.parallel_drafting else 1
++    )
++    decode_query_len = 1 + spec_multiplier * speculative_tokens
++    warmup_query_len = decode_query_len + 1
++    return max(
++        1,
++        vllm_config.scheduler_config.max_num_seqs * warmup_query_len,
++        int(vllm_config.compilation_config.max_cudagraph_capture_size or 0),
++    )
++
++
+ class DeepseekV41B12xAttention(DeepseekV4Attention):
+     """Upstream V4.1 semantics with B12X's SM12x sparse-attention kernel."""
+ 
+@@ -273,13 +299,20 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+             attn_sink_present=True,
+             output_mode="provided",
+         )
++        # B12X's compressed decode contract names this capacity ``max_batch``
++        # but validates it against Q rows. Extend mode uses request batches.
++        max_batch = (
++            rows
++            if mode == "decode"
++            else self._vllm_config.scheduler_config.max_num_seqs
++        )
+         plan = mla.plan(
+             mla.Caps(
+                 device=swa_cache.device,
+                 num_q_heads=self.n_local_heads,
+                 max_q_rows=rows,
+                 max_width=swa_width + indexed_width,
+-                max_batch=self._vllm_config.scheduler_config.max_num_seqs,
++                max_batch=max_batch,
+                 max_page_table_width=max_page_table_width,
+                 swa_width=swa_width,
+                 indexed_width=indexed_width,
+@@ -317,15 +350,7 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+         speculative_tokens = (
+             0 if spec_config is None else int(spec_config.num_speculative_tokens)
+         )
+-        spec_multiplier = (
+-            2 if spec_config is not None and spec_config.parallel_drafting else 1
+-        )
+-        decode_query_len = 1 + spec_multiplier * speculative_tokens
+-        decode_rows = max(
+-            1,
+-            self._vllm_config.scheduler_config.max_num_seqs * decode_query_len,
+-            int(self._vllm_config.compilation_config.max_cudagraph_capture_size or 0),
+-        )
++        decode_rows = _decode_plan_row_capacity(self._vllm_config)
+         extend_rows = self.max_num_batched_tokens
+         decode_swa_width = (
+             get_dspark_swa_index_width(self.window_size, speculative_tokens)
+-- 
+2.54.0 (Apple Git-157)
+

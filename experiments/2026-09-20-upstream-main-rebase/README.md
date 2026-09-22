@@ -510,6 +510,27 @@ build, native regression, and model-free qualification complete. That image
 will receive a new cold-cache namespace; the complete 925-file patch-0023 cache
 is evidence, not an input to the patch-0024 cold test.
 
+The patch-0025 image then completed fresh compilation, loaded the 98.1 GiB
+target-plus-draft model, prepared all selected B12X plans, allocated the fixed
+3 GiB KV cache, and passed the former SWA-only failure. vLLM's runtime warmup
+exposed a separate adapter capacity error: its eight synthetic DSpark prompts
+contain five rows each, but the decode plan used the eight-request count as
+B12X's row-validated `max_batch` and covered only the 32-row serving-decode
+shape. Patch 0026 sizes that plan for the 40-row warmup and passes the actual
+row capacity to B12X. The change adds only 11.123 MiB of decode scratch per
+rank (44.491 MiB to 55.614 MiB) and has model-free coverage for the warmup
+bound, graph-capacity precedence, and B12X caps.
+
+That run also recorded one non-fatal `NV_ERR_NO_MEMORY` on dgx2 while the fixed
+3 GiB KV cache was being reserved. The 5 GiB guard still preserved every host,
+but a first startup of a new image must not repeat that allocation boundary.
+Patch 0026 qualification therefore uses a temporary 2 GiB KV cache: it still
+provides roughly 902,000 KV tokens (enough for four 128K windows), while
+restoring about 1 GiB of host/driver headroom. The 3 GiB production target is a
+separate post-readiness capacity step, never part of the cold-compilation test.
+The exact failure evidence is retained in
+`runs/launch-9e1e10e5a428-cold-specdecode-scratch.json`.
+
 Because the official base image provides precompiled vLLM native extensions,
 the candidate image now rebuilds only `_C_stable_libtorch` from the recorded
 patched source for SM121. The build stage is bounded to two compile jobs and one

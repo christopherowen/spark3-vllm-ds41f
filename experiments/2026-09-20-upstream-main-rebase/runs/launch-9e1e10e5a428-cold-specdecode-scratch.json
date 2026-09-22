@@ -1,0 +1,76 @@
+{
+  "date": "2026-09-22",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:891dfb6cb1f9-b69feee3022c-db1d7a0d67579",
+    "id": "sha256:9e1e10e5a4289f9f702bfd2a61a094c16f336a5cd06c4c86f05c818fdf664d63"
+  },
+  "cache_namespace": "/cache/qualification/patch0025-9e1e10e5a428-r1/jit",
+  "startup_protection": {
+    "container_memory_gib": 108,
+    "mem_available_guard_gib": 5,
+    "sample_interval_seconds": 0.1,
+    "cuda_graphs": "disabled"
+  },
+  "result": "deterministic_speculative_decode_scratch_capacity_failure",
+  "observations": {
+    "pre_weight_jit_seconds": 34.26,
+    "model_loading": {
+      "memory_gib_per_rank": 98.1,
+      "head_seconds": 193.368648
+    },
+    "prepared_b12x_plans_per_rank": {
+      "mxfp8": 226,
+      "moe": 43,
+      "rocenante_collectives": 1
+    },
+    "kv_cache": {
+      "memory_gib": 3.0,
+      "tokens": 1353553,
+      "maximum_160k_concurrency": 8.46,
+      "dynamic_memory_profiling_skipped": true
+    },
+    "failure": {
+      "component": "DeepseekV41B12xAttention.forward_mqa",
+      "phase": "vLLM runtime kernel warmup",
+      "exception": "ValueError: decode rows 40 exceed compressed MLA scratch max_batch 8",
+      "cause": "the adapter passed max_num_seqs as B12X's decode max_batch even though that contract validates Q rows, and it sized the plan for 32 serving-decode rows without vLLM's 40-row speculative warmup",
+      "head_exit_code": 1,
+      "oom_killed": false
+    },
+    "telemetry_minimum_mem_available_kib": {
+      "dgx1": 5750044,
+      "dgx2": 6737316,
+      "dgx3": 6924228
+    },
+    "maximum_swap_used_kib": {
+      "dgx1": 478364,
+      "dgx2": 300,
+      "dgx3": 308
+    },
+    "driver_memory_event": {
+      "host": "dgx2",
+      "timestamp": "2026-09-22T15:14:48.775852+02:00",
+      "message": "NV_ERR_NO_MEMORY returned from _memdescAllocInternal",
+      "timing": "during the fixed 3 GiB KV allocation boundary",
+      "fatal": false
+    },
+    "hosts_remained_reachable": true,
+    "coordinated_rollback_completed": true
+  },
+  "cache_state": {
+    "compilation_completed": true,
+    "eligible_as_patch_0026_cold_input": false,
+    "preserved_for_evidence": true,
+    "files": {
+      "dgx1": 925,
+      "dgx2": 925,
+      "dgx3": 925
+    },
+    "bytes": {
+      "dgx1": 13930054,
+      "dgx2": 13930322,
+      "dgx3": 13929645
+    }
+  },
+  "resolution": "Patch 0026 prepares the decode plan for 40 Q rows and supplies that row capacity to B12X; model-free regressions pass and the extra scratch is only 11.123 MiB. A new immutable image must use a fresh cache namespace and a reduced 2 GiB KV cache for the first cold/warm inference pair so the prior driver-allocation boundary is not repeated."
+}
