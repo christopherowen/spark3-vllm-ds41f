@@ -23,8 +23,8 @@
     },
     "deployment.launch_enabled": {
       "from": true,
-      "to": false,
-      "reason": "the patch-0024 image passes local native and model-free qualification but is not yet distributed byte-identically to all three nodes; cluster start must fail locally before contacting a node"
+      "to": true,
+      "reason": "the patch-0024 image passes native and model-free qualification and is distributed byte-identically to all three healthy nodes; only this experimental configuration is enabled for the fail-closed guarded cold/warm startup pair"
     }
   },
   "source_delta": [
@@ -117,16 +117,16 @@
   "image_digest": "sha256:04500fc12dbd564245b84757cca46f1cfc148cbbe053eb8e892ea2016a137a72",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0024 image sha256:04500fc12dbd passes the 12-case native TP3 kernel matrix and all 11 exact patch-0022/0023 model-free regressions on dgx1; distribution and guarded cold/warm TP3 startup remain required, so both candidate and promoted launches remain locked",
+  "deployment_status": "patch 0024 image sha256:04500fc12dbd passes the 12-case native TP3 kernel matrix and all 11 exact patch-0022/0023 model-free regressions and is byte-identical on every rank; the experimental launch is enabled only for the guarded cold/warm pair, while the promoted launch remains locked",
   "integration_status": {
-    "status": "locally qualified immutable candidate: patch 0024 adds the exact native 24-head fused DeepSeek V4 QNorm/RoPE instantiation required by quality-preserving TP3 padding; image build and native/model-free tests pass, while byte-identical distribution and guarded cold/warm TP3 startup remain required",
+    "status": "distributed immutable candidate: patch 0024 adds the exact native 24-head fused DeepSeek V4 QNorm/RoPE instantiation required by quality-preserving TP3 padding; image build, native/model-free tests, and byte-identical distribution pass, while guarded cold/warm TP3 startup remains required",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0024-image-passes-local-model-free-qualification-pending-distribution-and-cold-warm-startup",
+    "status": "patch-0024-image-passes-distributed-prelaunch-qualification-pending-cold-warm-startup",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

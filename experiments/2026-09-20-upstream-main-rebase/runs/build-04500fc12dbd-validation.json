@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "passed-local-immutable-model-free-qualification",
+  "status": "passed-distributed-immutable-prelaunch-qualification",
   "timestamp": "2026-09-22T13:49:09+02:00",
   "image": {
     "tag": "vllm-ds41f-upstream-main:6131c72e0f15-b69feee3022c-d035350a4c857",
@@ -28,20 +28,20 @@
     "native_tp3_regression": "12 passed from the immutable image for interleaved Q layouts, including the exact n_heads=24 and q_head_padded=24 TP3 geometry",
     "focused_patch_regressions": "11 passed from the immutable image: model/backend-selected registration, pre-weight ordering, incremental B12X preparation, lazy MXFP8 lifetime, and exact B12X/indexer geometry",
     "broad_file_probe": "94 unrelated tests passed; 29 fixture errors and one offline stock-model lookup failure were excluded because --noconftest and --network none deliberately omit the full upstream integration harness",
-    "image_labels": "deployment revision, upstream bases, patch heads, and source trees exactly match the locked build inputs",
+    "image_labels": "deployment revision, upstream bases, patch heads, and source trees exactly match the locked build inputs on all three nodes",
+    "image_distribution": "dgx1, dgx2, and dgx3 report the exact image ID sha256:04500fc12dbd564245b84757cca46f1cfc148cbbe053eb8e892ea2016a137a72 after two concurrent uncompressed streams over dgx1's verified 192.168.0.0/24 and 192.168.2.0/24 ConnectX-7 links",
+    "distributed_preflight": "all nodes report the same repository revision, zero running containers, systemd running, no current-boot NV_ERR_NO_MEMORY, at least 117115148 KiB MemAvailable, and an absent patch0024-04500fc12dbd-r1 cache namespace",
     "host_health": "dgx1 remained systemd-running with 121350996 KiB MemAvailable, 391724 KiB swap used, zero running containers, and no current-boot NV_ERR_NO_MEMORY entry after validation"
   },
   "safety": {
-    "candidate_cluster_launch_enabled": false,
+    "candidate_cluster_launch_enabled": true,
     "promoted_cluster_launch_enabled": false,
     "startup_memguard_gib": 5,
     "startup_memguard_interval_seconds": 0.1,
-    "candidate_distributed": false,
+    "candidate_distributed": true,
     "tp3_started": false
   },
   "remaining": [
-    "copy this exact image uncompressed over dgx1's two ConnectX-7 links and verify byte-identical IDs and labels on dgx2 and dgx3",
-    "prove the fresh patch0024-04500fc12dbd-r1 qualification cache namespace is absent on all ranks",
     "perform guarded cold and warm TP3 eager startups with per-rank telemetry and a deterministic API smoke request"
   ]
 }
