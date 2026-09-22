@@ -126,7 +126,7 @@
   "failed_image_digest": "sha256:b9c4e1264f2f7fa1d0de93b3db0e452e732e754608595b654f38e65f6e4df2a7",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "the corrected patch 0028 image is built, runtime-tested, and present with identical identity on all three nodes; launch remains locked until its guarded target-only semantic smoke passes",
+  "deployment_status": "the corrected patch 0028 image is built, runtime-tested, and present with identical identity on all three nodes; a guarded target-only semantic smoke is explicitly authorized, but promotion still requires that smoke to pass",
   "integration_status": {
     "status": "patch 0028 routes both SWA MXFP8 and indexed NVFP4 writes through B12X's prepared contiguous-record writers and preserves an explicit singleton head while applying RoPE; source and rebuilt-image regression tests pass and guarded semantic qualification remains pending",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",

@@ -196,7 +196,7 @@
     "master_port": "29554"
   },
   "deployment": {
-    "launch_enabled": false,
+    "launch_enabled": true,
     "repository": "https://github.com/christopherowen/spark3-vllm-ds41f.git",
     "branch": "main",
     "path": "{home}/projects/spark3-vllm-ds41f",
