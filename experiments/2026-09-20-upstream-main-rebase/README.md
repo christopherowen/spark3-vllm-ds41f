@@ -460,12 +460,23 @@ kill path has been exercised on all three nodes with a GPU-free 64 MiB smoke
 container and left no residual units or containers. The promoted configuration
 remains launch-locked. After the image was copied
 byte-for-byte to every rank and the owner authorized hardware qualification,
-the dedicated candidate configuration was opened for exactly one cold-cache and
-one warm-cache TP3 startup. Those starts use a new
+the dedicated candidate configuration was opened for a guarded cold-cache and
+warm-cache TP3 startup pair. The first cold attempt used the new
 `patch0023-9076b0bd9fee` cache namespace, a 108 GiB container cap, a protected
-10 GiB startup guard sampled every 100 ms, and CUDA graphs disabled. The cold
-run must begin with that namespace absent on every rank; the warm run must reuse
-it unchanged.
+10 GiB startup guard sampled every 100 ms, and CUDA graphs disabled. All ranks
+completed the 24-key pre-weight JIT, but dgx2 and dgx3 crossed that intentionally
+conservative guard immediately after weight loading. The guard stopped them
+with explicit SIGKILLs, not cgroup OOM kills; coordinated rollback succeeded,
+all hosts stayed reachable, and no current-boot `NV_ERR_NO_MEMORY` was present.
+That incomplete cache is preserved as evidence and is not eligible for a warm
+test. The receipt is `runs/launch-9076b0bd9fee-cold-r1-guarded.json`.
+
+The second cold attempt uses a fresh `patch0023-9076b0bd9fee-r2` namespace and
+an 8 GiB startup guard sampled every 100 ms. This still leaves substantially
+more host/driver headroom than the 1.01--1.72 GiB trough associated with the
+previous control-plane loss. Its cold run must begin with the namespace absent
+on every rank; only a cold run that reaches API readiness may provide the cache
+for the warm run.
 
 The startup pair is ordered and fail-closed:
 
@@ -484,7 +495,8 @@ Each rank runs `scripts/startup-telemetry` as a protected transient service for
 the duration of a startup. It samples host `MemAvailable`, swap use, and exact
 container state twice per second into the ignored qualification directory, then
 reports cache file count and bytes without placing mutable runtime artifacts in
-Git.
+Git. Summary parsing rejects incomplete rows so an interrupted `docker inspect`
+cannot be mistaken for a zero-memory sample.
 
 ## Quality and safety gates
 

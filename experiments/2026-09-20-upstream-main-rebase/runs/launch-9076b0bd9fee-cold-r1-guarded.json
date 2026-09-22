@@ -1,0 +1,63 @@
+{
+  "date": "2026-09-22",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:c6d531aa609f-b69feee3022c-d397d35a4e051",
+    "id": "sha256:9076b0bd9fee09d1dda4958667ba4fa29dea3a9251f0ba682fd616e6db058dd3"
+  },
+  "cache_namespace": "/cache/qualification/patch0023-9076b0bd9fee/jit",
+  "startup_protection": {
+    "container_memory_gib": 108,
+    "mem_available_guard_gib": 10,
+    "sample_interval_seconds": 0.1,
+    "cuda_graphs": "disabled"
+  },
+  "result": "safe_guard_stop",
+  "observations": {
+    "pre_weight_jit": {
+      "status": "completed_on_all_ranks",
+      "compile_keys": 24,
+      "seconds": {
+        "dgx1": 34.29,
+        "dgx2": 34.12,
+        "dgx3": 31.97
+      }
+    },
+    "weight_loading_seconds": {
+      "dgx2": 44.87,
+      "dgx3": 37.0
+    },
+    "minimum_mem_available_kib": {
+      "dgx1": 15459044,
+      "dgx2": 10481468,
+      "dgx3": 10444444
+    },
+    "maximum_swap_used_kib": {
+      "dgx1": 490176,
+      "dgx2": 0,
+      "dgx3": 0
+    },
+    "container_exit": {
+      "dgx1": "removed by coordinated rollback",
+      "dgx2": "exit 137; OOMKilled=false; explicit startup memguard SIGKILL",
+      "dgx3": "exit 137; OOMKilled=false; explicit startup memguard SIGKILL"
+    },
+    "nvidia_nv_err_no_memory_current_boot": false,
+    "hosts_remained_reachable": true,
+    "coordinated_rollback_completed": true
+  },
+  "cache_state": {
+    "complete": false,
+    "preserved_for_evidence": true,
+    "files": {
+      "dgx1": 101,
+      "dgx2": 182,
+      "dgx3": 182
+    },
+    "bytes": {
+      "dgx1": 1297424,
+      "dgx2": 2096047,
+      "dgx3": 2095379
+    }
+  },
+  "conclusion": "The protected cold start verified that model-selected JIT runs before checkpoint loading and that fail-closed memory protection preserves host control. The 10 GiB qualification threshold stopped two ranks immediately after weight loading, before API readiness; this namespace must not be used as the warm-cache qualification input."
+}

@@ -38,9 +38,12 @@ while true; do
     ' /proc/meminfo
   )
   swap_used_kib=$((swap_total_kib - swap_free_kib))
-  state=$(docker inspect \
+  if ! state=$(docker inspect \
     --format '{{.State.Running}}:{{.State.ExitCode}}:{{.State.OOMKilled}}' \
-    "$CONTAINER_NAME" 2>/dev/null || printf 'absent')
+    "$CONTAINER_NAME" 2>/dev/null); then
+    state=absent
+  fi
+  state=${state//$'\n'/}
   printf '%s\t%s\t%s\t%s\n' \
     "$(date +%s%3N)" "$available_kib" "$swap_used_kib" "$state" \
     >>"$OUTPUT_PATH"

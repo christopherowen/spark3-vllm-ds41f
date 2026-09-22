@@ -96,6 +96,7 @@ case "$action" in
     fi
     awk -F '\t' '
       NR == 1 || /^#/ { next }
+      $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ || $3 !~ /^[0-9]+$/ { next }
       samples == 0 { first = $1; min_available = $2; max_swap = $3 }
       {
         samples++
@@ -104,7 +105,11 @@ case "$action" in
         if ($3 > max_swap) max_swap = $3
       }
       END {
-        printf "samples=%d elapsed_ms=%d min_available_kib=%d max_swap_used_kib=%d\n", samples, last - first, min_available, max_swap
+        if (samples == 0) {
+          print "no valid telemetry samples" > "/dev/stderr"
+          exit 1
+        }
+        printf "samples=%d elapsed_seconds=%.3f min_available_kib=%d max_swap_used_kib=%d\n", samples, (last - first) / 1000, min_available, max_swap
       }
     ' "$output"
     cache_path="$host_cache/$relative_cache"
