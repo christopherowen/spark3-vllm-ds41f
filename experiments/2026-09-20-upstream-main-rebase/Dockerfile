@@ -17,6 +17,7 @@ COPY --from=vllm-source . /workspace/vllm/
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       cmake \
+      git \
     && rm -rf /var/lib/apt/lists/*
 ENV TORCH_CUDA_ARCH_LIST=12.1a
 RUN set -eux; \
