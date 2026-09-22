@@ -35,6 +35,8 @@
     },
     "kv_cache_tokens": 520817,
     "max_160k_concurrency": 3.26,
+    "max_128k_concurrency_nominal": 4.07,
+    "four_by_128k_token_slack": 8817,
     "minimum_available_kib": {
       "dgx1": 5919072,
       "dgx2": 7194968,
@@ -67,6 +69,8 @@
     "engine_init_seconds": 13.68,
     "kv_cache_tokens": 520817,
     "max_160k_concurrency": 3.26,
+    "max_128k_concurrency_nominal": 4.07,
+    "four_by_128k_token_slack": 8817,
     "minimum_available_kib": {
       "dgx1": 6493724,
       "dgx2": 7647064,

@@ -585,10 +585,12 @@ telemetry and container logs. The 5 GiB startup guard was material: dgx1 reached
 This candidate is not qualified for inference or promotion. Temperature-zero
 chat smokes on both cold and warm starts returned garbled and repetitive tokens
 despite valid HTTP responses and usage accounting. The temporary 2 GiB safety
-cache also exposed 520,817 tokens, or 3.26 simultaneous 160K requests, so it is
-not the final four-by-128K capacity configuration. The launch is locked while
-generation correctness is isolated between the target-only and DSpark paths.
-Full evidence is in `runs/launch-64e2b8cf5925-cold-warm.json`.
+cache exposed 520,817 tokens, or 3.26 simultaneous 160K requests. That is
+nominally enough for four 128K windows with 8,817 tokens (1.7%) of aggregate
+slack, but the four-way long-context execution gate remains deferred until
+generation correctness passes. The launch is locked while correctness is
+isolated between the target-only and DSpark paths. Full evidence is in
+`runs/launch-64e2b8cf5925-cold-warm.json`.
 
 ## Quality and safety gates
 
