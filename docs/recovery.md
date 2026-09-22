@@ -55,6 +55,14 @@ without changing inference arithmetic or kernel selection:
 The policy deliberately does not reboot for gateway loss, Internet loss, a
 single failed health check, or a generic hung task.
 
+The 2026-09-22 recovery also exposed an independent boot-completion race. All
+three hosts had the same vendor `plymouth-quit-wait.service` with an infinite
+timeout. dgx1 received the graphical quit event after 5.4 seconds; dgx2 and
+dgx3 waited about 101 and 98 minutes respectively until an operator issued
+`plymouth quit`. A repository-owned drop-in now preserves the normal handoff
+for 30 seconds, then explicitly quits Plymouth, with a 40-second outer service
+bound. The same drop-in is installed and checked on every node.
+
 ## 2026-09-22 three-node qualification incident
 
 A patch-0022 recovery launch disabled the eager JIT registry sweep but left the

@@ -16,6 +16,7 @@ files=(
   "sshd.conf:/etc/ssh/sshd_config.d/95-spark-recovery.conf:0644"
   "ssh.service.conf:/etc/systemd/system/ssh.service.d/95-spark-recovery.conf:0644"
   "tailscaled.service.conf:/etc/systemd/system/tailscaled.service.d/95-spark-recovery.conf:0644"
+  "plymouth-quit-wait.service.conf:/etc/systemd/system/plymouth-quit-wait.service.d/95-spark-recovery.conf:0644"
   "kernel-denylist:/etc/spark3/kernel-denylist:0644"
   "spark-kernel-next-boot:/usr/local/sbin/spark-kernel-next-boot:0755"
   "spark-kernel-next-boot.service:/etc/systemd/system/spark-kernel-next-boot.service:0644"
@@ -26,7 +27,7 @@ files=(
 )
 
 check_files() {
-  local failed=0 entry source destination mode actual_mode sshd_effective
+  local failed=0 entry source destination mode actual_mode sshd_effective legacy
   for entry in "${files[@]}"; do
     IFS=: read -r source destination mode <<<"$entry"
     if ! sudo -n test -f "$destination"; then
@@ -53,6 +54,21 @@ check_files() {
     echo "systemd reboot watchdog is not set to 10 minutes" >&2
     failed=1
   fi
+  if [[ "$(systemctl show plymouth-quit-wait.service \
+    --property=TimeoutStartUSec --value)" != 40s ]]; then
+    echo "plymouth-quit-wait.service is not bounded at 40s" >&2
+    failed=1
+  fi
+  for legacy in \
+    /etc/systemd/system.conf.d/90-law-watchdog.conf \
+    /etc/systemd/system.conf.d/90-law-watchdog.conf.spark3-migrated \
+    /etc/sysctl.d/90-law-watchdog.conf \
+    /etc/sysctl.d/90-law-watchdog.conf.spark3-migrated; do
+    if sudo -n test -e "$legacy"; then
+      echo "retired legacy recovery file remains: $legacy" >&2
+      failed=1
+    fi
+  done
   if ! systemctl is-enabled --quiet spark-management-health.timer \
     || ! systemctl is-active --quiet spark-management-health.timer; then
     echo "spark-management-health.timer is not enabled and active" >&2
@@ -119,13 +135,13 @@ for entry in "${files[@]}"; do
 done
 
 # Retire the earlier ad-hoc files only after their repository-owned replacements
-# are installed. The disabled copies remain recoverable and are not parsed.
+# are installed. Their directives are fully represented by the managed files;
+# removing both active and migrated copies keeps every host's configuration
+# inventory identical.
 for legacy in \
   /etc/systemd/system.conf.d/90-law-watchdog.conf \
   /etc/sysctl.d/90-law-watchdog.conf; do
-  if sudo -n test -f "$legacy"; then
-    sudo -n mv "$legacy" "$legacy.spark3-migrated"
-  fi
+  sudo -n rm -f "$legacy" "$legacy.spark3-migrated"
 done
 
 sudo -n sshd -t
