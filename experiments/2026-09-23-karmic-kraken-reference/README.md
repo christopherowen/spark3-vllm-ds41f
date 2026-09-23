@@ -126,3 +126,12 @@ and vLLM provides piecewise graphs for it only with
 decode graphs. `cluster-kkref-g-breakable.json` is PIECEWISE with breakable
 graphs on: the `eager_break_during_capture` regions (SWA write, compressor and
 compressed-cache write, indexer and attention) run eagerly on every replay.
+
+Breakable PIECEWISE failed 8/8 (`runs/kktrace/g-piecewise-breakable.json`),
+and one-request speed fell to 30 tok/s. With SWA write, compressor write,
+indexer and attention re-executed eagerly at every replay, the defect remains.
+The faulty component is captured in every graph mode. The model has no
+token-hash routing. `cluster-kkref-g-nccl.json` keeps full decode graphs and
+changes only `VLLM_ENABLE_ROCE_ALLREDUCE=0`: B12X RoCE collectives, including
+our switchless routing, are captured in the graphs and rely on
+device-resident sequence state across replays.
