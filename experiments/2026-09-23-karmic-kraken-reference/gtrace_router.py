@@ -39,7 +39,8 @@ for step in (1, 2, 3):
                 continue
             noise = max([rel(e[step][key][0], e0[key][0]) for e in E[1:]] + [1e-7])
             g = max(rel(x[step][key][0], e0[key][0]) for x in G)
-            cells.append(f"{key[1]} g{g:.4f}/n{noise:.4f}")
+            gg = max([rel(x[step][key][0], G[0][step][key][0]) for x in G[1:]] + [0.0])
+            cells.append(f"{key[1]} g{g:.4f}/n{noise:.4f}/gg{gg:.4f}")
         same = [ids(x[step][(r, "topk_ids")]) == ids(e0[(r, "topk_ids")]) for x in G + E[1:]]
         cells.append(f"ids-same={same}")
         print(f" L{layer:2d} " + " | ".join(cells))
