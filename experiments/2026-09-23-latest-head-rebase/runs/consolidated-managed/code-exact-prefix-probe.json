@@ -1,0 +1,100 @@
+{
+  "request": "Write a short Python LRU cache class with get and put methods using OrderedDict. Give code and one sentence on complexity.",
+  "seed": 42,
+  "chat_prompt_token_count": 29,
+  "chat_generated_token_count": 172,
+  "chat_logprob_count": 172,
+  "chat_content": "```python\nfrom collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value recon):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n```\n\nBoth `get` and `put` run in **O(1)** average time thanks to `OrderedDict`'s hash-based lookups and doubly-linked-list ordering.",
+  "prefix_found": true,
+  "prefix_index": 84,
+  "chat_next_token": " recon",
+  "chat_next_top_logprobs": [
+    {
+      "token": " recon",
+      "logprob": -2.2872557640075684,
+      "bytes": [
+        32,
+        114,
+        101,
+        99,
+        111,
+        110
+      ]
+    },
+    {
+      "token": " splash",
+      "logprob": -2.3497557640075684,
+      "bytes": [
+        32,
+        115,
+        112,
+        108,
+        97,
+        115,
+        104
+      ]
+    },
+    {
+      "token": "erk",
+      "logprob": -2.5997557640075684,
+      "bytes": [
+        101,
+        114,
+        107
+      ]
+    },
+    {
+      "token": " Lor",
+      "logprob": -3.7872557640075684,
+      "bytes": [
+        32,
+        76,
+        111,
+        114
+      ]
+    },
+    {
+      "token": "era",
+      "logprob": -3.9122557640075684,
+      "bytes": [
+        101,
+        114,
+        97
+      ]
+    }
+  ],
+  "chat_prefix_suffix": "  self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value",
+  "chat_prompt_text_suffix": "et and put methods using OrderedDict. Give code and one sentence on complexity.<\uff5cAssistant\uff5c></think>",
+  "forced_prompt_token_count": 114,
+  "forced_text": "):\n",
+  "forced_token_ids": [
+    3395
+  ],
+  "forced_logprobs": {
+    "text_offset": [
+      0
+    ],
+    "token_logprobs": [
+      -0.0010339635191485286
+    ],
+    "tokens": [
+      "):\n"
+    ],
+    "top_logprobs": [
+      {
+        "):\n": -0.0010339635191485286,
+        ")": -6.876033782958984,
+        "=None": -14.376033782958984,
+        "):\n\n": -15.376033782958984,
+        "):": -15.501033782958984
+      }
+    ]
+  },
+  "forced_usage": {
+    "prompt_tokens": 114,
+    "total_tokens": 115,
+    "completion_tokens": 1,
+    "prompt_tokens_details": null,
+    "completion_tokens_details": null
+  }
+}

@@ -79,6 +79,8 @@ candidate. The latter completed all 30 matched requests; throughput remains
 far below the weekend setup at low and moderate concurrency.
 `performance-recovery.md` records the source/configuration attribution audit
 and the controlled qualification sequence for recovering decode speed.
+`quality-diagnosis.md` records the exact-token comparison that blocks
+promotion while incremental output remains intermittently malformed.
 
 `cluster-eager.json` keeps the working patch-0029 target-only serving flags and
 guarded memory limits. Its latest revision pins the managed-weight image and

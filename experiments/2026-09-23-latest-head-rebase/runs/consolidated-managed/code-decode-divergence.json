@@ -1,0 +1,268 @@
+{
+  "prompt": "Write a short Python LRU cache class with get and put methods using OrderedDict. Give code and one sentence on complexity.",
+  "chat_content": "```python\nfrom collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n```\n\nBoth `get` and `put` run in **O(1)** average time, since `OrderedDict` provides constant-time lookups, insertions, and `move_to_end`/`popitem` operations.",
+  "prompt_tokens": 29,
+  "generated_tokens": 181,
+  "checkpoints": [
+    {
+      "generated_prefix_tokens": 1,
+      "total_prefix_tokens": 30,
+      "chat_next": "python",
+      "chat_next_logprob": -1.1920928244535389e-07,
+      "chat_top": [
+        [
+          "python",
+          -0.0
+        ],
+        [
+          " python",
+          -17.0
+        ],
+        [
+          "<\uff5cend\u2581of\u2581sentence\uff5c>",
+          -18.375
+        ],
+        [
+          "Python",
+          -18.625
+        ],
+        [
+          "py",
+          -18.875
+        ]
+      ],
+      "forced_next": "python",
+      "forced_next_logprob": -1.1920928244535389e-07,
+      "forced_top": [
+        [
+          "python",
+          -0.0
+        ],
+        [
+          " python",
+          -16.75
+        ],
+        [
+          "Python",
+          -17.875
+        ],
+        [
+          "<\uff5cend\u2581of\u2581sentence\uff5c>",
+          -17.875
+        ],
+        [
+          "py",
+          -18.25
+        ]
+      ]
+    },
+    {
+      "generated_prefix_tokens": 16,
+      "total_prefix_tokens": 45,
+      "chat_next": " __",
+      "chat_next_logprob": -1.1920928244535389e-07,
+      "chat_top": [
+        [
+          " __",
+          -0.0
+        ],
+        [
+          " ___",
+          -16.75
+        ],
+        [
+          " init",
+          -17.625
+        ],
+        [
+          " _",
+          -17.625
+        ],
+        [
+          " get",
+          -18.25
+        ]
+      ],
+      "forced_next": " __",
+      "forced_next_logprob": 0.0,
+      "forced_top": [
+        [
+          " __",
+          0.0
+        ],
+        [
+          " ___",
+          -16.75
+        ],
+        [
+          " init",
+          -17.875
+        ],
+        [
+          " _",
+          -17.875
+        ],
+        [
+          " get",
+          -18.5
+        ]
+      ]
+    },
+    {
+      "generated_prefix_tokens": 32,
+      "total_prefix_tokens": 61,
+      "chat_next": "       ",
+      "chat_next_logprob": -3.576272320060525e-06,
+      "chat_top": [
+        [
+          "       ",
+          -0.0
+        ],
+        [
+          "   ",
+          -13.5
+        ],
+        [
+          "           ",
+          -15.0
+        ],
+        [
+          "      ",
+          -15.6875
+        ],
+        [
+          "        \n",
+          -15.9375
+        ]
+      ],
+      "forced_next": "       ",
+      "forced_next_logprob": -1.1920928244535389e-07,
+      "forced_top": [
+        [
+          "       ",
+          -0.0
+        ],
+        [
+          "   ",
+          -16.875
+        ],
+        [
+          "           ",
+          -18.0625
+        ],
+        [
+          "<\uff5cend\u2581of\u2581sentence\uff5c>",
+          -18.25
+        ],
+        [
+          " self",
+          -18.375
+        ]
+      ]
+    },
+    {
+      "generated_prefix_tokens": 64,
+      "total_prefix_tokens": 93,
+      "chat_next": "ache",
+      "chat_next_logprob": 0.0,
+      "chat_top": [
+        [
+          "ache",
+          0.0
+        ],
+        [
+          "achev",
+          -18.9375
+        ],
+        [
+          "<\uff5cend\u2581of\u2581sentence\uff5c>",
+          -19.5
+        ],
+        [
+          " ache",
+          -19.625
+        ],
+        [
+          "ACHE",
+          -20.625
+        ]
+      ],
+      "forced_next": "ache",
+      "forced_next_logprob": 0.0,
+      "forced_top": [
+        [
+          "ache",
+          0.0
+        ],
+        [
+          "achev",
+          -19.5625
+        ],
+        [
+          " ache",
+          -19.6875
+        ],
+        [
+          "ACHE",
+          -20.3125
+        ],
+        [
+          "ach",
+          -20.5625
+        ]
+      ]
+    },
+    {
+      "generated_prefix_tokens": 84,
+      "total_prefix_tokens": 113,
+      "chat_next": " value",
+      "chat_next_logprob": -1.1920928244535389e-07,
+      "chat_top": [
+        [
+          " value",
+          -0.0
+        ],
+        [
+          " val",
+          -16.375
+        ],
+        [
+          "value",
+          -17.125
+        ],
+        [
+          "<\uff5cend\u2581of\u2581sentence\uff5c>",
+          -18.125
+        ],
+        [
+          "\u503c",
+          -18.875
+        ]
+      ],
+      "forced_next": " value",
+      "forced_next_logprob": -1.1920928244535389e-07,
+      "forced_top": [
+        [
+          " value",
+          -0.0
+        ],
+        [
+          " val",
+          -16.625
+        ],
+        [
+          "value",
+          -17.75
+        ],
+        [
+          "<\uff5cend\u2581of\u2581sentence\uff5c>",
+          -19.0
+        ],
+        [
+          "\u4ef7\u503c",
+          -19.125
+        ]
+      ]
+    }
+  ]
+}

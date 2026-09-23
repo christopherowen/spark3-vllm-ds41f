@@ -1,0 +1,13 @@
+{
+  "request": "Write a short Python LRU cache class with get and put methods using OrderedDict. Give code and one sentence on complexity.",
+  "prompt_token_count": 29,
+  "completion_token_count": 172,
+  "completion_text": "```python\nfrom collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, valueerk):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n```\n\nBoth `get` and `put` run in **O(1)** average time thanks to `OrderedDict`'s hash-based lookups and doubly-linked-list ordering.",
+  "completion_usage": {
+    "prompt_tokens": 29,
+    "total_tokens": 201,
+    "completion_tokens": 172,
+    "prompt_tokens_details": null,
+    "completion_tokens_details": null
+  }
+}

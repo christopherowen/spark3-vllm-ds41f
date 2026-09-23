@@ -1,0 +1,26 @@
+{
+  "prefix_suffix": "       self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value",
+  "prompt_tokens": 114,
+  "text": "):\n",
+  "finish_reason": "length",
+  "logprobs": {
+    "text_offset": [
+      0
+    ],
+    "token_logprobs": [
+      -0.00029690624796785414
+    ],
+    "tokens": [
+      "):\n"
+    ],
+    "top_logprobs": [
+      {
+        "):\n": -0.00029690624796785414,
+        ")": -8.125296592712402,
+        "=None": -14.500296592712402,
+        "):": -15.750296592712402,
+        "):\n\n": -16.12529754638672
+      }
+    ]
+  }
+}
