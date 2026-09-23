@@ -118,3 +118,11 @@ device synchronize. Kernel numerics, Engram, collectives and host races are
 not the cause. The next arms separate PIECEWISE graphs (attention eager
 between pieces) from FULL_AND_PIECEWISE with breakable CUDA graphs enabled,
 which runs the `eager_break_during_capture` regions eagerly.
+
+The "PIECEWISE" arm (`cluster-kkref-g-piecewise.json`) failed 7/8
+(`runs/kktrace/g-piecewise-nonbreakable.json`). DS4.1 is not torch-compiled,
+and vLLM provides piecewise graphs for it only with
+`VLLM_USE_BREAKABLE_CUDAGRAPH=1`. With that off, this arm still replayed full
+decode graphs. `cluster-kkref-g-breakable.json` is PIECEWISE with breakable
+graphs on: the `eager_break_during_capture` regions (SWA write, compressor and
+compressed-cache write, indexer and attention) run eagerly on every replay.

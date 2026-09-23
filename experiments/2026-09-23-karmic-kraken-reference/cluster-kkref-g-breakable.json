@@ -166,7 +166,7 @@
     "--jit-monitor-mode",
     "warn",
     "--compilation-config",
-    "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24]}",
+    "{\"cudagraph_mode\":\"PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24]}",
     "--prefix-cache-retention-interval",
     "512",
     "--long-prefill-token-threshold",
