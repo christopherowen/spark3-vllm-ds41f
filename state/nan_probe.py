@@ -323,6 +323,22 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
     @functools.wraps(original)
     def checked(self: Any, *args: Any, **kwargs: Any) -> Any:
         prefix = getattr(self, "prefix", type(self).__name__)
+        if os.path.exists(_ARM_FILE) and kwargs.get("indexed_indices") is not None:
+            from vllm.forward_context import get_forward_context
+
+            assert self.compressor is not None
+            compressed = get_forward_context().attn_metadata[
+                self.compressor.k_cache_prefix
+            ]
+            if getattr(self, "layer_id", None) == 2:
+                print(
+                    "spark3 NaN probe: "
+                    f"{prefix}.indexed_block_table "
+                    f"swa_first={kwargs['block_table'][0, :4].detach().cpu().tolist()} "
+                    f"compressed_first={compressed.block_table[0, :4].detach().cpu().tolist()}",
+                    flush=True,
+                )
+            kwargs = {**kwargs, "block_table": compressed.block_table}
         armed = os.path.exists(_ARM_FILE) and getattr(self, "layer_id", None) in (
             0,
             1,

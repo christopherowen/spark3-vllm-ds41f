@@ -45,6 +45,14 @@ read values over 1,900 from the indexed cache; the reference reaches 2,304.
 The compressed latent entering the B12X indexed cache writer and the decoded
 cache record are the next boundary. See `runs/launch-v2-fullref-q10.json`.
 
+The first valid indexed cache writes decode near ±1.3 and match their source
+latent within ordinary NVFP4 quantization error. B12X's adapter passes the
+SWA block table to `compute_global_topk_indices_and_lens`, while the upstream
+FlashInfer/FlashMLA paths pass the compressed-cache metadata's block table.
+The next diagnostic substitutes that compressed block table in the adapter
+at request time without rebuilding the image. See
+`runs/launch-v2-cache-q11.json`.
+
 ## Review correction: disk Engram collective
 
 Source review found that the proposed dim-0 all-gather probe does **not**

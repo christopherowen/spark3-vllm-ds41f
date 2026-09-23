@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "result": "api_ok_incorrect_text",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 200,
+    "text": " hurry dispensing acc\u7684\u795e\u79d8"
+  },
+  "configuration": "cluster-v2-cache.json",
+  "repository_commit": "406d78818c31c24730ddc3d6d09c6229530b557b",
+  "findings": {
+    "indexed_writer_slots_first_prefill": [
+      448,
+      449
+    ],
+    "decoded_written_range": [
+      -1.125,
+      1.3125
+    ],
+    "rotated_valid_max_abs": 1.359375,
+    "write_max_abs_error": 0.1796875,
+    "suspected_cause": "B12X adapter maps indexed top-k through SWA block_table while upstream backends use compressed-cache metadata block_table"
+  },
+  "nodes": {
+    "dgx1": {
+      "container_id": "c48ae918e852c0e47688612dc40c48f4965f1b7b3f8cb0b48b29ab5d61b81483",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx2": {
+      "container_id": "4fd3fedab1478d8d80271195d5985cd9a42bcf22e78d9c30730d5eafc3af4769",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx3": {
+      "container_id": "f950e5a009d49be56337de00f63b6cb7bd820c9a4a59eba8d0142fd901ba2e8b",
+      "exit_code": 0,
+      "oom_killed": false
+    }
+  }
+}
