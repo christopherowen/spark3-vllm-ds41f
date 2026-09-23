@@ -40,6 +40,9 @@ separate model-state test fixture predates this branch's disk-Engram extension
 and lacks `disk_engram_models`; it failed before exercising the gather. These
 bounded results and inconclusive setup failures are recorded in
 `runs/capped-component-controls.json`.
+The current B12X TP3 disk-Engram lookup test also passed varied rows, graph
+replay, and stream reuse with production-style nonresident scales. This checks
+the isolated lookup, not the live input hashes or synchronization across ranks.
 
 No image or service restart was needed for these checks. The candidate remains
 unpromoted and guarded. Before changing throughput settings, the next causal

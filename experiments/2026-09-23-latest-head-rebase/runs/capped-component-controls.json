@@ -32,6 +32,12 @@
       "memory_cap": "4g",
       "test": "tests/kernels/test_engram.py::test_v2_model_state_gathers_lookback_window",
       "result": "fixture failed after local model-state extension: its __new__ mock lacks disk_engram_models; not a runtime gather result"
+    },
+    {
+      "host": "dgx3",
+      "memory_cap": "4g",
+      "test": "tests/sequence/test_engram.py::test_disk_lookup_matches_varied_rows_with_graph_replay_and_stream_reuse[False]",
+      "result": "passed in 2.40 s with io_uring permissions; TP3-sharded varied rows, graph replay, reused streams, resident_scales=false as in production. Synthetic table only"
     }
   ],
   "safety": "test containers were removed; all three serving containers remained running with OOMKilled=false and active guards"
