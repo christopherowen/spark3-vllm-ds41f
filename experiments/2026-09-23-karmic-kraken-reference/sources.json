@@ -12,8 +12,11 @@
     "repository": "https://github.com/local-inference-lab/b12x.git",
     "ref": "integration/karmic-kraken-beta",
     "revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
-    "expected_tree": "d661de3161ff474a92646974584d6f5eb1958f75",
-    "patches": ["patches/b12x/0001-switchless-rocenante.patch"]
+    "expected_tree": "4e432c03b96752e621751f6d2e14b7398c65aa98",
+    "patches": [
+      "patches/b12x/0001-switchless-rocenante.patch",
+      "patches/b12x/0002-tiny-decode-swiglu-limit.patch"
+    ]
   },
   "runtime_base_image": "docker.io/vllm/vllm-openai@sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
   "runtime_base_revision": "af1c01499b289be555c475669ba50a88e96d846e"

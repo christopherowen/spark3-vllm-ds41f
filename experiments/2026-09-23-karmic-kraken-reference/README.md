@@ -223,3 +223,35 @@ up before SiLU, keeping the tiny-decode kernel's speed. Unclamped models
 compile the same kernel as before. `cluster-kkref-tinyclamp.json` mounts the
 patched files (`overlay-b12x/`) into the r4 configuration (full graphs,
 DSpark 3).
+
+## Result with the fix (`runs/kkref-tinyclamp/`)
+
+r4 configuration (full graphs, DSpark 3, autotune off) with patch 0002
+mounted. Same client and procedure as the other arms (`run_arm.sh`). Values
+are aggregate tok/s, 256 output tokens.
+
+| Case | Weekend control | r4 unpatched | r4 + 0002 |
+|---|---|---|---|
+| prose c1 | 34.6 | 40.9 | 41.7 |
+| prose c2 | 57.6 | 61.5 | 61.9 |
+| prose c4 | 76.0 | 94.3 | 101.8 |
+| prose c8 | 83.1 | 133.0 | 148.1 |
+| code c1 | 44.0 | 53.5 | 51.2 |
+| code c2 | 65.4 | 78.5 | 78.0 |
+| code c4 | 96.0 | 119.7 | 118.7 |
+| code c8 | 71.9 | 161.3 | 164.6 |
+| LRU gate | 1/5 | 0/5 | 5/5 |
+
+The fixed build passes the quality gate and is faster than the weekend image
+at every point, including TTFT (0.24-0.26 s vs 0.32-0.33 s at c1).
+`sources.json` now pins 0001 + 0002 (tree `4e432c03`); the mounted overlays
+are byte-identical to that tree.
+
+Follow-ups, not blocking:
+
+- Tiny decode also rounds activations to FP16 and folds FC2 partials with
+  BF16 atomic adds (18 per element here), which gives it 0.3-0.5% run-to-run
+  spread against 0.2% for the clamped kernel. Report upstream with 0002.
+- With the shared-experts stream on, one of three graph runs showed a 1.2%
+  shared-expert difference at the first decode step only. Watch for it in
+  broader evals; `VLLM_DISABLE_SHARED_EXPERTS_STREAM=1` removes it.
