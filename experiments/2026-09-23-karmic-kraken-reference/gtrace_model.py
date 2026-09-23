@@ -502,6 +502,7 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
         ced_indices: torch.Tensor | None = None,
     ) -> torch.Tensor | IntermediateTensors:
         GT_CALLS[0] = 0
+        GT_MOE_CALLS[0] = 0
         if get_pp_group().is_first_rank:
             if inputs_embeds is not None:
                 hidden_states = inputs_embeds
@@ -929,6 +930,7 @@ _GT_ENABLED = _gt_os.environ.get("SPARK3_GRAPH_TRACE") == "1"
 _GT_ROWS = 8
 GT_BUFFERS: dict = {}
 GT_CALLS = [0]
+GT_MOE_CALLS = [0]
 GT_ROWS_WRITTEN: dict = {}
 
 
