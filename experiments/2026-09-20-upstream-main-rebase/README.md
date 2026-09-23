@@ -623,6 +623,26 @@ required before promotion.
 
 ## Quality and safety gates
 
+The V2 runner initializes disk Engram state, resolving the first NaN observed
+with the V1 runner. Subsequent target-only requests were finite but garbled.
+The full live-cache reference isolated a large layer-2 indexed-attention value;
+the compressed cache writer itself stored bounded records. The B12X adapter
+was mapping indexed top-k positions through the independent SWA block table.
+
+The q12 probe first failed on its own assertion for a shared-cache consumer;
+it is recorded in `runs/launch-v2-blockfix-q12.json`. The corrected q13 probe
+substituted the compressed-cache metadata table while preserving the patch-0028
+image. SWA and compressed block IDs were 3 and 7, respectively. Three short
+deterministic prompts returned coherent answers, and layer-2 native attention
+agreed with the full live-cache reference within BF16 error on all three ranks.
+All q13 containers stopped cleanly without OOM; the receipt is
+`runs/launch-v2-blockfix-q13.json`.
+
+Patch 0029 puts that table lookup in the B12X adapter for indexed decode and
+prefill, including layers that read another layer's compressed cache. A fresh
+28-plus-1 patch replay, source identity check, syntax check, and diff check
+pass. Its image and unpatched TP3 runtime still need validation.
+
 - Keep the stopped promoted containers intact until the candidate passes its
   gates, so rollback remains a coordinated start of known state.
 - Native checkpoint weights and arithmetic must remain unchanged.

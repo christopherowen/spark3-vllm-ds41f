@@ -1,0 +1,132 @@
+From d9ddab37ab97df1b699b785ad3b22f3b3c862668 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Wed, 23 Sep 2026 04:04:02 +0200
+Subject: [PATCH] fix(deepseek-v41): map B12X indices through compressed KV
+ blocks
+
+B12X mapped indexed top-k positions through the sliding-window block table, even though the indexed cache has separate allocation and can be shared from an earlier KV-source layer. Use the compressed-cache metadata table for indexed decode and prefill. Fail closed when that metadata is absent.
+
+Quality: restores the native DeepSeek V4.1 sparse attention semantics without changing weights or arithmetic. Guarded TP3 A/B with the same image changed deterministic smokes from garbled text to correct answers; B12X layer-2 output matched the full live-cache reference within BF16 error on all ranks. Add a shared-cache ownership regression test. Upstream status: local candidate patch pending upstream submission.
+---
+ tests/models/test_deepseek_v41_b12x.py        | 53 +++++++++++++++++++
+ .../deepseek_v41/nvidia/b12x_attention.py     | 19 ++++++-
+ 2 files changed, 70 insertions(+), 2 deletions(-)
+
+diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
+index 3adedb94e..7c285466b 100644
+--- a/tests/models/test_deepseek_v41_b12x.py
++++ b/tests/models/test_deepseek_v41_b12x.py
+@@ -158,6 +158,59 @@ def test_flatten_cache_preserves_packed_page_storage() -> None:
+         _flatten_cache(cache.to(torch.bfloat16), name="test cache")
+ 
+ 
++def test_b12x_maps_indexed_positions_through_shared_compressed_cache(
++    monkeypatch,
++) -> None:
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention.compress_ratio = 2
++    attention.compressed_cache_prefix = "model.layers.2.attn"
++    attention.swa_cache_layer = SimpleNamespace(
++        prefix="model.layers.3.attn.swa_cache",
++        kv_cache=torch.empty((2, 32, 528), dtype=torch.uint8),
++    )
++    attention.topk_indices_buffer = torch.tensor([[0], [1]], dtype=torch.int32)
++    attention._compressed_kv_cache = lambda: torch.empty(
++        (2, 64, 528), dtype=torch.uint8
++    )
++    attention._ensure_plans = lambda: SimpleNamespace(decode="decode", extend="extend")
++    calls = []
++    attention._run_attention = lambda **kwargs: calls.append(kwargs)
++    swa_table = torch.tensor([[3, 0]], dtype=torch.int32)
++    compressed_table = torch.tensor([[7, 0]], dtype=torch.int32)
++    swa = SimpleNamespace(
++        block_table=swa_table,
++        token_to_req_indices=torch.zeros(2, dtype=torch.int32),
++        is_valid_token=torch.ones(2, dtype=torch.bool),
++        num_decode_tokens=1,
++        num_decodes=1,
++        decode_swa_indices=torch.zeros((1, 1), dtype=torch.int32),
++        decode_swa_lens=torch.ones(1, dtype=torch.int32),
++        num_prefill_tokens=1,
++        prefill_swa_indices=torch.zeros((1, 1), dtype=torch.int32),
++        prefill_swa_lens=torch.ones(1, dtype=torch.int32),
++    )
++    monkeypatch.setattr(
++        b12x_attention,
++        "get_forward_context",
++        lambda: SimpleNamespace(
++            attn_metadata={
++                attention.swa_cache_layer.prefix: swa,
++                attention.compressed_cache_prefix: SimpleNamespace(
++                    block_table=compressed_table
++                ),
++            }
++        ),
++    )
++
++    q = torch.zeros((2, 1, 1), dtype=torch.bfloat16)
++    attention.forward_mqa(q, q, torch.arange(2), torch.empty_like(q))
++
++    assert [call["plan"] for call in calls] == ["decode", "extend"]
++    assert all(torch.equal(call["block_table"], compressed_table) for call in calls)
++    assert all(call["indexed_indices"] is not None for call in calls)
++
++
+ class _RecordingRotary(torch.nn.Module):
+     def __init__(self) -> None:
+         super().__init__()
+diff --git a/vllm/models/deepseek_v41/nvidia/b12x_attention.py b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+index 673be97f5..e511abe01 100644
+--- a/vllm/models/deepseek_v41/nvidia/b12x_attention.py
++++ b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+@@ -28,6 +28,7 @@ from vllm.models.deepseek_v41.common.ops import (
+     compute_global_topk_indices_and_lens,
+ )
+ from vllm.models.deepseek_v41.sparse_mla import (
++    DeepseekV4FlashMLAMetadata,
+     DeepseekV4SparseMLABackend,
+     DeepseekV4SparseMLAMetadataBuilder,
+     DeepseekV41SparseSWAMetadataBuilder,
+@@ -807,6 +808,20 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+         if swa.token_to_req_indices is None or swa.is_valid_token is None:
+             raise RuntimeError("DeepSeek V4.1 B12X token metadata is incomplete")
+ 
++        # Top-k positions address the compressed KV cache, which can be owned
++        # by an earlier layer. SWA has a separate allocation and block table.
++        indexed_block_table = swa.block_table
++        if topk is not None:
++            compressed = cast(
++                "DeepseekV4FlashMLAMetadata | None",
++                metadata.get(self.compressed_cache_prefix),
++            )
++            if compressed is None or compressed.block_table is None:
++                raise RuntimeError(
++                    "DeepSeek V4.1 B12X compressed cache metadata is missing"
++                )
++            indexed_block_table = compressed.block_table
++
+         decode_tokens = swa.num_decode_tokens
+         if decode_tokens:
+             if swa.decode_swa_indices is None or swa.decode_swa_lens is None:
+@@ -819,7 +834,7 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+                 swa_lengths=swa.decode_swa_lens,
+                 token_to_req_indices=swa.token_to_req_indices[:decode_tokens],
+                 is_valid_token=swa.is_valid_token[:decode_tokens],
+-                block_table=swa.block_table[: swa.num_decodes],
++                block_table=indexed_block_table[: swa.num_decodes],
+                 indexed_indices=(None if topk is None else topk[:decode_tokens]),
+                 indexed_cache=indexed_cache,
+             )
+@@ -837,7 +852,7 @@ class DeepseekV41B12xAttention(DeepseekV4Attention):
+                 swa_lengths=swa.prefill_swa_lens,
+                 token_to_req_indices=swa.token_to_req_indices[token_slice],
+                 is_valid_token=swa.is_valid_token[token_slice],
+-                block_table=swa.block_table,
++                block_table=indexed_block_table,
+                 indexed_indices=(None if topk is None else topk[token_slice]),
+                 indexed_cache=indexed_cache,
+             )
+-- 
+2.54.0 (Apple Git-157)
+

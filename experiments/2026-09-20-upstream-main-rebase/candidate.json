@@ -60,9 +60,10 @@
         "891dfb6cb1f9e7fa61547081ba346dcec405a275",
         "329631a979ddc91191a9f13ca3d0ac4efeb9d549",
         "6e1e038b0910ae1ed3da4e7cff24382815920c0b",
-        "67e0b2ada271f75b2f9f0de473889a0f99b2062c"
+        "67e0b2ada271f75b2f9f0de473889a0f99b2062c",
+        "d9ddab37ab97df1b699b785ad3b22f3b3c862668"
       ],
-      "source_tree": "8c657dad6d3eb6d5f6a33ff87058fd3e745f0c4c",
+      "source_tree": "92aa9f7d15c88b69bc6117963e2dcb52b81a55e5",
       "branch": "spark3/ds41f-tp3",
       "patches": [
         "patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch",
@@ -92,7 +93,8 @@
         "patches/vllm/0025-fix-deepseek-v41-skip-indexed-path-for-B12X-SWA-only.patch",
         "patches/vllm/0026-fix-deepseek-v41-cover-B12X-speculative-warmup-rows.patch",
         "patches/vllm/0027-fix-deepseek-v41-use-64-state-SM12x-indexer-pages.patch",
-        "patches/vllm/0028-fix-deepseek-v41-write-B12X-contiguous-cache-records.patch"
+        "patches/vllm/0028-fix-deepseek-v41-write-B12X-contiguous-cache-records.patch",
+        "patches/vllm/0029-fix-deepseek-v41-map-B12X-indexed-compressed-blocks.patch"
       ]
     },
     {
@@ -122,20 +124,20 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
+  "image_digest": null,
   "failed_image_digest": "sha256:b9c4e1264f2f7fa1d0de93b3db0e452e732e754608595b654f38e65f6e4df2a7",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "the corrected patch 0028 image completes guarded fresh-cache startup without memory failure, but its first target-only request exposes an all-NaN result from the first Engram injection before the following MHC pre-normalization; launch is locked while the Engram disk lookup and projection boundary is isolated",
+  "deployment_status": "patch 0029 source candidate prepared; guarded q13 monkeypatch proved compressed-cache block mapping restores coherent target-only output; new immutable image build and unpatched TP3 smoke pending",
   "integration_status": {
-    "status": "patch 0028 fixes the proven B12X cache-record ABI and passes source and rebuilt-image regressions, but the expanded live probe now isolates an all-NaN result from the first Engram injection; cache publication is no longer the first observed corruption boundary",
+    "status": "patch 0029 corrects the B12X indexed block-table owner based on q13 TP3 A/B; new image qualification pending",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0028-runtime-regressions-and-cold-start-pass-live-semantic-probe-fails-at-first-engram-injection",
+    "status": "patch-0029-source-replay-pending-build-and-unpatched-runtime",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

@@ -3,7 +3,7 @@ set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 experiment_root="$repo_root/experiments/2026-09-20-upstream-main-rebase"
-destination_root=${1:-"$repo_root/.work/experiments/2026-09-20-upstream-main-rebase"}
+destination_root=${1:-"$repo_root/.work/experiments/2026-09-23-blocktable"}
 temporary=
 
 cleanup() {
@@ -56,7 +56,7 @@ prepare \
   vllm \
   https://github.com/vllm-project/vllm.git \
   d05da62e9ccdf8e342b15bf6785d83224cc165af \
-  8c657dad6d3eb6d5f6a33ff87058fd3e745f0c4c \
+  92aa9f7d15c88b69bc6117963e2dcb52b81a55e5 \
   patches/vllm/0001-model-support-quality-preserving-DeepSeek-V4.1-TP3-p.patch \
   patches/vllm/0002-feat-deepseek-v41-add-native-B12X-sparse-MLA-adapter.patch \
   patches/vllm/0003-feat-distributed-port-RoCEnante-to-prepared-B12X-pla.patch \
@@ -84,7 +84,8 @@ prepare \
   patches/vllm/0025-fix-deepseek-v41-skip-indexed-path-for-B12X-SWA-only.patch \
   patches/vllm/0026-fix-deepseek-v41-cover-B12X-speculative-warmup-rows.patch \
   patches/vllm/0027-fix-deepseek-v41-use-64-state-SM12x-indexer-pages.patch \
-  patches/vllm/0028-fix-deepseek-v41-write-B12X-contiguous-cache-records.patch
+  patches/vllm/0028-fix-deepseek-v41-write-B12X-contiguous-cache-records.patch \
+  patches/vllm/0029-fix-deepseek-v41-map-B12X-indexed-compressed-blocks.patch
 
 prepare \
   b12x \

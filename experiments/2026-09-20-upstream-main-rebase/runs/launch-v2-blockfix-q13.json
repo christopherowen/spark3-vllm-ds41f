@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "result": "api_ok_correct_text",
+  "configuration": "cluster-v2-blockfix-q13.json",
+  "repository_commit": "50d15931c03d8c582d27d54cf3959c550ba14b08",
+  "image_digest": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
+  "change": "Probe substitutes compressed-cache metadata block table for B12X indexed mapping while leaving all other image code unchanged.",
+  "request_results": [
+    {
+      "prompt": "1 + 1 =",
+      "text": " 2\n2",
+      "http_status": 200
+    },
+    {
+      "prompt": "2 + 2 =",
+      "text": " 4\n2",
+      "http_status": 200
+    },
+    {
+      "prompt": "The capital of France is",
+      "text": " Paris.",
+      "http_status": 200
+    }
+  ],
+  "findings": {
+    "swa_block_table_first": 3,
+    "compressed_block_table_first": 7,
+    "layer2_native_vs_full_reference_max_abs_later_decode": 0.05859375,
+    "prior_unpatched_layer2_native_max_abs": 4672,
+    "conclusion": "Wrong SWA block table mapped indexed top-k to unrelated compressed records; source adapter must use compressed-cache metadata table for indexed mapping."
+  },
+  "nodes": {
+    "dgx1": {
+      "container_id": "dfed00bd33c7beb49b57f74ed65806e5cdf67d13a1bc9df771f2b98a04f0c014",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx2": {
+      "container_id": "6a6a45b90f8888cdac1ca35e6ed542b29d1d74e794238c377d7f0fba01734e45",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx3": {
+      "container_id": "27729e33e0e3c42f3756104f9180235c752579e7ed42f6aebc3ac1a156df05fa",
+      "exit_code": 0,
+      "oom_killed": false
+    }
+  }
+}
