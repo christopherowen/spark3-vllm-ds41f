@@ -65,3 +65,21 @@ experiment's job is to make that series coherent and minimal.
 - Performance: `../2026-09-20-upstream-main-rebase/benchmark_serving.py`,
   prose and code at concurrency 1, 2, 4 and 8, 256 output tokens, on dgx1
   against localhost.
+
+## Startup finding: FlashInfer JIT after weight residency
+
+The first two weekend-control launches (`cluster-weekend-control.json`, then
+`-kv2.json` with 2 GiB KV) were both stopped by the 5 GiB startup memguard.
+The kill came 1-5 s after "Graph capturing finished", when FlashInfer began
+"Building JIT module sampling" with about 97 GiB of weights resident. The
+2026-09-20 containers had built `sampling.so` once into their own writable
+layers (`docker diff` on the retained `dsv41-tuned-8192-s3-kv30-g4`), so the
+weekend service never paid this cost again. Every fresh container repeats it.
+The weekend image's `/root/.cache/flashinfer` holds only its baked modules.
+
+`prebuild_flashinfer.sh` builds the module on an idle host in a 24 GiB-capped
+container from the same image, seeding `cache/flashinfer-r37` with the image's
+baked FlashInfer modules. `cluster-weekend-control-kv2-fi.json` sets
+`FLASHINFER_WORKSPACE_BASE=/cache/flashinfer-r37`. The guard thresholds are
+unchanged. Any image that uses `VLLM_USE_FLASHINFER_SAMPLER=1` needs the same
+pre-weight build.
