@@ -9,6 +9,7 @@ next request.  The wrapper then launches the ordinary vLLM CLI in-process.
 from __future__ import annotations
 
 import functools
+import hashlib
 import os
 import runpy
 import sys
@@ -70,6 +71,50 @@ def _trace(stage: str, tensor: torch.Tensor) -> None:
         f"max={float(good.max().item()) if good.numel() else None}",
         flush=True,
     )
+
+
+def _wrap_engram_prepare(owner: type[Any]) -> None:
+    original = owner.prepare_disk
+
+    @functools.wraps(original)
+    def checked(self: Any, hash_ids: torch.Tensor) -> None:
+        armed = os.path.exists(_ARM_FILE)
+        stage = f"Engram[{self.layer_hash_index}]"
+        if armed:
+            raw = hash_ids.detach().contiguous().view(torch.uint8).cpu()
+            digest = hashlib.sha256(raw.numpy().tobytes()).hexdigest()
+            print(
+                f"spark3 NaN probe: {stage}.hash_ids "
+                f"shape={tuple(hash_ids.shape)} sha256={digest}",
+                flush=True,
+            )
+        original(self, hash_ids)
+        if armed:
+            rows = self.staged_rows[: hash_ids.shape[0]]
+            _trace(f"{stage}.prepared_rows", rows)
+            bad = ~torch.isfinite(rows)
+            bad_heads = bad.any(dim=-1).nonzero()
+            details = [
+                (
+                    int(token),
+                    int(head),
+                    int(hash_ids[token, head].item()),
+                    int(bad[token, head].sum().item()),
+                )
+                for token, head in bad_heads[:16].tolist()
+            ]
+            table = self.embed_tokens.disk_table
+            cache_values = table.weight[: hash_ids.numel()]
+            cache_scales = table.scale_bytes[: hash_ids.numel()]
+            print(
+                f"spark3 NaN probe: {stage}.bad_heads "
+                f"count={bad_heads.shape[0]} first16={details} "
+                f"cache_value_nan={int(torch.isnan(cache_values.float()).sum().item())} "
+                f"cache_scale_ff={int((cache_scales == 255).sum().item())}",
+                flush=True,
+            )
+
+    owner.prepare_disk = checked
 
 
 def _wrap_engram(owner: type[Any]) -> None:
@@ -276,6 +321,7 @@ def _install() -> None:
     )
     from vllm.models.deepseek_v41.nvidia.engram import Engram
 
+    _wrap_engram_prepare(Engram)
     _wrap_engram(Engram)
     _wrap_method(Engram, "embed", "embed")
     _wrap_b12x_wkv(B12xMxfp8LinearKernel)

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "result": "fail",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 500
+  },
+  "first_non_finite": {
+    "stage": "layer-1 Engram staged_rows before TP all-reduce",
+    "shape": [
+      5,
+      24,
+      256
+    ],
+    "dtype": "bfloat16",
+    "nan_count": 94
+  },
+  "configuration": "cluster-engram-trace.json",
+  "repository_commit": "7b31882632ac1a7b42d5793e104f1955be7612e5",
+  "nodes": {
+    "dgx1": {
+      "container_id": "1cbd64a54eef909bb5bfb1be2d3658ad1bd28fe6ebb84576fcaf50bf35e889df",
+      "exit_code": 0,
+      "oom_killed": false,
+      "log": "experiments/2026-09-20-upstream-main-rebase/runs/engram-live-trace-q3-dgx1.log",
+      "nan_stage": "Engram.staged_rows",
+      "nan_count": 94
+    },
+    "dgx2": {
+      "container_id": "d3658749f42be5f7d0bbe69ce8486adae457aa72f121381165f27b83dfbb66dc",
+      "exit_code": 0,
+      "oom_killed": false,
+      "log": "experiments/2026-09-20-upstream-main-rebase/runs/engram-live-trace-q3-dgx2.log",
+      "nan_stage": "Engram.staged_rows",
+      "nan_count": 94
+    },
+    "dgx3": {
+      "container_id": "584dc772c89b15023d45a20b7e7e11e39c645b7cba3e298c6ca958ae797f5edc",
+      "exit_code": 0,
+      "oom_killed": false,
+      "log": "experiments/2026-09-20-upstream-main-rebase/runs/engram-live-trace-q3-dgx3.log",
+      "nan_stage": "Engram.staged_rows",
+      "nan_count": 94
+    }
+  }
+}
