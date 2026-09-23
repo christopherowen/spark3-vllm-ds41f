@@ -12,7 +12,7 @@ Fetched at 2026-09-23 07:30 UTC:
 | Project | Canonical branch | Pinned commit | Local concept patches |
 | --- | --- | --- | ---: |
 | vLLM | `main` | `0f2a15c9277f34c9afe141cf578d1f02b3bebdfe` | 10 |
-| B12X | `master` | `0332cc5089137753d3af43d1c643516b4350359f` | 3 |
+| B12X | `master` | `0332cc5089137753d3af43d1c643516b4350359f` | 4 |
 
 Run `prepare-sources` to fetch the pinned bases, replay the patches, and verify
 the exact trees in `series.json`. The source candidate is isolated in `.work/`.
@@ -71,3 +71,9 @@ its own JIT cache. It is an experiment configuration, not a promotion.
 `cluster-rollback.json` pins the previously working patch-0029 image on the
 same deployment branch, so a failed candidate can be stopped and the prior
 three-rank service relaunched with the coordinated cluster commands.
+
+The first guarded launch of image `sha256:d25a2e05` exposed a B12X progress
+stream import removed in the pinned vLLM head. All three new containers rolled
+back without OOM. Patch 0004 passes the current stderr stream directly to the
+checkpoint display; it changes progress rendering only. The corrected source
+requires a new image and guarded load.

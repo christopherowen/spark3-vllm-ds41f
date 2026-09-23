@@ -2,7 +2,7 @@
 
 2026-09-23. This is a source and configuration audit, not a runtime benchmark
 of the consolidated candidate. All future measurements use the consolidated
-10-vLLM/3-B12X series pinned in `series.json`.
+10-vLLM/4-B12X series pinned in `series.json`.
 
 ## What the existing comparison establishes
 

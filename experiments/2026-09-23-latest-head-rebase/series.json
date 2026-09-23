@@ -58,8 +58,8 @@
   },
   "b12x": {
     "upstream_base": "0332cc5089137753d3af43d1c643516b4350359f",
-    "expected_tree": "de6142a42059d7075623d348fe71f52724926a94",
-    "patch_head": "fa366598208baa0b31e513308685f07a27490810",
+    "expected_tree": "0f1684e3adb47ab82812183302dd9a90d66b3971",
+    "patch_head": "ad98f319b2b03326f080ab67e982ded366b02a4e",
     "patches": [
       {
         "concept": "cutlass_dsl_alignment",
@@ -75,6 +75,11 @@
         "concept": "mhc_3072_tuning",
         "patch": "patches/b12x/0003-mhc-3072-tuning.patch",
         "files": 2
+      },
+      {
+        "concept": "vllm_progress_stream",
+        "patch": "patches/b12x/0004-vllm-progress-stream.patch",
+        "files": 1
       }
     ]
   }

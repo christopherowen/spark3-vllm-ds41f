@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-23T09:02:14.207695+00:00",
+  "result": "failed_initial_three_rank_load_rolled_back",
+  "deployment_commit": "8d737566286ed7534887d72dfdc60e73cc855351",
+  "container": "dsv41-latest-1b6675-fa3665-eager-r1",
+  "image_id": "sha256:d25a2e054421e72da1e3ca4c58f4abd6cd1d56bf71b39e581fb256761164a0ab",
+  "b12x_patch_head": "fa366598208baa0b31e513308685f07a27490810",
+  "build": "passed; native extensions, dependency and import checks, 8 GiB GPU/native-loader smoke",
+  "distribution": "same image ID and source labels verified on dgx1, dgx2, dgx3",
+  "startup": "5 GiB guards prearmed on all ranks; all three containers launched",
+  "first_exception": "dgx2 Worker_TP1 B12X load_weights ImportError: cannot import undecorated_log_stream from vllm.utils.system_utils",
+  "root_cause": "B12X master references a progress-only vLLM utility removed at the pinned vLLM head",
+  "memory": "no container OOMKilled; rollback completed; all three guards inactive and hosts recovered above 110 GiB available",
+  "logs": "runs/failed-starts/20260923T085834Z-dsv41-latest-1b6675-fa3665-eager-r1/",
+  "correction": "B12X concept patch 0004 passes sys.stderr to CheckpointDisplay; source replay passed; new image required"
+}

@@ -1,0 +1,42 @@
+From ad98f319b2b03326f080ab67e982ded366b02a4e Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Wed, 23 Sep 2026 11:00:29 +0200
+Subject: [PATCH] fix(loader): use current vLLM progress stream
+
+Upstream base: 0332cc5089137753d3af43d1c643516b4350359f
+
+Rationale: Current vLLM removed undecorated_log_stream; importing it at weight load prevents every rank from starting.
+
+Quality and speed: Progress rendering only; checkpoint data, model arithmetic, and hot paths are unchanged.
+
+Tests: syntax parse and source replay; guarded TP3 load pending.
+
+Upstream status: local candidate, not submitted.
+---
+ b12x/integration/vllm/loader.py | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/b12x/integration/vllm/loader.py b/b12x/integration/vllm/loader.py
+index bb1584c..80a39c3 100644
+--- a/b12x/integration/vllm/loader.py
++++ b/b12x/integration/vllm/loader.py
+@@ -103,7 +103,6 @@ class B12xModelLoader(DefaultModelLoader):
+         return model
+ 
+     def load_weights(self, model, model_config):
+-        from vllm.utils.system_utils import undecorated_log_stream
+         from vllm.v1.executor._b12x_output import PreparationOutput
+ 
+         session = self._session
+@@ -114,7 +113,7 @@ class B12xModelLoader(DefaultModelLoader):
+             group._gather(None)
+         progress = CheckpointDisplay(
+             enabled=enable_tqdm(self.load_config.use_tqdm_on_load),
+-            stream=undecorated_log_stream(sys.stderr),
++            stream=sys.stderr,
+         )
+         with ExitStack() as stack:
+             output = stack.enter_context(PreparationOutput(
+-- 
+2.54.0 (Apple Git-157)
+

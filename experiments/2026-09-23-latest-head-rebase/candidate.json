@@ -1,7 +1,7 @@
 {
   "intended_variable": "upstream source revisions from the pinned September 23 heads",
   "configuration_delta": {},
-  "runtime_action": "none",
+  "runtime_action": "guarded TP3 qualification in progress",
   "source_delta": {
     "vllm": {
       "upstream_commit": "0f2a15c9277f34c9afe141cf578d1f02b3bebdfe",
@@ -11,13 +11,13 @@
     },
     "b12x": {
       "upstream_commit": "0332cc5089137753d3af43d1c643516b4350359f",
-      "patch_head": "fa366598208baa0b31e513308685f07a27490810",
-      "source_tree": "de6142a42059d7075623d348fe71f52724926a94",
-      "concept_patches": 3
+      "patch_head": "ad98f319b2b03326f080ab67e982ded366b02a4e",
+      "source_tree": "0f1684e3adb47ab82812183302dd9a90d66b3971",
+      "concept_patches": 4
     }
   },
   "omitted_local_behavior": [
     "B12X managed-weight pool adaptation: superseded by current upstream ordinary-weight bounce/GDS loader"
   ],
-  "status": "source replayed; native build and target-hardware qualification pending"
+  "status": "native image built; first guarded load found missing B12X/vLLM progress API and rolled back safely"
 }
