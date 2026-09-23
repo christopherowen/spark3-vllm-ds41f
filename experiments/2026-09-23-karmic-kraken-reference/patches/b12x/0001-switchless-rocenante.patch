@@ -1,0 +1,783 @@
+From f99cd41222a1a5d2be730bf89de5b9fecb6f9b8f Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Wed, 23 Sep 2026 09:31:56 +0200
+Subject: [PATCH] feat(rocenante): route switchless peers by HCA stripe
+
+Upstream base: 0332cc5089137753d3af43d1c643516b4350359f
+
+Rationale: Prepare per peer HCA routes and key compiled flags by route stripe count.
+Quality and speed: Preserves collective values and switchless routing capacity.
+Tests: source replay, syntax parse, and diff check; target hardware qualification pending.
+Upstream status: local candidate, not submitted.
+---
+ b12x/comm/roce/_preparation.py   |   7 +-
+ b12x/comm/roce/_proxy.py         |  16 +++
+ b12x/comm/roce/_roce_proxy.c     | 130 +++++++++++++++++-------
+ b12x/comm/roce/roce_oneshot.py   | 165 ++++++++++++++++++++++++++++---
+ tests/comm/test_roce_topology.py | 115 +++++++++++++++++++++
+ 5 files changed, 382 insertions(+), 51 deletions(-)
+ create mode 100644 tests/comm/test_roce_topology.py
+
+diff --git a/b12x/comm/roce/_preparation.py b/b12x/comm/roce/_preparation.py
+index 1dc2302d..7e216d44 100644
+--- a/b12x/comm/roce/_preparation.py
++++ b/b12x/comm/roce/_preparation.py
+@@ -153,7 +153,12 @@ def query_from_runtime(
+                 "threads": runtime._threads,
+                 "slots": runtime._layout.slots,
+                 "flag_stride": runtime._layout.flag_stride,
+-                "hca_count": len(runtime.hca_names),
++                # The GPU flag layout follows route lanes, not the number of
++                # local HCA functions opened across all switchless peers.  A
++                # three-node ring opens four functions but routes two stripes
++                # per edge; compiling for four would make the kernel read flag
++                # offsets the two-stripe proxy never writes.
++                "hca_count": runtime.stripe_count,
+             }
+         ),
+     )
+diff --git a/b12x/comm/roce/_proxy.py b/b12x/comm/roce/_proxy.py
+index 4a9ce229..22e5f643 100644
+--- a/b12x/comm/roce/_proxy.py
++++ b/b12x/comm/roce/_proxy.py
+@@ -114,6 +114,8 @@ def load() -> ctypes.CDLL:
+             ctypes.c_int,
+             ctypes.POINTER(ctypes.c_char_p),
+             ctypes.c_int,
++            ctypes.POINTER(ctypes.c_int),
++            ctypes.c_int,
+             ctypes.c_int,
+             ctypes.c_int,
+             p,
+@@ -187,6 +189,8 @@ class Proxy:
+         world_size: int,
+         rank: int,
+         hca_names: tuple[str, ...],
++        peer_hca_indices: tuple[tuple[int, ...], ...],
++        stripe_count: int,
+         gid_index: int,
+         region_ptr: int,
+         region_bytes: int,
+@@ -196,12 +200,22 @@ class Proxy:
+         self.traffic_class = _traffic_class()
+         self._lib = load()
+         names = (ctypes.c_char_p * len(hca_names))(*[n.encode() for n in hca_names])
++        if len(peer_hca_indices) != int(world_size):
++            raise ValueError("peer HCA routes must cover the entire process group")
++        flat_routes = [
++            -1 if peer == int(rank) else int(peer_hca_indices[peer][lane])
++            for peer in range(int(world_size))
++            for lane in range(int(stripe_count))
++        ]
++        routes = (ctypes.c_int * len(flat_routes))(*flat_routes)
+         err = ctypes.create_string_buffer(512)
+         self._ctx = self._lib.roce_create(
+             int(world_size),
+             int(rank),
+             names,
+             len(hca_names),
++            routes,
++            int(stripe_count),
+             int(gid_index),
+             self.traffic_class,
+             ctypes.c_void_p(int(region_ptr)),
+@@ -217,6 +231,8 @@ class Proxy:
+         self.world_size = int(world_size)
+         self.rank = int(rank)
+         self.hca_names = tuple(hca_names)
++        self.peer_hca_indices = tuple(tuple(route) for route in peer_hca_indices)
++        self.stripe_count = int(stripe_count)
+ 
+     def local_blob(self) -> bytes:
+         """Serialized connection record (region address, keys, queue-pair numbers) to send to every peer."""
+diff --git a/b12x/comm/roce/_roce_proxy.c b/b12x/comm/roce/_roce_proxy.c
+index 27b45a43..19a90af1 100644
+--- a/b12x/comm/roce/_roce_proxy.c
++++ b/b12x/comm/roce/_roce_proxy.c
+@@ -3,8 +3,8 @@
+ // One rank owns one pinned host region laid out as:
+ //
+ //   recv[src][slot]  (world * SLOTS * slot_bytes)  filled by peers' RDMA writes
+-//   flag[src][slot][hca] sequence number written on each HCA after that HCA's
+-//                         payload stripe
++//   flag[src][slot][lane] sequence number written after that route lane's
++//                          payload stripe
+ //   send[slot]       (SLOTS * slot_bytes)          staged by the local GPU kernel
+ //   ctrl             (FLAG_STRIDE)                 {u32 seq, u32 nbytes, u32 error,
+ //                                                   u32 missing_peer} doorbell; the
+@@ -12,13 +12,12 @@
+ //                                                  when a wait times out
+ //
+ // The GPU kernel stages its input into send[seq & 1], publishes nbytes and seq
+-// in ctrl, then spins on flag[peer][seq & 1][hca] for every peer and HCA.  The
+-// proxy thread
+-// below spins on ctrl.seq and, for every peer, stripes the payload across every
+-// HCA.  Each stripe is followed by its own 4-byte seq write on the same reliable
+-// QP, so its flag cannot become visible before its payload.  The GPU waits for
+-// every stripe flag before consuming the receive slot.  Nothing on the receive
+-// path involves the host.
++// in ctrl, then spins on flag[peer][seq & 1][lane] for every peer and route
++// lane. The proxy thread below spins on ctrl.seq and, for every peer, stripes
++// the payload across the HCAs selected for that peer. Each stripe is followed
++// by its own 4-byte seq write on the same reliable QP, so its flag cannot become
++// visible before its payload. The GPU waits for every stripe flag before
++// consuming the receive slot. Nothing on the receive path involves the host.
+ //
+ // This file is compiled by b12x.comm.roce._proxy at first use with the host
+ // gcc and libibverbs; it must stay plain C with no CUDA dependency.
+@@ -36,7 +35,8 @@
+ #include <time.h>
+ 
+ #define ROCE_MAX_PEERS 16
+-#define ROCE_MAX_HCAS 2
++#define ROCE_MAX_LOCAL_HCAS 4
++#define ROCE_MAX_STRIPES 2
+ #define ROCE_SLOTS 2
+ #define ROCE_FLAG_STRIDE 128
+ #define ROCE_PORT 1
+@@ -49,11 +49,14 @@
+ 
+ typedef struct {
+     uint64_t region_addr;
+-    uint32_t rkey[ROCE_MAX_HCAS];
+-    uint16_t lid[ROCE_MAX_HCAS];
+-    uint8_t gid[ROCE_MAX_HCAS][16];
+-    uint32_t mtu[ROCE_MAX_HCAS];
+-    uint32_t qp_num[ROCE_MAX_HCAS][ROCE_MAX_PEERS];
++    uint32_t rkey[ROCE_MAX_LOCAL_HCAS];
++    uint16_t lid[ROCE_MAX_LOCAL_HCAS];
++    uint8_t gid[ROCE_MAX_LOCAL_HCAS][16];
++    uint32_t mtu[ROCE_MAX_LOCAL_HCAS];
++    uint32_t qp_num[ROCE_MAX_LOCAL_HCAS][ROCE_MAX_PEERS];
++    uint8_t n_hca;
++    uint8_t n_stripes;
++    uint8_t route_hca[ROCE_MAX_PEERS][ROCE_MAX_STRIPES];
+ } roce_blob_t;
+ 
+ typedef struct {
+@@ -74,9 +77,11 @@ typedef struct {
+     int world;
+     int rank;
+     int n_hca;
++    int n_stripes;
+     int gid_index;
+     int traffic_class;
+-    roce_hca_t hca[ROCE_MAX_HCAS];
++    roce_hca_t hca[ROCE_MAX_LOCAL_HCAS];
++    uint8_t route_hca[ROCE_MAX_PEERS][ROCE_MAX_STRIPES];
+     uint8_t *region;
+     size_t region_bytes;
+     size_t slot_bytes;
+@@ -86,7 +91,7 @@ typedef struct {
+     size_t ctrl_off;
+     int started;
+     uint64_t peer_addr[ROCE_MAX_PEERS];
+-    uint32_t peer_rkey[ROCE_MAX_HCAS][ROCE_MAX_PEERS];
++    uint32_t peer_rkey[ROCE_MAX_STRIPES][ROCE_MAX_PEERS];
+     pthread_t thread;
+     atomic_int running;
+     atomic_int failed;
+@@ -115,7 +120,7 @@ int roce_layout(int world, uint64_t slot_bytes, uint64_t *out) {
+     if (slot_bytes > ((uint64_t)1 << 40) ||
+         __builtin_mul_overflow((uint64_t)world * ROCE_SLOTS, slot_bytes, &recv_bytes) ||
+         __builtin_mul_overflow(
+-            (uint64_t)world * ROCE_SLOTS * ROCE_MAX_HCAS,
++            (uint64_t)world * ROCE_SLOTS * ROCE_MAX_STRIPES,
+             (uint64_t)ROCE_FLAG_STRIDE,
+             &flag_bytes) ||
+         __builtin_mul_overflow((uint64_t)ROCE_SLOTS, slot_bytes, &send_bytes) ||
+@@ -231,15 +236,38 @@ static int open_hca(roce_ctx_t *c, int h, const char *name) {
+ }
+ 
+ roce_ctx_t *roce_create(int world, int rank, const char *const *hca_names, int n_hca,
+-                        int gid_index, int traffic_class, void *region, uint64_t region_bytes,
++                        const int *route_hca, int n_stripes, int gid_index,
++                        int traffic_class,
++                        void *region, uint64_t region_bytes,
+                         uint64_t slot_bytes, char *err, uint64_t err_len) {
+     uint64_t layout[7];
+     if (roce_layout(world, slot_bytes, layout) != 0 || layout[4] > region_bytes ||
+-        rank < 0 || rank >= world || n_hca < 1 || n_hca > ROCE_MAX_HCAS ||
++        rank < 0 || rank >= world || n_hca < 1 || n_hca > ROCE_MAX_LOCAL_HCAS ||
++        n_stripes < 1 || n_stripes > ROCE_MAX_STRIPES || route_hca == NULL ||
+         traffic_class < 0 || traffic_class > 255) {
+         snprintf(err, err_len, "invalid roce runtime geometry");
+         return NULL;
+     }
++    for (int p = 0; p < world; p++) {
++        if (p == rank) {
++            continue;
++        }
++        for (int lane = 0; lane < n_stripes; lane++) {
++            int h = route_hca[p * n_stripes + lane];
++            if (h < 0 || h >= n_hca) {
++                snprintf(err, err_len,
++                         "invalid HCA route for peer %d lane %d: %d", p, lane, h);
++                return NULL;
++            }
++            for (int prior = 0; prior < lane; prior++) {
++                if (h == route_hca[p * n_stripes + prior]) {
++                    snprintf(err, err_len,
++                             "duplicate HCA route for peer %d: %d", p, h);
++                    return NULL;
++                }
++            }
++        }
++    }
+     roce_ctx_t *c = calloc(1, sizeof(*c));
+     if (c == NULL) {
+         snprintf(err, err_len, "out of memory");
+@@ -248,6 +276,7 @@ roce_ctx_t *roce_create(int world, int rank, const char *const *hca_names, int n
+     c->world = world;
+     c->rank = rank;
+     c->n_hca = n_hca;
++    c->n_stripes = n_stripes;
+     c->gid_index = gid_index;
+     c->traffic_class = traffic_class;
+     c->region = region;
+@@ -257,6 +286,13 @@ roce_ctx_t *roce_create(int world, int rank, const char *const *hca_names, int n
+     c->flag_off = layout[1];
+     c->send_off = layout[2];
+     c->ctrl_off = layout[3];
++    for (int p = 0; p < world; p++) {
++        for (int lane = 0; lane < n_stripes; lane++) {
++            c->route_hca[p][lane] = p == rank
++                ? 0
++                : (uint8_t)route_hca[p * n_stripes + lane];
++        }
++    }
+     for (int h = 0; h < n_hca; h++) {
+         if (open_hca(c, h, hca_names[h]) != 0) {
+             snprintf(err, err_len, "%s", c->err);
+@@ -274,6 +310,9 @@ int roce_local_blob(roce_ctx_t *c, void *out, uint64_t out_len) {
+     roce_blob_t blob;
+     memset(&blob, 0, sizeof(blob));
+     blob.region_addr = (uint64_t)(uintptr_t)c->region;
++    blob.n_hca = (uint8_t)c->n_hca;
++    blob.n_stripes = (uint8_t)c->n_stripes;
++    memcpy(blob.route_hca, c->route_hca, sizeof(blob.route_hca));
+     for (int h = 0; h < c->n_hca; h++) {
+         blob.rkey[h] = c->hca[h].mr->rkey;
+         blob.lid[h] = c->hca[h].lid;
+@@ -287,22 +326,25 @@ int roce_local_blob(roce_ctx_t *c, void *out, uint64_t out_len) {
+     return 0;
+ }
+ 
+-static int connect_qp(roce_ctx_t *c, int h, int p, const roce_blob_t *peer) {
+-    roce_hca_t *hca = &c->hca[h];
++static int connect_qp(roce_ctx_t *c, int local_h, int remote_h, int p,
++                      const roce_blob_t *peer) {
++    roce_hca_t *hca = &c->hca[local_h];
+     struct ibv_qp_attr rtr;
+     memset(&rtr, 0, sizeof(rtr));
+     rtr.qp_state = IBV_QPS_RTR;
+-    rtr.path_mtu = (enum ibv_mtu)(peer->mtu[h] < (uint32_t)hca->mtu ? peer->mtu[h] : (uint32_t)hca->mtu);
+-    rtr.dest_qp_num = peer->qp_num[h][c->rank];
++    rtr.path_mtu = (enum ibv_mtu)(peer->mtu[remote_h] < (uint32_t)hca->mtu
++                                      ? peer->mtu[remote_h]
++                                      : (uint32_t)hca->mtu);
++    rtr.dest_qp_num = peer->qp_num[remote_h][c->rank];
+     rtr.rq_psn = 0;
+     rtr.max_dest_rd_atomic = 1;
+     rtr.min_rnr_timer = 12;
+     rtr.ah_attr.is_global = 1;
+-    rtr.ah_attr.dlid = peer->lid[h];
++    rtr.ah_attr.dlid = peer->lid[remote_h];
+     rtr.ah_attr.sl = 0;
+     rtr.ah_attr.src_path_bits = 0;
+     rtr.ah_attr.port_num = ROCE_PORT;
+-    memcpy(rtr.ah_attr.grh.dgid.raw, peer->gid[h], 16);
++    memcpy(rtr.ah_attr.grh.dgid.raw, peer->gid[remote_h], 16);
+     rtr.ah_attr.grh.sgid_index = (uint8_t)c->gid_index;
+     rtr.ah_attr.grh.hop_limit = 64;
+     rtr.ah_attr.grh.traffic_class = (uint8_t)c->traffic_class;
+@@ -342,10 +384,23 @@ int roce_connect(roce_ctx_t *c, const void *blobs, uint64_t blobs_len) {
+         if (p == c->rank) {
+             continue;
+         }
++        if (all[p].n_hca < 1 || all[p].n_hca > ROCE_MAX_LOCAL_HCAS ||
++            all[p].n_stripes != c->n_stripes) {
++            snprintf(c->err, sizeof(c->err),
++                     "rank %d published incompatible HCA geometry", p);
++            return -1;
++        }
+         c->peer_addr[p] = all[p].region_addr;
+-        for (int h = 0; h < c->n_hca; h++) {
+-            c->peer_rkey[h][p] = all[p].rkey[h];
+-            if (connect_qp(c, h, p, &all[p]) != 0) {
++        for (int lane = 0; lane < c->n_stripes; lane++) {
++            int local_h = c->route_hca[p][lane];
++            int remote_h = all[p].route_hca[c->rank][lane];
++            if (remote_h < 0 || remote_h >= all[p].n_hca) {
++                snprintf(c->err, sizeof(c->err),
++                         "rank %d published invalid HCA route for lane %d", p, lane);
++                return -1;
++            }
++            c->peer_rkey[lane][p] = all[p].rkey[remote_h];
++            if (connect_qp(c, local_h, remote_h, p, &all[p]) != 0) {
+                 return -1;
+             }
+         }
+@@ -391,7 +446,8 @@ static int post_op(roce_ctx_t *c, uint32_t seq, uint32_t nbytes) {
+             continue;
+         }
+         uint32_t pack_offset = 0;
+-        for (int h = 0; h < c->n_hca; h++) {
++        for (int lane = 0; lane < c->n_stripes; lane++) {
++            int h = c->route_hca[p][lane];
+             roce_hca_t *hca = &c->hca[h];
+             // Two work requests per stripe; keep the queue at most a quarter
+             // full so a provider that needs extra entries can never fail a post.
+@@ -409,8 +465,8 @@ static int post_op(roce_ctx_t *c, uint32_t seq, uint32_t nbytes) {
+                     return -1;
+                 }
+             }
+-            uint32_t stripe_packs = total_packs / (uint32_t)c->n_hca;
+-            if ((uint32_t)h < total_packs % (uint32_t)c->n_hca) {
++            uint32_t stripe_packs = total_packs / (uint32_t)c->n_stripes;
++            if ((uint32_t)lane < total_packs % (uint32_t)c->n_stripes) {
+                 stripe_packs += 1;
+             }
+             uint32_t stripe_bytes = stripe_packs * 16;
+@@ -430,9 +486,9 @@ static int post_op(roce_ctx_t *c, uint32_t seq, uint32_t nbytes) {
+             flag_wr.send_flags = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
+             flag_wr.wr.rdma.remote_addr =
+                 remote + c->flag_off +
+-                (((uint64_t)c->rank * ROCE_SLOTS + slot) * (uint64_t)c->n_hca +
+-                 (uint64_t)h) * ROCE_FLAG_STRIDE;
+-            flag_wr.wr.rdma.rkey = c->peer_rkey[h][p];
++                (((uint64_t)c->rank * ROCE_SLOTS + slot) * (uint64_t)c->n_stripes +
++                 (uint64_t)lane) * ROCE_FLAG_STRIDE;
++            flag_wr.wr.rdma.rkey = c->peer_rkey[lane][p];
+ 
+             struct ibv_send_wr data_wr;
+             struct ibv_sge data_sge;
+@@ -453,7 +509,7 @@ static int post_op(roce_ctx_t *c, uint32_t seq, uint32_t nbytes) {
+                     remote + c->recv_off +
+                     ((uint64_t)c->rank * ROCE_SLOTS + slot) * c->slot_bytes +
+                     byte_offset;
+-                data_wr.wr.rdma.rkey = c->peer_rkey[h][p];
++                data_wr.wr.rdma.rkey = c->peer_rkey[lane][p];
+                 first_wr = &data_wr;
+             }
+             struct ibv_send_wr *bad = NULL;
+@@ -593,7 +649,7 @@ void roce_destroy(roce_ctx_t *c) {
+         return;
+     }
+     roce_stop(c);
+-    for (int h = 0; h < ROCE_MAX_HCAS; h++) {
++    for (int h = 0; h < ROCE_MAX_LOCAL_HCAS; h++) {
+         roce_hca_t *hca = &c->hca[h];
+         for (int p = 0; p < ROCE_MAX_PEERS; p++) {
+             if (hca->qp[p] != NULL) {
+diff --git a/b12x/comm/roce/roce_oneshot.py b/b12x/comm/roce/roce_oneshot.py
+index b3436b99..fb89cc33 100644
+--- a/b12x/comm/roce/roce_oneshot.py
++++ b/b12x/comm/roce/roce_oneshot.py
+@@ -12,19 +12,21 @@ Runtime constraints:
+ * all-reduce messages up to ``max_size`` bytes and all-gather shards up to
+   ``max_gather_bytes``, both multiples of 16 bytes;
+ * every rank of the exchange group must construct the runtime collectively;
+-* every peer payload is striped across all configured HCAs, with a completion
+-  flag per stripe so the GPU consumes the slot only after every HCA delivered.
++* every peer payload is striped across the HCAs routed to that peer, with a
++  completion flag per stripe so the GPU consumes the slot only after every
++  route lane delivered.
+ """
+ 
+ from __future__ import annotations
+ 
+ import contextlib
++import json
+ import logging
+ import os
+ import threading
+ from contextlib import contextmanager
+ from pathlib import Path
+-from typing import Any, Optional, Sequence
++from typing import Any, Mapping, Optional, Sequence
+ 
+ import torch
+ import torch.distributed as dist
+@@ -49,6 +51,8 @@ DEFAULT_GID_INDEX = 3
+ # Polls of a peer flag before the kernel gives up (each poll is a system-scope
+ # load of host memory, roughly a microsecond): about 20 s.
+ DEFAULT_SPIN_LIMIT = 20_000_000
++MAX_LOCAL_HCAS = 4
++MAX_STRIPES = 2
+ _SLOT_ALIGNMENT = 4096
+ _DTYPE_NAMES = {
+     torch.float16: "float16",
+@@ -116,6 +120,109 @@ def discover_hcas(gid_index: Optional[int] = None) -> tuple[str, ...]:
+     return tuple(found[:2])
+ 
+ 
++def _peer_hca_names_from_env() -> Optional[dict[int, tuple[str, ...]]]:
++    """Parse the optional rank-to-local-HCA map used by non-clique fabrics.
++
++    ``B12X_ROCE_PEER_HCAS`` is a JSON object whose keys are peer ranks and
++    whose values are the local HCAs that reach that peer, in stripe-lane order.
++    The local rank is omitted. JSON keeps interface names unambiguous and lets
++    launchers pass the value through without inventing a delimiter syntax.
++    """
++
++    raw = os.getenv("B12X_ROCE_PEER_HCAS")
++    if not raw:
++        return None
++    try:
++        value = json.loads(raw)
++    except json.JSONDecodeError as exc:
++        raise ValueError("B12X_ROCE_PEER_HCAS must be a JSON object") from exc
++    if not isinstance(value, dict):
++        raise ValueError("B12X_ROCE_PEER_HCAS must be a JSON object")
++    routes: dict[int, tuple[str, ...]] = {}
++    for peer, names in value.items():
++        try:
++            peer_rank = int(peer)
++        except (TypeError, ValueError) as exc:
++            raise ValueError(
++                f"B12X_ROCE_PEER_HCAS rank {peer!r} is not an integer"
++            ) from exc
++        if not isinstance(names, list) or not all(
++            isinstance(name, str) and name for name in names
++        ):
++            raise ValueError(
++                f"B12X_ROCE_PEER_HCAS[{peer!r}] must be a non-empty string list"
++            )
++        routes[peer_rank] = tuple(names)
++    return routes
++
++
++def _resolve_hca_topology(
++    *,
++    world_size: int,
++    rank: int,
++    hca_names: Optional[Sequence[str]],
++    peer_hca_names: Optional[Mapping[int, Sequence[str]]],
++    gid_index: int,
++) -> tuple[tuple[str, ...], tuple[tuple[str, ...], ...], int]:
++    """Return opened HCAs, per-peer local routes, and the stripe count.
++
++    Without a peer map this preserves the clique behavior: the same one or two
++    HCAs reach every peer. A peer map may use up to four local HCA functions,
++    while every edge still carries one or two stripes. All non-self peers must
++    be present and use the same stripe count so GPU launch geometry remains
++    rank-invariant.
++    """
++
++    explicit_routes = peer_hca_names
++    if explicit_routes is None:
++        explicit_routes = _peer_hca_names_from_env()
++    if explicit_routes is None:
++        names = tuple(hca_names) if hca_names else discover_hcas(gid_index)
++        names = names[:MAX_STRIPES]
++        if not names:
++            raise RuntimeError("no active RDMA device found for the RoCE all-reduce")
++        routes = tuple(() if peer == rank else names for peer in range(world_size))
++        return names, routes, len(names)
++
++    normalized: dict[int, tuple[str, ...]] = {
++        int(peer): tuple(names) for peer, names in explicit_routes.items()
++    }
++    expected_peers = set(range(world_size)) - {rank}
++    if set(normalized) != expected_peers:
++        missing = sorted(expected_peers - set(normalized))
++        extra = sorted(set(normalized) - expected_peers)
++        raise ValueError(
++            "peer_hca_names must name every non-self rank exactly once; "
++            f"missing={missing}, extra={extra}"
++        )
++    widths = {len(route) for route in normalized.values()}
++    if len(widths) != 1 or not widths or not 1 <= next(iter(widths)) <= MAX_STRIPES:
++        raise ValueError(
++            f"every peer HCA route must use the same 1..{MAX_STRIPES} stripe count"
++        )
++    for peer, route in normalized.items():
++        if len(set(route)) != len(route) or any(not name for name in route):
++            raise ValueError(
++                f"peer {peer} HCA route contains an empty or duplicate name"
++            )
++
++    routed_names = tuple(
++        dict.fromkeys(name for peer in sorted(normalized) for name in normalized[peer])
++    )
++    names = tuple(hca_names) if hca_names else routed_names
++    if len(set(names)) != len(names) or not 1 <= len(names) <= MAX_LOCAL_HCAS:
++        raise ValueError(
++            f"RoCEnante requires 1..{MAX_LOCAL_HCAS} unique local HCA names"
++        )
++    unknown = sorted(set(routed_names) - set(names))
++    if unknown:
++        raise ValueError(f"peer HCA routes use unopened devices: {unknown}")
++    routes = tuple(
++        () if peer == rank else normalized[peer] for peer in range(world_size)
++    )
++    return names, routes, next(iter(widths))
++
++
+ def is_supported(device: torch.device | int | str | None = None) -> bool:
+     """True on an integrated GPU with at least one active RDMA device.
+ 
+@@ -196,6 +303,7 @@ class RoceOneshotAllReduce:
+         max_size: int = DEFAULT_MAX_SIZE,
+         max_gather_bytes: int = DEFAULT_MAX_GATHER_BYTES,
+         hca_names: Optional[Sequence[str]] = None,
++        peer_hca_names: Optional[Mapping[int, Sequence[str]]] = None,
+         gid_index: Optional[int] = None,
+         threads: int = DEFAULT_THREADS,
+         blocks: int = DEFAULT_BLOCKS,
+@@ -235,10 +343,17 @@ class RoceOneshotAllReduce:
+         self._counter_classes = self._blocks.bit_length()
+         self.gid_index = default_gid_index() if gid_index is None else int(gid_index)
+         self.spin_limit = _env_int("B12X_ROCE_SPIN_LIMIT", default=DEFAULT_SPIN_LIMIT)
+-        names = tuple(hca_names) if hca_names else discover_hcas(self.gid_index)
+-        if not names:
+-            raise RuntimeError("no active RDMA device found for the RoCE all-reduce")
+-        self.hca_names = names[:2]
++        self.hca_names, self.peer_hca_names, self.stripe_count = _resolve_hca_topology(
++            world_size=self.world_size,
++            rank=self.rank,
++            hca_names=hca_names,
++            peer_hca_names=peer_hca_names,
++            gid_index=self.gid_index,
++        )
++        hca_indices = {name: index for index, name in enumerate(self.hca_names)}
++        self._peer_hca_indices = tuple(
++            tuple(hca_indices[name] for name in route) for route in self.peer_hca_names
++        )
+ 
+         slot_bytes = _align_up(
+             max(self.max_size, self.max_gather_bytes), _SLOT_ALIGNMENT
+@@ -290,6 +405,8 @@ class RoceOneshotAllReduce:
+                 world_size=self.world_size,
+                 rank=self.rank,
+                 hca_names=self.hca_names,
++                peer_hca_indices=self._peer_hca_indices,
++                stripe_count=self.stripe_count,
+                 gid_index=self.gid_index,
+                 region_ptr=host_ptr,
+                 region_bytes=self._layout.total_bytes,
+@@ -307,7 +424,9 @@ class RoceOneshotAllReduce:
+             if error is None
+             else None,
+             "world_size": self.world_size,
+-            "hca_count": len(self.hca_names),
++            "hca_count": self.stripe_count,
++            "open_hca_count": len(self.hca_names),
++            "peer_stripes": tuple(len(route) for route in self.peer_hca_names),
+             "traffic_class": self._proxy.traffic_class if error is None else None,
+             "slot_bytes": slot_bytes,
+             "slots": self._layout.slots,
+@@ -324,16 +443,28 @@ class RoceOneshotAllReduce:
+         ]
+         if not failures:
+             reference = statuses[0][2]
++            rank_local_keys = {"open_hca_count", "peer_stripes"}
+             for i, s in enumerate(statuses):
+                 differing = {
+                     k: (reference[k], s[2].get(k))
+                     for k in reference
+-                    if s[2].get(k) != reference[k]
++                    if k not in rank_local_keys and s[2].get(k) != reference[k]
+                 }
+                 if differing:
+                     failures.append(
+                         f"rank {i} configuration differs from rank 0: {differing}"
+                     )
++            for i, s in enumerate(statuses):
++                peer_stripes = tuple(s[2].get("peer_stripes", ()))
++                expected = tuple(
++                    0 if peer == i else reference["hca_count"]
++                    for peer in range(self.world_size)
++                )
++                if peer_stripes != expected:
++                    failures.append(
++                        f"rank {i} peer stripe routes differ from the collective: "
++                        f"expected {expected}, got {peer_stripes}"
++                    )
+         if failures:
+             self.close()
+             raise RuntimeError("RoCE all-reduce setup failed: " + "; ".join(failures))
+@@ -349,9 +480,10 @@ class RoceOneshotAllReduce:
+             raise RuntimeError("RoCE all-reduce connect failed: " + "; ".join(failures))
+         if self.rank == 0:
+             logger.info(
+-                "RoCEnante ready: world=%d hcas=%s gid_index=%d max_size=%d traffic_class=%d",
++                "RoCEnante ready: world=%d hcas=%s stripes=%d gid_index=%d max_size=%d traffic_class=%d",
+                 self.world_size,
+                 ",".join(self.hca_names),
++                self.stripe_count,
+                 self.gid_index,
+                 self.max_size,
+                 self._proxy.traffic_class,
+@@ -447,7 +579,7 @@ class RoceOneshotAllReduce:
+             self._threads,
+             self._layout.slots,
+             self._layout.flag_stride,
+-            len(self.hca_names),
++            self.stripe_count,
+             self.device.index,
+         )
+ 
+@@ -459,7 +591,7 @@ class RoceOneshotAllReduce:
+             self._threads,
+             self._layout.slots,
+             self._layout.flag_stride,
+-            len(self.hca_names),
++            self.stripe_count,
+             self.device.index,
+         )
+ 
+@@ -894,6 +1026,12 @@ class RoceOneshotAllReduce:
+             "world_size": self.world_size,
+             "rank": self.rank,
+             "hcas": list(self.hca_names),
++            "peer_hca_routes": {
++                str(peer): list(route)
++                for peer, route in enumerate(self.peer_hca_names)
++                if peer != self.rank
++            },
++            "stripe_count": self.stripe_count,
+             "max_size": self.max_size,
+             "max_gather_bytes": self.max_gather_bytes,
+             "slot_bytes": self._slot_bytes,
+@@ -903,7 +1041,7 @@ class RoceOneshotAllReduce:
+             "error_hca": int(self._ctrl_words[6].item()),
+             "ctrl_seq": int(self._ctrl_words[0].item()),
+             "spin_limit": self.spin_limit,
+-            "stripe_hcas": list(range(len(self.hca_names))),
++            "stripe_hcas": list(range(self.stripe_count)),
+         }
+         if self._proxy is not None:
+             info.update(self._proxy.stats())
+@@ -952,5 +1090,6 @@ __all__ = [
+     "RoceOneshotAllReduce",
+     "default_gid_index",
+     "discover_hcas",
++    "_resolve_hca_topology",
+     "is_supported",
+ ]
+diff --git a/tests/comm/test_roce_topology.py b/tests/comm/test_roce_topology.py
+new file mode 100644
+index 00000000..83ffe0ab
+--- /dev/null
++++ b/tests/comm/test_roce_topology.py
+@@ -0,0 +1,115 @@
++from types import SimpleNamespace
++
++import pytest
++
++from b12x.comm.roce._preparation import query_from_runtime
++from b12x.comm.roce.roce_oneshot import (
++    _peer_hca_names_from_env,
++    _resolve_hca_topology,
++)
++
++
++def test_preparation_uses_route_stripes_for_switchless_flag_layout() -> None:
++    runtime = SimpleNamespace(
++        world_size=3,
++        rank=0,
++        hca_names=("mlx5_0", "mlx5_1", "mlx5_2", "mlx5_3"),
++        stripe_count=2,
++        _threads=512,
++        _layout=SimpleNamespace(slots=2, flag_stride=128),
++    )
++
++    query = query_from_runtime(
++        runtime,
++        surface="AllReduce.all_reduce",
++        call={"dtypes": ("bfloat16",)},
++        topology="roce_rdma",
++        peer_hosts=("rank:0", "rank:1", "rank:2"),
++    )
++
++    assert query.hca_names == runtime.hca_names
++    assert query.setup["hca_count"] == runtime.stripe_count
++
++
++def test_clique_topology_preserves_shared_hca_routes(monkeypatch) -> None:
++    monkeypatch.delenv("B12X_ROCE_PEER_HCAS", raising=False)
++
++    names, routes, stripes = _resolve_hca_topology(
++        world_size=3,
++        rank=1,
++        hca_names=("mlx5_0", "mlx5_1"),
++        peer_hca_names=None,
++        gid_index=3,
++    )
++
++    assert names == ("mlx5_0", "mlx5_1")
++    assert routes == (
++        ("mlx5_0", "mlx5_1"),
++        (),
++        ("mlx5_0", "mlx5_1"),
++    )
++    assert stripes == 2
++
++
++def test_switchless_topology_opens_union_and_routes_each_peer() -> None:
++    names, routes, stripes = _resolve_hca_topology(
++        world_size=3,
++        rank=0,
++        hca_names=None,
++        peer_hca_names={1: ("mlx5_0",), 2: ("mlx5_2",)},
++        gid_index=3,
++    )
++
++    assert names == ("mlx5_0", "mlx5_2")
++    assert routes == ((), ("mlx5_0",), ("mlx5_2",))
++    assert stripes == 1
++
++
++def test_peer_hca_environment_is_unambiguous_json(monkeypatch) -> None:
++    monkeypatch.setenv(
++        "B12X_ROCE_PEER_HCAS",
++        '{"0": ["mlx5_0", "mlx5_1"], "2": ["mlx5_2", "mlx5_3"]}',
++    )
++
++    assert _peer_hca_names_from_env() == {
++        0: ("mlx5_0", "mlx5_1"),
++        2: ("mlx5_2", "mlx5_3"),
++    }
++
++
++@pytest.mark.parametrize(
++    ("routes", "message"),
++    [
++        ({1: ("mlx5_0",)}, "every non-self rank"),
++        (
++            {1: ("mlx5_0",), 2: ("mlx5_1", "mlx5_2")},
++            "same 1..2 stripe count",
++        ),
++        (
++            {1: ("mlx5_0", "mlx5_0"), 2: ("mlx5_1", "mlx5_2")},
++            "empty or duplicate",
++        ),
++    ],
++)
++def test_switchless_topology_rejects_incomplete_or_asymmetric_routes(
++    routes, message
++) -> None:
++    with pytest.raises(ValueError, match=message):
++        _resolve_hca_topology(
++            world_size=3,
++            rank=0,
++            hca_names=None,
++            peer_hca_names=routes,
++            gid_index=3,
++        )
++
++
++def test_switchless_topology_rejects_unopened_hca() -> None:
++    with pytest.raises(ValueError, match="unopened devices"):
++        _resolve_hca_topology(
++            world_size=3,
++            rank=0,
++            hca_names=("mlx5_0", "mlx5_1"),
++            peer_hca_names={1: ("mlx5_0",), 2: ("mlx5_2",)},
++            gid_index=3,
++        )
+-- 
+2.54.0 (Apple Git-157)
+
