@@ -1,0 +1,1 @@
+{"requested_repetitions": 8192, "elapsed_s": 5.273087850990123, "usage": {"prompt_tokens": 8206, "total_tokens": 8207, "completion_tokens": 1, "prompt_tokens_details": null, "completion_tokens_details": null}, "choice": "", "finish_reason": "stop", "status": 200}

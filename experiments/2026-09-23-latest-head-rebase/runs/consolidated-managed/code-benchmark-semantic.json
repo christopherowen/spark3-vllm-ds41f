@@ -1,0 +1,1 @@
+{"elapsed_s": 82.83751679499983, "usage": {"prompt_tokens": 75, "total_tokens": 843, "completion_tokens": 768, "prompt_tokens_details": null, "completion_tokens_details": {"reasoning_tokens": 768}}, "content": null, "reasoning_length": 3005, "finish_reason": "length"}

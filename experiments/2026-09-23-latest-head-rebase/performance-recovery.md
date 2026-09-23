@@ -1,16 +1,18 @@
 # DS4.1 performance attribution and recovery plan
 
-2026-09-23. This is a source and configuration audit, not a runtime benchmark
-of the consolidated candidate. All future measurements use the consolidated
-10-vLLM/4-B12X series pinned in `series.json`.
+2026-09-23. This source and configuration audit is paired with the consolidated
+runtime benchmark in `performance-bridge.md`. All new measurements use the
+consolidated 10-vLLM/5-B12X series pinned in `series.json`.
 
 ## What the existing comparison establishes
 
 The September 20 weekend service reached 31.4/44.3 output tokens/s at
-concurrency 1 for prose/code; the running patch-0029 target-only service
-reached 10.1/10.1. All eight matched cases were slower in
-`performance-bridge.md`. This is an as-operated regression, not a patch
-attribution. The weekend used three-token DSpark and
+concurrency 1 for prose/code; the patch-0029 target-only service reached
+10.1/10.1. The consolidated current-head service reached 9.1/8.9 on the first
+pass and 9.3/9.3 on the single-request repeats. At concurrency 2–8 it was
+within roughly 3% of patch0029. All eight matched cases were slower than the
+weekend setup in `performance-bridge.md`. This is an as-operated regression,
+not a patch attribution. The weekend used three-token DSpark and
 `FULL_AND_PIECEWISE` CUDA graphs. Patch-0029 has no DSpark and uses
 `cudagraph_mode=NONE`. The V4.1 model does not support `torch.compile`, so
 turning graphs off leaves the target decode path eager. The source, block size,
@@ -19,15 +21,17 @@ KV reservation, and container memory cap also differ.
 We own the decision to leave both accelerators off after the new path's
 correctness and startup failures. Those failures justified a safe target-only
 launch; they do not establish that the consolidated source must remain slow.
-No local patch has yet been measured in isolation against the same source,
-config, workload, and hardware state. Do not attribute the 68–82% low/moderate
-concurrency loss to an upstream kernel or to B12X by inspection.
+No local patch has been measured in isolation against the same source, config,
+workload, and hardware state. The consolidated result shows that patch cleanup
+did not create the large loss, but it does not separate upstream code from the
+disabled accelerators. Do not attribute the 69–82% low/moderate concurrency
+loss to an upstream kernel or to B12X by inspection.
 
 The TP3 virtual geometry (64/8 real heads/groups to 72/9 padded) is present
 in the shared `state/config.json` for both services. It costs extra work, but
 it is not a new variable in the weekend-to-patch-0029 comparison. The patch
 consolidation itself preserved the old candidate's exact source trees; the
-September 23 rebase changes upstream source, which is still unmeasured.
+September 23 rebase changes upstream source, now measured as a complete arm.
 
 ## Local hot-path candidates
 
@@ -59,11 +63,10 @@ B12X also replaced its managed weight pool with ordinary CUDA allocations in
 That commit reports a V4.1 target/draft smoke on **four** Sparks. It does not
 establish the memory fit of our larger per-rank TP3 shard. Our first
 current-head target-only load reached the dgx3 5 GiB startup floor just after
-weight loading, with driver allocation failures. This makes weight allocation
-and the obsolete B12X completion hook concrete startup suspects. The grouped
-loader-lifecycle patch tests transfer completion and cache release first;
-restore a managed allocator only if the guarded run still needs it. This is a
-memory compatibility risk, not an explanation of steady decode TPS.
+weight loading, with driver allocation failures. The loader-lifecycle fix alone
+failed at the same memory floor. The separate scoped managed-weight patch then
+passed bounded checkpoint copy, guarded TP3 startup, API readiness, and the
+serving matrix. It recovered memory fit; it did not recover weekend decode TPS.
 
 Two prominent upstream vLLM speedups cannot run on this topology:
 
@@ -98,8 +101,10 @@ Build one immutable image from the consolidated series, distribute that digest
 to all three ranks, and change one runtime variable per guarded launch:
 
 1. **Target-only, eager:** reproduce semantics, long-context admission, memory,
-   and the serving matrix on the consolidated image. This is the new source
-   baseline, not the speed target.
+   and the serving matrix on the consolidated image. API, memory, long-context
+   admission, and throughput passed; deterministic code output remains a
+   quality failure needing a known-good same-prompt control. This is the new
+   source baseline, not the speed target.
 2. **Target-only, `FULL_DECODE_ONLY`:** isolate graph acceleration while keeping
    mixed prefill eager. A [GB10/TP2 V4 field report](https://github.com/vllm-project/vllm/issues/40969#issuecomment-5190414871)
    found this mode stable and fast where `FULL_AND_PIECEWISE` hung; it is a test

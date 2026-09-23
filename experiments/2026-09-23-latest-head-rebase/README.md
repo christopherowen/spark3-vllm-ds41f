@@ -54,8 +54,9 @@ corrected image loaded weights on dgx2 and dgx3, then dgx3 reached the 5 GiB sta
 memory floor during post-load initialization. The memory guard stopped it, and
 the coordinated launcher removed all candidate containers. The known working
 patch0029 image was restored on all three nodes with active guards and API
-readiness. Neither candidate passed semantic, quality, long-context, or speed
-qualification. See `runs/launch-eager-cb3f6320-failed.json`.
+readiness. Neither of those early candidates passed semantic, quality,
+long-context, or speed qualification. See
+`runs/launch-eager-cb3f6320-failed.json`.
 
 Patch 0004 groups current-vLLM loader lifecycle compatibility: removed
 private progress imports, explicit transfer completion at `load_weights`, and
@@ -67,11 +68,15 @@ weight loading. See `runs/launch-eager-c068aebe-failed.json`. This rules out
 the loader-lifecycle fix alone as sufficient. Patch 0005 restores scoped
 managed final weights as the next single causal change. Image `sha256:a3152e8c`
 passed a capped 1 MiB native checkpoint copy into managed weight storage with
-exact values after pool scope exit. Three-rank qualification remains.
+exact values after pool scope exit. It then reached three-rank API readiness,
+passed 159K context admission, and completed the matched serving matrix. A
+deterministic LRU request produced malformed code, so quality qualification and
+promotion remain blocked. See `runs/launch-eager-a3152e8c-observed.json`.
 
-`performance-bridge.md` records a same-script serving comparison between the
-successful weekend baseline and patch0029. It is an interim measurement;
-the consolidated latest-head image has no successful serving measurement.
+`performance-bridge.md` records the same-script serving comparison across the
+successful weekend baseline, patch0029, and the consolidated managed-weight
+candidate. The latter completed all 30 matched requests; throughput remains
+far below the weekend setup at low and moderate concurrency.
 `performance-recovery.md` records the source/configuration attribution audit
 and the controlled qualification sequence for recovering decode speed.
 
@@ -88,4 +93,5 @@ progress import. Image `sha256:d4c5337e` exposed a second private output import
 in a bounded GPU smoke. Image `sha256:cb3f6320` passed that smoke but reached
 the startup memory floor after checkpoint loading. The guards and rollback
 worked as designed. Image `sha256:c068aebe` then repeated the post-load memory
-failure. The known working patch0029 image is serving with active guards.
+failure. The managed-weight candidate now serves on all three nodes with
+active guards, pending the code-output quality gate.

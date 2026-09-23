@@ -2,12 +2,10 @@
 
 ## Scope and identity
 
-This is a measured comparison of the successful 2026-09-20 promoted service
-with the **known working patch-0029 service**. It is not a performance
-measurement of the consolidated latest-head series in this experiment: that
-series has not reached serving readiness. The two operating configurations differ
-substantially, so the numbers measure the complete setups, not the causal
-effect of patch consolidation.
+This compares the successful 2026-09-20 promoted service, the known working
+patch-0029 service, and the consolidated September 23 current-head service.
+The weekend operating configuration differs substantially, so its comparison
+measures complete setups rather than the causal effect of patch consolidation.
 
 - Original: `config/cluster.json`, image
   `vllm-dsv41:r37-b12x-e4m3fix1-arm64-sm121`, raw receipts in
@@ -15,6 +13,10 @@ effect of patch consolidation.
 - Interim: `../2026-09-20-upstream-main-rebase/cluster-v2-patch0029.json`,
   image `vllm-ds41f-upstream-main:d9ddab37ab97-b69feee3022c-d4243ad067ab8`,
   raw receipts in `runs/patch0029-live/`.
+- Consolidated: `cluster-eager.json`, image ID
+  `sha256:a3152e8cf0cde66a2997bdf6fa0ce7001dc2cf62a9b8bf1d8a95cbd5a1ad354a`,
+  vLLM patch head `1b6675db79b8`, B12X patch head `355611878e2e`,
+  raw receipts in `runs/consolidated-managed/`.
 - Client: the identical `../2026-09-20-upstream-main-rebase/benchmark_serving.py`,
   SHA-256
   `888fcfebc223dd971c362474f2f543c48443437484021adcfc0cfad5797528ef`.
@@ -23,9 +25,10 @@ effect of patch consolidation.
   on dgx1 against localhost. The weekend receipts identify the script but do
   not record the client host or URL, so its network path is unknown.
 
-The interim sequence used one 64-token prose warmup, then prose and code at
-concurrency 1, 2, 4, and 8. Each case was run once, sequentially; both
-single-request cases were then repeated. The command shape was:
+The interim and consolidated sequences used one 64-token prose warmup, then
+prose and code at concurrency 1, 2, 4, and 8. Each case was run once,
+sequentially; both single-request cases were then repeated. The command shape
+was:
 
 ```sh
 python3 experiments/2026-09-20-upstream-main-rebase/benchmark_serving.py \
@@ -33,11 +36,12 @@ python3 experiments/2026-09-20-upstream-main-rebase/benchmark_serving.py \
   --concurrency 1 --output-tokens 256
 ```
 
-The old receipts also contain a 64-token prose warmup. All 30 matched interim
-requests succeeded and each returned 256 completion tokens. There were no
-benchmark HTTP failures. Foreign request traffic was not measured for the
-interim runs; the old run recorded zero foreign requests. Thus these are
-single-run directional results, not a statistical confidence estimate.
+The old receipts also contain a 64-token prose warmup. All 30 matched requests
+succeeded on each of the interim and consolidated arms, and each returned 256
+completion tokens. There were no benchmark HTTP failures. Foreign request
+traffic was not measured for the two newer runs; the old run recorded zero
+foreign requests. These are single-run directional results, not a statistical
+confidence estimate.
 
 ## Matched serving results
 
@@ -65,6 +69,31 @@ long-context gates remain open.
 
 ## Interpretation and next comparison
 
+The consolidated source with managed final weights stayed close to patch0029
+at concurrency 2–8. Its one-request repeats reached 9.33 prose and 9.32 code
+TPS, versus 10.00 and 10.10 for patch0029. The small one-request difference is
+unattributed; the large weekend gap clearly predates this consolidation.
+
+| Prompt | Concurrency | Weekend TPS | Patch-0029 TPS | Consolidated TPS | Consolidated vs weekend | Consolidated TTFT |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Prose | 1 | 31.41 | 10.13 | 9.13 | -70.9% | 0.287 |
+| Prose | 2 | 53.18 | 12.09 | 11.77 | -77.9% | 0.521 |
+| Prose | 4 | 77.66 | 23.97 | 23.62 | -69.6% | 0.599 |
+| Prose | 8 | 57.78 | 47.72 | 47.34 | -18.1% | 0.776 |
+| Code | 1 | 44.28 | 10.06 | 8.94 | -79.8% | 0.298 |
+| Code | 2 | 64.92 | 11.96 | 11.90 | -81.7% | 0.488 |
+| Code | 4 | 94.35 | 23.72 | 23.93 | -74.6% | 0.611 |
+| Code | 8 | 76.08 | 46.87 | 47.40 | -37.7% | 0.768 |
+
+All eight consolidated cases used the same script and 256 requested output
+tokens as the earlier arms. The consolidated arm ran on dgx1 against localhost
+with 3 GiB steady memory guards active. A deterministic arithmetic request and
+normal prose answer passed before timing. The benchmark records hashes rather
+than full completions, so it cannot by itself establish output quality. A later
+temperature-zero LRU request returned malformed identifiers and an undefined
+assignment twice; see `runs/launch-eager-a3152e8c-observed.json`. Treat these
+numbers as throughput evidence only while the quality gate remains open.
+
 The interim setup has a clear as-operated speed regression. Its first-token
 latency is roughly comparable, while decode dominates the slowdown. It has
 speculative decoding disabled and CUDA graphs set to `NONE`; the successful
@@ -73,8 +102,6 @@ weekend setup used three-token DSpark speculation and
 KV reservation from 3 GiB to 2 GiB, and the vLLM/B12X source. These changes
 prevent attribution to any one patch. The 1-to-4-way loss is especially large.
 
-After the consolidated image is built and safely launched on all three ranks,
-repeat the same matrix with raw receipts, the semantic and long-context gates,
-and the normal Strix workload. Then test performance features separately where
-the new upstream supports them, preserving output correctness and host memory
-headroom. The consolidated image has no measured performance result yet.
+The next controlled performance arm should enable `FULL_DECODE_ONLY` CUDA
+graphs on this same consolidated image, then qualify fixed-block DSpark
+separately. Keep the model, prompts, client host, and guard thresholds fixed.

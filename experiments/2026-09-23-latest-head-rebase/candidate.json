@@ -1,7 +1,7 @@
 {
   "intended_variable": "upstream source revisions from the pinned September 23 heads",
   "configuration_delta": {},
-  "runtime_action": "bounded managed-weight qualification before one guarded TP3 cutover",
+  "runtime_action": "managed-weight TP3 candidate running under steady guards; quality gate open",
   "source_delta": {
     "vllm": {
       "upstream_commit": "0f2a15c9277f34c9afe141cf578d1f02b3bebdfe",
@@ -17,5 +17,5 @@
     }
   },
   "omitted_local_behavior": [],
-  "status": "loader-lifecycle image sha256:c068aebe also reached dgx3 startup memory floor after weight loading; scoped managed-weight patch added and awaits bounded GPU qualification"
+  "status": "managed-weight image sha256:a3152e8c reached API readiness, passed 159K context admission and the serving matrix, but deterministic LRU output contains malformed identifiers; do not promote"
 }

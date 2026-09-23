@@ -6,13 +6,13 @@
   "rocenante_c_syntax": "pass: gcc -std=gnu11 -fsyntax-only -Wall -Wextra on dgx1",
   "build_inputs": "pass: latest-head source and deployment identities on the local host and dgx1",
   "dockerfile_check": "pass: docker buildx build --check on dgx1, no warnings",
-  "live_service_observation": "known working patch0029 image restored on all three nodes; API ready and 3 GiB steady guards active",
+  "live_service_observation": "consolidated managed-weight image sha256:a3152e8c running on all three nodes; API ready, 3 GiB steady guards active, no Docker OOM kill; runs/launch-eager-a3152e8c-observed.json",
   "native_build": "pass: sha256:a3152e8cf0cde66a2997bdf6fa0ce7001dc2cf62a9b8bf1d8a95cbd5a1ad354a with exact five-patch B12X source and unchanged rebuilt vLLM stable extensions; runs/build-a3152e8c-validation.json",
   "target_hardware_tests": "loader-lifecycle unit test and 8 GiB GPU/native-loader smoke passed for sha256:c068aebe; both sha256:cb3f6320 and sha256:c068aebe guarded TP3 loads reached dgx3 5 GiB startup floor after weights; capped 1 MiB exact B12X managed-weight checkpoint copy passed for sha256:a3152e8c",
-  "quality_comparison": "not run",
-  "performance_comparison": "not run: consolidated latest-head image has not reached API readiness",
-  "interim_live_comparison": "performance-bridge.md: weekend promoted service versus running patch-0029; all eight matched cases slower on patch-0029",
-  "patch_author_replay": "pass: initial 13 local commits reauthored to GitHub noreply identity; later loader patch also authored and committed as Christopher Owen",
+  "quality_comparison": "basic arithmetic and prose passed; deterministic LRU code request repeated malformed identifiers and an undefined assignment, including with thinking disabled; no known-good same-prompt control yet; promotion blocked",
+  "performance_comparison": "30/30 consolidated requests succeeded; 8-case matrix ranges 9.13/8.94 TPS at c1 through 47.34/47.40 TPS at c8 for prose/code, close to patch0029 at c2-c8 and far below weekend at c1-c4; performance-bridge.md",
+  "interim_live_comparison": "performance-bridge.md: weekend promoted service versus historical patch-0029 and current consolidated image; large weekend gap persists",
+  "patch_author_replay": "pass: all local concept patches, including loader and managed-weight patches, and deployment commits use Christopher Owen GitHub noreply identity",
   "b12x_loader_lifecycle": "patch 0004 removes stale private progress APIs and dead _log_loading_time hook; it finishes transfers and releases CUDA cache before post-load preparation; exact replay and bounded tests passed, guarded TP3 startup still failed the memory floor",
-  "b12x_managed_weights": "patch 0005 restores only scoped coherent final-weight allocations for GB10; upstream bounded bounce/GDS readers remain; exact bounded native copy passed; guarded TP3 qualification pending"
+  "b12x_managed_weights": "patch 0005 restores only scoped coherent final-weight allocations for GB10; upstream bounded bounce/GDS readers remain; exact bounded native copy and guarded TP3 startup passed; code-output quality remains unqualified"
 }

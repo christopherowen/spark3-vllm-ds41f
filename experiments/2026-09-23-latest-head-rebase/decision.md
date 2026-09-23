@@ -1,15 +1,17 @@
 # Decision
 
-Keep the consolidated current-head source as an unpromoted candidate. The new
-native image passes bounded GPU smoke, but its guarded three-rank start reached
-the 5 GiB memory floor after checkpoint loading on dgx3. The known working
-patch0029 service has been restored on all three nodes. Do not lower the guard
-or treat this image as qualified.
+Keep the consolidated current-head source as an unpromoted experiment. The
+smaller B12X loader-lifecycle fix did not recover startup memory headroom: its
+guarded load crossed the dgx3 5 GiB floor after weights. Patch 0005 restores
+scoped managed final weights on GB10 while retaining upstream's bounded reader.
+The new image passed a capped native copy, guarded TP3 startup, API readiness,
+159K context admission, and the 30-request serving matrix with active guards.
 
-The smaller B12X lifecycle fix did not recover memory headroom. The latest
-guarded load repeated the post-weight failure at 5,164,244 KiB available on
-dgx3. Patch 0005 now restores managed storage for final model weights on GB10
-as one distinct concept, retaining upstream's bounded reader. A 1 MiB native
-checkpoint copy passed with exact values in an 8 GiB container. The next gate
-is one guarded TP3 start using the same 5 GiB startup floor.
-Output quality, long-context capacity, and serving speed remain open gates.
+Do not promote yet. The same temperature-zero LRU request produced malformed
+identifiers twice, and a thinking-disabled request also produced an undefined
+assignment. Logprobs favor stray suffixes immediately after confidently
+generated identifiers, pointing to model-state/logit behavior rather than
+response formatting. The 256-token code throughput cases may contain only
+reasoning tokens and cannot establish code quality. Keep the candidate running
+for controlled diagnosis; compare the exact quality prompt against a known-good
+arm before changing CUDA graphs or DSpark. The large weekend speed gap remains.

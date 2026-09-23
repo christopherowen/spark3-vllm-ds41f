@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "result": "api_ready_performance_measured_quality_gate_open",
+  "configuration": "cluster-eager.json at c2640f32dfac545d22b969e7738525f94a6aa2e4",
+  "image_id": "sha256:a3152e8cf0cde66a2997bdf6fa0ce7001dc2cf62a9b8bf1d8a95cbd5a1ad354a",
+  "startup": "all three ranks reached API readiness; 5 GiB startup guards switched to active 3 GiB steady guards; no Docker OOM kill",
+  "memory_observations": {
+    "after_ready_kib": {"dgx1": 8453528, "dgx2": 10034788, "dgx3": 9510204},
+    "after_long_context_kib": {"dgx1": 7380976, "dgx2": 8127960, "dgx3": 8111228},
+    "note": "sampled MemAvailable, not continuous minima"
+  },
+  "semantic": {
+    "arithmetic": "1 + 1 = returned a continuation beginning with 2",
+    "prose": "coherent explanation of exact speculative rejection sampling; normal stop at 189 completion tokens",
+    "code": "failed requested LRU implementation: two deterministic responses used parameter name valueazon while assigning an undefined value; thinking-disabled request used valueerk with the same undefined assignment",
+    "code_logprobs": "with thinking disabled, the model strongly selected the preceding ' value' and '(key' tokens, then gave diffuse next-token distributions led by 'azon' (logprob -2.32) and 'uit' (-2.96); this implicates generated logits or model state rather than response formatting, but has no known-good control",
+    "code_benchmark_prompt": "a separate 768-token response to the benchmark's full code prompt spent the entire limit in reasoning and returned no final content; the 256-token throughput cases therefore measure token generation, not code quality",
+    "evidence": [
+      "runs/consolidated-managed/code-semantic.json",
+      "runs/consolidated-managed/code-semantic-repeat.json",
+      "runs/consolidated-managed/code-no-thinking.json",
+      "runs/consolidated-managed/code-logprobs.json",
+      "runs/consolidated-managed/code-benchmark-semantic.json"
+    ]
+  },
+  "long_context": {
+    "status": "8K, 64K, 128K, and near-160K admissions returned HTTP 200",
+    "prompt_tokens": [8206, 65550, 131086, 159014],
+    "qualification_limit": "repetitive prefix-cached prompts returned an empty one-token stop; these prove admission and memory fit, not long-context answer quality or cold-prefill speed"
+  },
+  "performance": "30/30 matched 256-token requests succeeded; see performance-bridge.md and runs/consolidated-managed/",
+  "deployment": "experimental candidate still running on all three nodes; promoted config/cluster.json unchanged",
+  "next_gate": "compare code-output quality against a known-good arm or isolate the source of malformed identifiers before graph/DSpark speed work or promotion"
+}
