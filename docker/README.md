@@ -44,3 +44,26 @@ deploy it until it builds on a Spark, passes import/schema checks, serves the
 quality probes, reproduces the baseline benchmark, and has one pushed OCI digest
 used by all three ranks. The captured live service remains authoritative during
 that transition.
+
+## Build resource policy on DGX Spark
+
+Build the current-head candidate with
+`experiments/2026-09-23-latest-head-rebase/build-candidate` after preparing its
+pinned sources. Run `check` first; run `build` only on an idle Spark with the
+DS4.1 container stopped. With no model weights resident, compilation can use
+much more of the 128 GiB host than a serving process can. The candidate build
+selects up to eight compile jobs on a 20-CPU Spark, each with two NVCC threads;
+it reserves four CPUs, budgets 8 GiB per job, and never selects more than ten
+jobs. It requires 64 GiB `MemAvailable` at start and cancels if a one-second
+sample falls below a 24 GiB host reserve. A host lock prevents overlapping
+candidate builds. The older two-job setting was chosen for caution, not
+because the previous builds exhausted host memory: the
+recorded native rebuild stayed above 100 GiB available.
+
+Keep the build policy separate from inference startup. Once the image is built,
+verify its imports and exact image identity, then use the coordinated launch
+with its existing 5 GiB startup and 3 GiB steady guards. After an aborted
+build, confirm the Docker build has stopped and memory has recovered before
+starting a model. Record the chosen job count, minimum observed available
+memory, elapsed build time, and image digest in the experiment receipt so
+future resource changes can be compared without changing model quality gates.

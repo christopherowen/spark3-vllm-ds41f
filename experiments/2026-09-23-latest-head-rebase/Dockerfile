@@ -11,14 +11,16 @@ USER root
 COPY --from=vllm-source . /workspace/vllm/
 
 # Rebuild both CUDA stable extensions: upstream changed their source after the
-# pinned dependency image. Keep compilation bounded and run this stage only
-# while the local inference service is stopped.
+# pinned dependency image. Build parallelism is selected from idle host resources
+# by build-candidate; keep the job pool and NVCC fan-out bounded together.
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       cmake \
       git \
     && rm -rf /var/lib/apt/lists/*
 ENV TORCH_CUDA_ARCH_LIST=12.1a
+ARG VLLM_COMPILE_JOBS=8
+ARG VLLM_NVCC_THREADS=2
 RUN --mount=type=secret,id=github_token,required=false \
     set -eu; \
     if [ -s /run/secrets/github_token ]; then \
@@ -36,10 +38,10 @@ RUN --mount=type=secret,id=github_token,required=false \
       "-DVLLM_PYTHON_PATH=$python_path" \
       -DFETCHCONTENT_BASE_DIR=/workspace/vllm/.deps \
       -DCMAKE_JOB_POOL_COMPILE:STRING=compile \
-      -DCMAKE_JOB_POOLS:STRING=compile=2 \
+      -DCMAKE_JOB_POOLS:STRING=compile=${VLLM_COMPILE_JOBS} \
       -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
-      -DNVCC_THREADS=1; \
-    cmake --build /tmp/vllm-native -j=2 \
+      -DNVCC_THREADS=${VLLM_NVCC_THREADS}; \
+    cmake --build /tmp/vllm-native -j=${VLLM_COMPILE_JOBS} \
       --target _C_stable_libtorch _moe_C_stable_libtorch; \
     cmake --install /tmp/vllm-native \
       --prefix /opt/vllm-native \

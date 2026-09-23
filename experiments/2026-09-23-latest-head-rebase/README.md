@@ -21,10 +21,20 @@ On September 23 the initial 13 local patch commits were reauthored to Christophe
 Owen's GitHub noreply identity. A fresh canonical replay produced the same
 vLLM and B12X source trees; `runs/source-replay-identity.json` records both
 sets of commit IDs. This changes attribution only, not the candidate code.
-`build-candidate check` verifies clean source and deployment commit identities;
+`build-candidate check` verifies source identities and reports uncommitted
+deployment changes; `build` requires a clean deployment commit.
 `build-candidate build` uses the pinned ARM64 dependency image and rebuilds the
 two vLLM CUDA stable extensions from this head. The build command refuses a
-host with a running DS4.1 container.
+host with a running DS4.1 container. On an idle Spark, it chooses compile jobs
+from the CPU allowance and `MemAvailable`: two NVCC threads per job, four CPUs
+left for the host, an 8 GiB allowance per compile job, and at most ten jobs.
+It requires 64 GiB available before starting and watches memory once a second,
+canceling the build below a 24 GiB host reserve. A host lock prevents two
+candidate builds from running together. A 20-CPU Spark with 120 GiB
+available gets eight compile jobs instead of the previous two. These are build
+limits, not serving limits; the 5 GiB startup and 3 GiB steady memory guards
+still protect the model after weights load. Build on one idle node at a time,
+then distribute the verified image digest to the other ranks.
 `bin/spark3 status` checks the promoted container name from `config/cluster.json`
 and does not list this unpromoted experiment. Direct read-only Docker and
 systemd checks on all three nodes found the current patch-0029 containers and

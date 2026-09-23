@@ -2,19 +2,97 @@
 """Check or build the pinned September 23 source candidate."""
 
 import argparse
+import fcntl
 import json
 import os
+import signal
 import subprocess
+import time
 from pathlib import Path
 
 
 EXPERIMENT = Path(__file__).resolve().parent
 REPO = EXPERIMENT.parents[1]
 SOURCES = REPO / ".work/experiments/2026-09-23-latest-head-rebase"
+GIB = 1024**3
+MIN_BUILD_AVAILABLE_GIB = 64
+BUILD_MEMORY_RESERVE_GIB = 24
+BUILD_MEMORY_PER_JOB_GIB = 8
+NVCC_THREADS = 2
+CPU_RESERVE = 4
+MAX_COMPILE_JOBS = 10
 
 
 def git(directory, *args):
     return subprocess.check_output(["git", *args], cwd=directory, text=True).strip()
+
+
+def available_memory_gib():
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) * 1024 / GIB
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"cannot read host MemAvailable: {exc}") from exc
+    raise SystemExit("cannot read host MemAvailable")
+
+
+def compile_jobs(available_gib):
+    if available_gib < MIN_BUILD_AVAILABLE_GIB:
+        raise SystemExit(
+            f"build requires at least {MIN_BUILD_AVAILABLE_GIB} GiB MemAvailable "
+            f"before starting; found {available_gib:.1f} GiB"
+        )
+    cpus = len(os.sched_getaffinity(0))
+    cpu_jobs = max(1, (cpus - CPU_RESERVE) // NVCC_THREADS)
+    memory_jobs = int(
+        (available_gib - BUILD_MEMORY_RESERVE_GIB) // BUILD_MEMORY_PER_JOB_GIB
+    )
+    return min(MAX_COMPILE_JOBS, cpu_jobs, memory_jobs)
+
+
+def cancel_build(process):
+    for sig, seconds in ((signal.SIGINT, 30), (signal.SIGTERM, 10), (signal.SIGKILL, 5)):
+        if process.poll() is not None:
+            return
+        try:
+            os.killpg(process.pid, sig)
+        except ProcessLookupError:
+            return
+        try:
+            process.wait(timeout=seconds)
+            return
+        except subprocess.TimeoutExpired:
+            pass
+
+
+def run_guarded_build(command, starting_available_gib):
+    started = time.monotonic()
+    minimum_available_gib = starting_available_gib
+    process = subprocess.Popen(command, start_new_session=True)
+    try:
+        while True:
+            try:
+                result = process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                available_gib = available_memory_gib()
+                minimum_available_gib = min(minimum_available_gib, available_gib)
+                if available_gib < BUILD_MEMORY_RESERVE_GIB:
+                    cancel_build(process)
+                    raise SystemExit(
+                        f"build canceled: MemAvailable fell to {available_gib:.1f} GiB "
+                        f"below the {BUILD_MEMORY_RESERVE_GIB} GiB host reserve"
+                    )
+                continue
+            if result:
+                raise subprocess.CalledProcessError(result, command)
+            return minimum_available_gib, time.monotonic() - started
+    except KeyboardInterrupt:
+        cancel_build(process)
+        raise SystemExit("build canceled") from None
+    except BaseException:
+        cancel_build(process)
+        raise
 
 
 def main():
@@ -25,8 +103,7 @@ def main():
     series = json.loads((EXPERIMENT / "series.json").read_text())
     source_root = args.source_root.resolve()
 
-    if git(REPO, "status", "--porcelain"):
-        raise SystemExit("deployment repository is dirty; commit before building")
+    deployment_dirty = bool(git(REPO, "status", "--porcelain"))
     for project, record in series.items():
         source = source_root / project
         if not source.is_dir() or git(source, "status", "--porcelain"):
@@ -36,14 +113,31 @@ def main():
         if head != record["patch_head"] or tree != record["expected_tree"]:
             raise SystemExit(f"{project}: prepared source identity differs from series.json")
     if args.mode == "check":
-        print("latest-head source and deployment identities OK")
+        print("latest-head source identities OK")
+        if deployment_dirty:
+            print("deployment repository has uncommitted changes; commit before building")
         return
+    if deployment_dirty:
+        raise SystemExit("deployment repository is dirty; commit before building")
 
+    lock = open("/tmp/spark3-build-candidate.lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise SystemExit("another candidate build is already running on this host")
     containers = subprocess.check_output(
         ["docker", "ps", "--format", "{{.Names}}"], text=True
     ).splitlines()
     if any(name.startswith("dsv41-") for name in containers):
         raise SystemExit("local DS4.1 service is running; build on an idle host")
+    available_gib = available_memory_gib()
+    jobs = compile_jobs(available_gib)
+    print(
+        f"build resources: {jobs} compile jobs, {NVCC_THREADS} NVCC threads/job; "
+        f"{available_gib:.1f} GiB available, {BUILD_MEMORY_RESERVE_GIB} GiB "
+        "monitored host reserve",
+        flush=True,
+    )
 
     deployment_commit = git(REPO, "rev-parse", "HEAD")
     vllm = series["vllm"]
@@ -65,14 +159,19 @@ def main():
         "--build-arg", f"B12X_PATCH_HEAD={b12x['patch_head']}",
         "--build-arg", f"B12X_TREE={b12x['expected_tree']}",
         "--build-arg", f"DEPLOYMENT_COMMIT={deployment_commit}",
+        "--build-arg", f"VLLM_COMPILE_JOBS={jobs}",
+        "--build-arg", f"VLLM_NVCC_THREADS={NVCC_THREADS}",
         "--tag", tag,
         "--file", str(EXPERIMENT / "Dockerfile"),
     ]
     if os.environ.get("GITHUB_TOKEN"):
         command += ["--secret", "id=github_token,env=GITHUB_TOKEN"]
     command.append(str(EXPERIMENT))
-    subprocess.run(command, check=True)
-    print(f"built {tag}")
+    minimum_available_gib, elapsed_seconds = run_guarded_build(command, available_gib)
+    print(
+        f"built {tag}; elapsed {elapsed_seconds:.0f}s; "
+        f"lowest sampled MemAvailable {minimum_available_gib:.1f} GiB"
+    )
 
 
 if __name__ == "__main__":
