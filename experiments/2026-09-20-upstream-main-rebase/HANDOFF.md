@@ -28,6 +28,12 @@ The next live trace compares `mhc_shifted_post_pre`'s residual update against
 the direct tensor formula and records the carried MHC mix ranges. See
 `runs/launch-v2-numeric-q7.json`.
 
+The MHC residual update matches its direct tensor reference; the large value
+arrives as the layer-2 attention output (about ±4,672) while layers 0 and 1
+are about ±4 and ±6. The next trace extends the live-cache native/reference
+B12X attention comparison to layers 1 and 2. See
+`runs/launch-v2-mhc-q8.json`.
+
 ## Review correction: disk Engram collective
 
 Source review found that the proposed dim-0 all-gather probe does **not**

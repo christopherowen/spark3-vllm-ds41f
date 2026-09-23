@@ -227,7 +227,7 @@ def _wrap_method(
         _check(f"{prefix}.{label}.output", output)
         if label == "embed" and isinstance(output, torch.Tensor):
             _trace(f"{prefix}.{label}.output", output)
-        if label in ("attention", "moe", "decoder", "logits"):
+        if label in ("attention", "moe", "decoder", "logits", "o_proj"):
             for index, tensor in enumerate(_tensors(output)):
                 if index >= (4 if label == "decoder" else 1):
                     break
@@ -317,13 +317,17 @@ def _wrap_sparse_entry(owner: type[Any]) -> None:
 
 
 def _wrap_b12x_attention(owner: type[Any]) -> None:
-    """Compare layer-0 B12X output with its reference on the live cache."""
+    """Compare early-layer B12X outputs with the live-cache reference."""
     original = getattr(owner, "_run_attention")
 
     @functools.wraps(original)
     def checked(self: Any, *args: Any, **kwargs: Any) -> Any:
         prefix = getattr(self, "prefix", type(self).__name__)
-        armed = os.path.exists(_ARM_FILE) and getattr(self, "layer_id", None) == 0
+        armed = os.path.exists(_ARM_FILE) and getattr(self, "layer_id", None) in (
+            0,
+            1,
+            2,
+        )
         expected = None
         if armed:
             from b12x.attention._shared.mla.compressed_reference import (

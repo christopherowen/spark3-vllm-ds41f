@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "result": "api_ok_incorrect_text",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 200,
+    "text": "Categories compounding bouncing\u5411\u65e5"
+  },
+  "configuration": "cluster-v2-mhc.json",
+  "repository_commit": "b348292921d5819fe0c67367ff2d8a47831d8ca9",
+  "findings": {
+    "first_large_activation": "layer-2 attention output about \u00b14672",
+    "mhc_call4_reference_max": 740.0,
+    "mhc_call4_actual_max": 740.0,
+    "mhc_call4_max_abs_error": 0.0,
+    "mhc_call4_input_x_max": 4672.0
+  },
+  "nodes": {
+    "dgx1": {
+      "container_id": "5accfc83201bd59cbdd167147e3a55b8b2626ad09db0c863debf3e7fdab71d20",
+      "exit_code": 0,
+      "oom_killed": false,
+      "non_finite_activation_errors": 0
+    },
+    "dgx2": {
+      "container_id": "3ef82520f2a21e42bd1ebdf54e4d9ae14f5aa9911f4737704459145a45cd5d5d",
+      "exit_code": 0,
+      "oom_killed": false,
+      "non_finite_activation_errors": 0
+    },
+    "dgx3": {
+      "container_id": "7c98288b261e83e3a45fba10ddead4818ecf0635561fc9767562b1fb33fd99e4",
+      "exit_code": 0,
+      "oom_killed": false,
+      "non_finite_activation_errors": 0
+    }
+  }
+}
