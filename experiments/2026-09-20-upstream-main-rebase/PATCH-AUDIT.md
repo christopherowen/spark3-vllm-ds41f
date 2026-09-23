@@ -22,6 +22,18 @@ The candidate source diff contains no temporary `print`, breakpoint, NaN
 probe, or TODO diagnostic to strip. Runtime-only probes are outside the image
 patch series.
 
+## Why the errors multiplied
+
+Several launch failures were repairs to boundaries introduced by this local
+rebase: the self-registered B12X warmup module, loader-owned weight allocation,
+lazy scale and virtual-head transforms, pre-profile plan timing, and RoCEnante
+stripe geometry. They were valuable failures to catch, but do not justify
+separate future upstream patches. The earlier garbled-output handoff focused on
+Engram and RoCEnante after a V1-runner NaN. Later V2 target-only A/B evidence
+identified a distinct compressed-cache block-table mapping error in the local
+B12X adapter. Patch 0029 corrected that mapping and the clean target-only smoke
+passed; further Engram or RoCEnante debug changes are not part of this fix.
+
 | Parent change | Foldable follow-ups | Final behavior to retain |
 | --- | --- | --- |
 | vLLM 0001, TP3/virtual heads | 0010, 0011 | Lazy and loader-backed virtual head groups. Keep the generic TP3 vocabulary correction (0006) separate for upstream review. |
