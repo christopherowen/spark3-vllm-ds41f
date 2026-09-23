@@ -158,3 +158,31 @@ for SM >= 9 including GB10). It calls `gdc_launch_dependents()` before storing
 its outputs. `cluster-kkref-g-nopdl.json` mounts `nopdl_cuda.py`, whose
 `is_arch_support_pdl()` returns False under `SPARK3_DISABLE_PDL=1`, and
 otherwise repeats the failing full-graph configuration.
+
+PDL off (`runs/kktrace/g-full-nopdl.json`) still failed 0/8, so vLLM's PDL
+launches are not the cause.
+
+## The routed B12X MoE diverges under graph replay
+
+`gtrace_dsv4_topk.py` and `gtrace_moe_runner.py` extend the graph-safe trace
+to router logits, the selected experts and weights, and the MoE runner's
+shared-expert and routed-expert outputs (`gtrace_router.py` compares them).
+Three eager runs pass. Of three graph runs, two fail with `valueerk`.
+
+At layer 0, on every decode step:
+
+| Quantity | Graph vs eager | Eager noise | Graph vs graph |
+|---|---|---|---|
+| MoE input, router logits, top-k ids and weights | 0 (bit-identical) | 0 | 0 |
+| shared-expert output (steps 2, 3) | 0 | 0 | 0 |
+| routed-expert output | 2.4-3.5% | 0.17-0.24% | 0.5-0.6% |
+
+With bit-identical inputs and routing, the routed B12X MoE computes a result
+that is consistently different under CUDA-graph replay. One graph run's
+shared-expert output also differed (1.2%) at step 1 only.
+
+In the vLLM graph, shared experts run on an auxiliary stream that joins the
+main stream before the router gate. During replay they can occupy SMs while
+the routed MoE kernel launches; in eager mode the CPU enqueues the routed
+kernels first. `cluster-kkref-gtrace-noaux.json` repeats the traced full-graph
+arm with `VLLM_DISABLE_SHARED_EXPERTS_STREAM=1`.
