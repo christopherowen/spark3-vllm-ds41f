@@ -40,6 +40,11 @@ The layer-0/1 comparisons are valid because those layers are SWA-only. The
 next probe includes the physical indexed IDs, lengths, compressed cache, and
 page size in the reference. See `runs/launch-v2-attn-q9.json`.
 
+With the complete reference, both native and reference layer-2 attention
+read values over 1,900 from the indexed cache; the reference reaches 2,304.
+The compressed latent entering the B12X indexed cache writer and the decoded
+cache record are the next boundary. See `runs/launch-v2-fullref-q10.json`.
+
 ## Review correction: disk Engram collective
 
 Source review found that the proposed dim-0 all-gather probe does **not**

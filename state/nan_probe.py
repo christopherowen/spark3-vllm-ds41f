@@ -432,6 +432,74 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
     setattr(owner, "_run_attention", checked)
 
 
+def _wrap_indexed_cache_insert(owner: type[Any]) -> None:
+    original = owner._insert_compressed_cache
+
+    @functools.wraps(original)
+    def checked(
+        self: Any, latent: torch.Tensor | None, positions: torch.Tensor
+    ) -> None:
+        selected = (
+            os.path.exists(_ARM_FILE)
+            and getattr(self, "layer_id", None) == 2
+            and latent is not None
+        )
+        if selected:
+            from vllm.forward_context import get_forward_context
+
+            _trace(f"{self.prefix}.compressed_latent", latent)
+            metadata = get_forward_context().attn_metadata[
+                self.compressor.k_cache_prefix
+            ]
+            slots = metadata.slot_mapping
+            cache_positions = positions.div(
+                self.compress_ratio, rounding_mode="floor"
+            ).mul(self.compress_ratio)
+            rotated, _ = self.rotary_emb(cache_positions, latent.clone().unsqueeze(-2))
+            rotated = rotated.squeeze(-2)
+            _trace(f"{self.prefix}.rotated_latent", rotated)
+        original(self, latent, positions)
+        if selected:
+            from b12x.attention._shared.mla.compressed_reference import (
+                _gather_cache_reference,
+            )
+            from vllm.models.deepseek_v41.nvidia.b12x_attention import (
+                _flatten_cache,
+            )
+
+            torch.cuda.synchronize(latent.device)
+            valid = slots >= 0
+            if bool(valid.any().item()):
+                page_size = (
+                    self._vllm_config.cache_config.block_size // self.compress_ratio
+                )
+                decoded, _ = _gather_cache_reference(
+                    _flatten_cache(
+                        self._compressed_kv_cache(),
+                        name="DeepSeek V4.1 indexed cache",
+                    ),
+                    slots[valid],
+                    page_size=page_size,
+                    cache_format="deepseek_v41",
+                    cache_kind="indexed",
+                )
+                expected = rotated[valid]
+                error = (decoded.float() - expected.float()).abs()
+                _trace(f"{self.prefix}.decoded_indexed_cache", decoded)
+                print(
+                    "spark3 NaN probe: "
+                    f"{self.prefix}.indexed_cache_write "
+                    f"slots={slots[valid].detach().cpu().tolist()} "
+                    f"expected_max={float(expected.float().abs().max().item())} "
+                    f"decoded_max={float(decoded.float().abs().max().item())} "
+                    f"max_abs_error={float(error.max().item())} "
+                    f"mean_abs_error={float(error.mean().item())}",
+                    flush=True,
+                )
+
+    owner._insert_compressed_cache = checked
+
+
 def _install() -> None:
     import vllm.models.deepseek_v41.nvidia.model as model
     from vllm.model_executor.kernels.linear.mxfp8.b12x import B12xMxfp8LinearKernel
@@ -452,6 +520,7 @@ def _install() -> None:
     _wrap_engram(Engram)
     _wrap_method(Engram, "embed", "embed")
     _wrap_b12x_wkv(B12xMxfp8LinearKernel)
+    _wrap_indexed_cache_insert(DeepseekV41B12xAttention)
     _wrap_method(VocabParallelEmbedding, "forward", "embedding")
     for method_name in (
         "_run_parallel_input_projections",

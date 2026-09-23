@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "result": "api_ok_incorrect_text",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 200,
+    "text": " stackixoneneg bodily"
+  },
+  "configuration": "cluster-v2-fullref.json",
+  "repository_commit": "76c28382784e0a6b1dab2deaa8b5d346fa84676c",
+  "findings": {
+    "layer2_indexed_lengths": [
+      0,
+      1,
+      1,
+      2,
+      2
+    ],
+    "layer2_full_reference_max_abs": 2304.0,
+    "layer2_native_max_abs": 1920.0,
+    "interpretation": "both full reference and native attention read large values from indexed cache; inspect compressed latent and cache writer"
+  },
+  "nodes": {
+    "dgx1": {
+      "container_id": "4f78413be3ebb50f47b7d91cc488862c0f2bee40044d16760b55e618ec365452",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx2": {
+      "container_id": "7b88f73e6a015e01195851e8a0baa1e688f153658738cd8fe559b15e3bf2aec9",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx3": {
+      "container_id": "ef2aba3481df189045d184901a9e41f618ba9fe1649fbc3d163cd8f8e2f42033",
+      "exit_code": 0,
+      "oom_killed": false
+    }
+  }
+}
