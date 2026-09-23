@@ -1,0 +1,23 @@
+{
+  "intended_variable": "upstream source revisions from the pinned September 23 heads",
+  "configuration_delta": {},
+  "runtime_action": "none",
+  "source_delta": {
+    "vllm": {
+      "upstream_commit": "0f2a15c9277f34c9afe141cf578d1f02b3bebdfe",
+      "patch_head": "efa5e032c9254a80941ec25ee9ddeaf02d582972",
+      "source_tree": "eddf87778c8d3617eb5b40b57d05cae8b95ec0c2",
+      "concept_patches": 10
+    },
+    "b12x": {
+      "upstream_commit": "0332cc5089137753d3af43d1c643516b4350359f",
+      "patch_head": "efc58696a860f5a0fa120cbc24c8619c34258f40",
+      "source_tree": "de6142a42059d7075623d348fe71f52724926a94",
+      "concept_patches": 3
+    }
+  },
+  "omitted_local_behavior": [
+    "B12X managed-weight pool adaptation: superseded by current upstream ordinary-weight bounce/GDS loader"
+  ],
+  "status": "source replayed; native build and target-hardware qualification pending"
+}

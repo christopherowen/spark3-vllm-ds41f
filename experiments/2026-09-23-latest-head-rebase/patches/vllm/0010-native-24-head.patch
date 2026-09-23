@@ -1,0 +1,64 @@
+From efa5e032c9254a80941ec25ee9ddeaf02d582972 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Wed, 23 Sep 2026 09:31:55 +0200
+Subject: [PATCH] fix(deepseek-v41): dispatch fused TP3 Q heads
+
+Upstream base: 0f2a15c9277f34c9afe141cf578d1f02b3bebdfe
+
+Rationale: Compile native fused Q head geometry for the 24 head TP3 partition.
+Quality and speed: Keeps native fused path and its numerical results.
+Tests: source replay, syntax parse, and diff check; target hardware qualification pending.
+Upstream status: local candidate, not submitted.
+---
+ .../fused_deepseek_v4_qnorm_rope_kv_insert_kernel.cu         | 5 +++--
+ tests/kernels/test_fused_deepseek_v4_qnorm_rope_kv_insert.py | 4 +++-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/csrc/libtorch_stable/fused_deepseek_v4_qnorm_rope_kv_insert_kernel.cu b/csrc/libtorch_stable/fused_deepseek_v4_qnorm_rope_kv_insert_kernel.cu
+index 5a5caacce7..d592037a3c 100644
+--- a/csrc/libtorch_stable/fused_deepseek_v4_qnorm_rope_kv_insert_kernel.cu
++++ b/csrc/libtorch_stable/fused_deepseek_v4_qnorm_rope_kv_insert_kernel.cu
+@@ -727,7 +727,7 @@ static void launchFusedDeepseekV4Templated(
+ }
+ 
+ // Runtime dispatch into one of the precompiled `kNumHeadsQPadded`
+-// instantiations.  Supported padded head counts: 8, 16, 32, 64, 128, plus 0
++// instantiations.  Supported padded head counts: 8, 16, 24, 32, 64, 128, plus 0
+ // for a KV-only launch that writes no Q at all.  `apply_q_norm` and
+ // `is_q_interleaved` are template parameters, `apply_q_rope` is not (see
+ // processDeepseekV4Slot), so each head count carries four instantiations.
+@@ -768,6 +768,7 @@ void launchFusedDeepseekV4QNormRopeKVRopeQuantInsert(
+   switch (num_heads_q_padded) {
+     DISPATCH(8)
+     DISPATCH(16)
++    DISPATCH(24)
+     DISPATCH(32)
+     DISPATCH(64)
+     DISPATCH(128)
+@@ -776,7 +777,7 @@ void launchFusedDeepseekV4QNormRopeKVRopeQuantInsert(
+                   "fused_deepseek_v4_qnorm_rope_kv_rope_quant_insert: "
+                   "unsupported num_heads_q_padded=",
+                   num_heads_q_padded,
+-                  " (compiled instantiations: 0, 8, 16, 32, 64, 128).");
++                  " (compiled instantiations: 0, 8, 16, 24, 32, 64, 128).");
+   }
+ #undef DISPATCH
+ #undef LAUNCH
+diff --git a/tests/kernels/test_fused_deepseek_v4_qnorm_rope_kv_insert.py b/tests/kernels/test_fused_deepseek_v4_qnorm_rope_kv_insert.py
+index c41af1e4b9..6659f06a7e 100644
+--- a/tests/kernels/test_fused_deepseek_v4_qnorm_rope_kv_insert.py
++++ b/tests/kernels/test_fused_deepseek_v4_qnorm_rope_kv_insert.py
+@@ -540,7 +540,9 @@ NUM_Q_CHUNKS = HEAD_DIM // Q_CHUNK  # 32
+ 
+ 
+ @pytest.mark.parametrize("num_tokens", [1, 17, 2048])
+-@pytest.mark.parametrize("n_heads,q_head_padded", [(16, 64), (64, 128), (64, 0)])
++@pytest.mark.parametrize(
++    "n_heads,q_head_padded", [(16, 64), (24, 24), (64, 128), (64, 0)]
++)
+ def test_q_interleaved_pads_without_rope(
+     num_tokens: int, n_heads: int, q_head_padded: int
+ ):
+-- 
+2.54.0 (Apple Git-157)
+

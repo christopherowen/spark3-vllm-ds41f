@@ -1,0 +1,10 @@
+{
+  "source_replay": "pass: exact pinned patch heads and source trees from canonical upstream fetch",
+  "python_syntax": "pass: parsed 82 changed vLLM and 6 changed B12X Python files before final regrouping",
+  "diff_check": "pass: both source deltas are whitespace-clean",
+  "build_inputs": "pending latest-head identity check after experiment commit",
+  "native_build": "not run",
+  "target_hardware_tests": "not run",
+  "quality_comparison": "not run",
+  "performance_comparison": "not run"
+}

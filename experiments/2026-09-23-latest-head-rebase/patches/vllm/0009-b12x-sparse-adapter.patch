@@ -1,0 +1,1797 @@
+From d602a63649ed6de98280c747c62771c9c89ca14f Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Wed, 23 Sep 2026 09:31:55 +0200
+Subject: [PATCH] feat(deepseek-v41): connect B12X sparse attention and caches
+
+Upstream base: 0f2a15c9277f34c9afe141cf578d1f02b3bebdfe
+
+Rationale: Use native DeepSeek indexer with B12X sparse MLA, including SWA routing, 64 state pages, contiguous writes, and compressed block mapping.
+Quality and speed: Preserves corrected target token path and cache semantics.
+Tests: source replay, syntax parse, and diff check; target hardware qualification pending.
+Upstream status: local candidate, not submitted.
+---
+ tests/models/test_deepseek_v41_b12x.py        | 591 ++++++++++++
+ .../test_indexer_deepseek_v4_slot_mapping.py  |  68 +-
+ .../deepseek_v41/common/ops/cache_utils.py    |  27 +-
+ .../deepseek_v41/nvidia/b12x_attention.py     | 861 ++++++++++++++++++
+ vllm/v1/attention/backends/mla/indexer.py     |  98 +-
+ 5 files changed, 1604 insertions(+), 41 deletions(-)
+ create mode 100644 tests/models/test_deepseek_v41_b12x.py
+ create mode 100644 vllm/models/deepseek_v41/nvidia/b12x_attention.py
+
+diff --git a/tests/models/test_deepseek_v41_b12x.py b/tests/models/test_deepseek_v41_b12x.py
+new file mode 100644
+index 0000000000..7c285466b2
+--- /dev/null
++++ b/tests/models/test_deepseek_v41_b12x.py
+@@ -0,0 +1,591 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from types import SimpleNamespace
++
++import pytest
++import torch
++
++import vllm.models.deepseek_v41.nvidia.b12x_attention as b12x_attention
++import vllm.models.deepseek_v41.nvidia.model as nvidia_model
++import vllm.models.deepseek_v41.nvidia.vl_model as vl_model
++from vllm.model_executor.model_loader.weight_utils import file_source_tensor
++from vllm.model_executor.models.utils import WeightsMapper
++from vllm.model_executor.weight_transfer import (
++    FileTensorSource,
++    get_file_tensor_source,
++)
++from vllm.models.deepseek_v41.attention import _use_v41_mxfp8_kv_record
++from vllm.models.deepseek_v41.nvidia.b12x_attention import (
++    DeepseekV41B12xAttention,
++    DeepseekV41B12xBackend,
++    _decode_plan_row_capacity,
++    _flatten_cache,
++)
++from vllm.models.deepseek_v41.nvidia.engram import ParallelEngramEmbedding
++from vllm.models.deepseek_v41.nvidia.model import (
++    DeepseekV4Model,
++    DeepseekV41LLMForCausalLM,
++)
++from vllm.models.deepseek_v41.nvidia.vl_model import (
++    DeepseekV41ForCausalLM as DeepseekV41VLForCausalLM,
++)
++from vllm.platforms.interface import DeviceCapability
++from vllm.v1.attention.backends.registry import AttentionBackendEnum
++
++
++def _combination_kwargs() -> dict[str, object]:
++    return {
++        "head_size": 512,
++        "dtype": torch.bfloat16,
++        "kv_cache_dtype": "nvfp4_ds_mla",
++        "block_size": 64,
++        "use_mla": True,
++        "has_sink": True,
++        "use_sparse": True,
++        "use_mm_prefix": False,
++        "device_capability": DeviceCapability(12, 1),
++    }
++
++
++def test_b12x_backend_requires_current_prepared_api(monkeypatch) -> None:
++    monkeypatch.setattr(b12x_attention, "get_b12x_compressed_sparse_mla", lambda: None)
++    assert "current B12X source tree" in (
++        DeepseekV41B12xBackend.supports_combination(**_combination_kwargs()) or ""
++    )
++
++    legacy = SimpleNamespace(is_supported=lambda: True)
++    monkeypatch.setattr(
++        b12x_attention, "get_b12x_compressed_sparse_mla", lambda: legacy
++    )
++    assert "prepared-plan API" in (
++        DeepseekV41B12xBackend.supports_combination(**_combination_kwargs()) or ""
++    )
++
++    current = SimpleNamespace(
++        CacheWriterQuery=lambda **kwargs: kwargs,
++        invocation_from_descriptors=lambda **kwargs: kwargs,
++        is_supported=lambda: True,
++        plan_cache_writer=lambda *args, **kwargs: None,
++        write_cache=lambda *args, **kwargs: None,
++    )
++    monkeypatch.setattr(
++        b12x_attention, "get_b12x_compressed_sparse_mla", lambda: current
++    )
++    assert DeepseekV41B12xBackend.supports_combination(**_combination_kwargs()) is None
++
++
++def test_b12x_backend_rejects_wrong_architecture_and_activation_dtype(
++    monkeypatch,
++) -> None:
++    module = SimpleNamespace(
++        invocation_from_descriptors=lambda **kwargs: kwargs,
++        is_supported=lambda: True,
++    )
++    monkeypatch.setattr(
++        b12x_attention, "get_b12x_compressed_sparse_mla", lambda: module
++    )
++    kwargs = _combination_kwargs()
++    kwargs["device_capability"] = DeviceCapability(10, 0)
++    assert "SM120 or SM121" in (
++        DeepseekV41B12xBackend.supports_combination(**kwargs) or ""
++    )
++    kwargs["device_capability"] = DeviceCapability(12, 1)
++    kwargs["dtype"] = torch.float16
++    assert "bfloat16" in (DeepseekV41B12xBackend.supports_combination(**kwargs) or "")
++
++
++def test_b12x_selection_is_explicit_and_does_not_fall_back(monkeypatch) -> None:
++    config = SimpleNamespace(
++        attention_config=SimpleNamespace(backend=AttentionBackendEnum.B12X)
++    )
++    monkeypatch.setattr(
++        nvidia_model.current_platform,
++        "get_device_capability",
++        lambda: DeviceCapability(12, 1),
++    )
++    assert nvidia_model._select_dsv4_attn_cls(config) is DeepseekV41B12xAttention
++
++    monkeypatch.setattr(
++        nvidia_model.current_platform,
++        "get_device_capability",
++        lambda: DeviceCapability(10, 0),
++    )
++    with pytest.raises(ValueError, match="SM120/SM121"):
++        nvidia_model._select_dsv4_attn_cls(config)
++
++
++def test_b12x_uses_native_tp3_heads_and_v41_cache_abi() -> None:
++    attention = object.__new__(DeepseekV41B12xAttention)
++    assert attention.get_padded_num_q_heads(24) == 24
++    assert attention.packed_kv_cache_dtype == "nvfp4_ds_mla"
++    assert attention.uses_v41_mxfp8_kv_record
++    assert _use_v41_mxfp8_kv_record("nvfp4_ds_mla")
++
++
++def test_b12x_self_warmup_provider_is_not_a_child_module(monkeypatch) -> None:
++    def initialize_base(attention, *_args, **_kwargs) -> None:
++        torch.nn.Module.__init__(attention)
++        attention.kv_cache_dtype = "nvfp4_ds_mla"
++        attention._o_proj_block_size = 128
++
++    current = SimpleNamespace(invocation_from_descriptors=lambda **kwargs: kwargs)
++    current.CacheWriterQuery = lambda **kwargs: kwargs
++    current.plan_cache_writer = lambda *args, **kwargs: None
++    current.write_cache = lambda *args, **kwargs: None
++    monkeypatch.setattr(b12x_attention.DeepseekV4Attention, "__init__", initialize_base)
++    monkeypatch.setattr(
++        b12x_attention, "get_b12x_compressed_sparse_mla", lambda: current
++    )
++    monkeypatch.setattr(
++        b12x_attention, "compute_fp8_einsum_recipe", lambda _size: (None, False)
++    )
++
++    attention = DeepseekV41B12xAttention(SimpleNamespace())
++
++    assert attention.b12x_warmup_provider is attention
++    assert "b12x_warmup_provider" not in attention._modules
++    assert list(attention.named_modules(remove_duplicate=False)) == [("", attention)]
++
++
++def test_flatten_cache_preserves_packed_page_storage() -> None:
++    cache = torch.empty((3, 64, 528), dtype=torch.uint8)
++    flattened = _flatten_cache(cache, name="test cache")
++    assert flattened.shape == (3, 64 * 528)
++    assert flattened.data_ptr() == cache.data_ptr()
++
++    with pytest.raises(TypeError, match="uint8 packed storage"):
++        _flatten_cache(cache.to(torch.bfloat16), name="test cache")
++
++
++def test_b12x_maps_indexed_positions_through_shared_compressed_cache(
++    monkeypatch,
++) -> None:
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention.compress_ratio = 2
++    attention.compressed_cache_prefix = "model.layers.2.attn"
++    attention.swa_cache_layer = SimpleNamespace(
++        prefix="model.layers.3.attn.swa_cache",
++        kv_cache=torch.empty((2, 32, 528), dtype=torch.uint8),
++    )
++    attention.topk_indices_buffer = torch.tensor([[0], [1]], dtype=torch.int32)
++    attention._compressed_kv_cache = lambda: torch.empty(
++        (2, 64, 528), dtype=torch.uint8
++    )
++    attention._ensure_plans = lambda: SimpleNamespace(decode="decode", extend="extend")
++    calls = []
++    attention._run_attention = lambda **kwargs: calls.append(kwargs)
++    swa_table = torch.tensor([[3, 0]], dtype=torch.int32)
++    compressed_table = torch.tensor([[7, 0]], dtype=torch.int32)
++    swa = SimpleNamespace(
++        block_table=swa_table,
++        token_to_req_indices=torch.zeros(2, dtype=torch.int32),
++        is_valid_token=torch.ones(2, dtype=torch.bool),
++        num_decode_tokens=1,
++        num_decodes=1,
++        decode_swa_indices=torch.zeros((1, 1), dtype=torch.int32),
++        decode_swa_lens=torch.ones(1, dtype=torch.int32),
++        num_prefill_tokens=1,
++        prefill_swa_indices=torch.zeros((1, 1), dtype=torch.int32),
++        prefill_swa_lens=torch.ones(1, dtype=torch.int32),
++    )
++    monkeypatch.setattr(
++        b12x_attention,
++        "get_forward_context",
++        lambda: SimpleNamespace(
++            attn_metadata={
++                attention.swa_cache_layer.prefix: swa,
++                attention.compressed_cache_prefix: SimpleNamespace(
++                    block_table=compressed_table
++                ),
++            }
++        ),
++    )
++
++    q = torch.zeros((2, 1, 1), dtype=torch.bfloat16)
++    attention.forward_mqa(q, q, torch.arange(2), torch.empty_like(q))
++
++    assert [call["plan"] for call in calls] == ["decode", "extend"]
++    assert all(torch.equal(call["block_table"], compressed_table) for call in calls)
++    assert all(call["indexed_indices"] is not None for call in calls)
++
++
++class _RecordingRotary(torch.nn.Module):
++    def __init__(self) -> None:
++        super().__init__()
++        self.positions = []
++
++    def forward(self, positions, query, key=None):
++        self.positions.append(positions.clone())
++        assert query.ndim == 3
++        query.add_(1)
++        if key is not None:
++            assert key.ndim == 3
++            assert key.shape[-2] == 1
++            key.add_(2)
++        return query, key
++
++
++class _RecordingMLA:
++    def __init__(self) -> None:
++        self.writes = []
++
++    def write_cache(self, kv, cache, slot_mapping, **kwargs):
++        self.writes.append((kv.clone(), cache, slot_mapping.clone(), kwargs))
++
++
++def test_b12x_writes_swa_in_its_contiguous_record_layout(monkeypatch) -> None:
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention._b12x = _RecordingMLA()
++    attention.rotary_emb = _RecordingRotary()
++    attention.swa_cache_layer = SimpleNamespace(
++        prefix="model.layers.0.swa",
++        block_size=32,
++        kv_cache=torch.empty((2, 32, 528), dtype=torch.uint8),
++    )
++    attention._ensure_plans = lambda: SimpleNamespace(swa_writer="swa-plan")
++    slots = torch.tensor([7, 8], dtype=torch.int64)
++    monkeypatch.setattr(
++        b12x_attention,
++        "get_forward_context",
++        lambda: SimpleNamespace(
++            attn_metadata={
++                attention.swa_cache_layer.prefix: SimpleNamespace(slot_mapping=slots)
++            }
++        ),
++    )
++    q = torch.zeros((2, 24, 512), dtype=torch.bfloat16)
++    kv = torch.zeros((2, 512), dtype=torch.bfloat16)
++
++    actual = attention._fused_qnorm_rope_kv_insert(
++        q,
++        kv,
++        torch.tensor([3, 4], dtype=torch.int64),
++        b12x_attention.get_forward_context().attn_metadata,
++    )
++
++    assert actual is q
++    assert torch.equal(q, torch.ones_like(q))
++    write_kv, write_cache, write_slots, kwargs = attention._b12x.writes[0]
++    assert torch.equal(write_kv, torch.full_like(kv, 2))
++    assert write_cache.shape == (2, 32 * 528)
++    assert torch.equal(write_slots, slots)
++    assert kwargs == {
++        "plan": "swa-plan",
++        "page_size": 32,
++        "cache_kind": "swa",
++        "cache_format": "deepseek_v41",
++    }
++
++
++def test_b12x_writes_rotated_compressed_rows_without_mutating_indexer_input(
++    monkeypatch,
++) -> None:
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention._b12x = _RecordingMLA()
++    attention.rotary_emb = _RecordingRotary()
++    attention.compress_ratio = 2
++    attention.compressor = SimpleNamespace(k_cache_prefix="model.layers.1.attn")
++    attention.is_kv_source = True
++    attention.kv_cache = torch.empty((2, 64, 288), dtype=torch.uint8)
++    attention._vllm_config = SimpleNamespace(
++        cache_config=SimpleNamespace(block_size=128)
++    )
++    attention._ensure_plans = lambda: SimpleNamespace(indexed_writer="indexed-plan")
++    slots = torch.tensor([-1, 7, -1, 8], dtype=torch.int64)
++    monkeypatch.setattr(
++        b12x_attention,
++        "get_forward_context",
++        lambda: SimpleNamespace(
++            attn_metadata={
++                attention.compressor.k_cache_prefix: SimpleNamespace(slot_mapping=slots)
++            }
++        ),
++    )
++    latent = torch.zeros((4, 512), dtype=torch.bfloat16)
++    positions = torch.tensor([0, 1, 2, 3], dtype=torch.int64)
++
++    attention._insert_compressed_cache(latent, positions)
++
++    assert torch.equal(latent, torch.zeros_like(latent))
++    assert torch.equal(
++        attention.rotary_emb.positions[0],
++        torch.tensor([0, 0, 2, 2], dtype=torch.int64),
++    )
++    write_kv, write_cache, write_slots, kwargs = attention._b12x.writes[0]
++    assert torch.equal(write_kv, torch.ones_like(write_kv))
++    assert write_cache.shape == (2, 64 * 288)
++    assert torch.equal(write_slots, slots)
++    assert kwargs == {
++        "plan": "indexed-plan",
++        "page_size": 64,
++        "cache_kind": "indexed",
++        "cache_format": "deepseek_v41",
++    }
++
++
++def test_b12x_swa_only_layer_ignores_shared_indexer_output(monkeypatch) -> None:
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention.compress_ratio = 0
++    attention.topk_indices_buffer = torch.tensor([[7, 11]], dtype=torch.int32)
++    attention.prefix = "model.layers.0.attn"
++    attention.swa_cache_layer = SimpleNamespace(prefix="model.layers.0.swa")
++    attention._ensure_plans = lambda: SimpleNamespace(decode=object(), extend=object())
++
++    calls = []
++    attention._run_attention = lambda **kwargs: calls.append(kwargs)
++    swa = SimpleNamespace(
++        num_decode_tokens=1,
++        decode_swa_indices=torch.zeros((1, 1), dtype=torch.int32),
++        decode_swa_lens=torch.ones((1,), dtype=torch.int32),
++        token_to_req_indices=torch.zeros((1,), dtype=torch.int32),
++        is_valid_token=torch.ones((1,), dtype=torch.bool),
++        block_table=torch.zeros((1, 1), dtype=torch.int32),
++        num_decodes=1,
++        num_prefill_tokens=0,
++    )
++    monkeypatch.setattr(
++        b12x_attention,
++        "get_forward_context",
++        lambda: SimpleNamespace(attn_metadata={attention.swa_cache_layer.prefix: swa}),
++    )
++
++    attention.forward_mqa(
++        torch.zeros((1, 24, 512), dtype=torch.bfloat16),
++        torch.empty(0),
++        torch.empty(0, dtype=torch.int64),
++        torch.empty((1, 24, 512), dtype=torch.bfloat16),
++    )
++
++    assert len(calls) == 1
++    assert calls[0]["indexed_indices"] is None
++    assert calls[0]["indexed_cache"] is None
++
++
++def test_b12x_decode_plan_covers_dspark_warmup_rows() -> None:
++    config = SimpleNamespace(
++        speculative_config=SimpleNamespace(
++            num_speculative_tokens=3,
++            parallel_drafting=False,
++        ),
++        scheduler_config=SimpleNamespace(max_num_seqs=8),
++        compilation_config=SimpleNamespace(max_cudagraph_capture_size=0),
++    )
++
++    # Serving decode is 8 * (1 + 3) = 32 rows. Kernel warmup deliberately
++    # exercises one additional row per request, for 8 * 5 = 40.
++    assert _decode_plan_row_capacity(config) == 40
++
++
++def test_b12x_decode_plan_keeps_larger_graph_capacity() -> None:
++    config = SimpleNamespace(
++        speculative_config=None,
++        scheduler_config=SimpleNamespace(max_num_seqs=8),
++        compilation_config=SimpleNamespace(max_cudagraph_capture_size=64),
++    )
++
++    assert _decode_plan_row_capacity(config) == 64
++
++
++def test_b12x_decode_caps_use_row_capacity_not_request_count() -> None:
++    recorded_caps = []
++
++    class FakeMLA:
++        @staticmethod
++        def Caps(**kwargs):
++            return SimpleNamespace(**kwargs)
++
++        @staticmethod
++        def invocation_from_descriptors(**kwargs):
++            return kwargs
++
++        @staticmethod
++        def plan(caps, *, invocation):
++            del invocation
++            recorded_caps.append(caps)
++            return caps
++
++    attention = object.__new__(DeepseekV41B12xAttention)
++    torch.nn.Module.__init__(attention)
++    attention._b12x = FakeMLA()
++    attention.n_local_heads = 24
++    attention.head_dim = 512
++    attention.max_model_len = 131072
++    attention.swa_cache_layer = SimpleNamespace(block_size=128)
++    attention._vllm_config = SimpleNamespace(
++        scheduler_config=SimpleNamespace(max_num_seqs=8),
++        cache_config=SimpleNamespace(block_size=128),
++    )
++    cache = torch.empty((2, 128), dtype=torch.uint8)
++
++    attention._plan(
++        mode="decode",
++        rows=40,
++        swa_width=3328,
++        swa_cache=cache,
++        indexed_cache=None,
++        indexed_width=0,
++        indexed_page_size=1,
++    )
++    attention._plan(
++        mode="extend",
++        rows=8192,
++        swa_width=32768,
++        swa_cache=cache,
++        indexed_cache=None,
++        indexed_width=0,
++        indexed_page_size=1,
++    )
++
++    assert recorded_caps[0].max_batch == 40
++    assert recorded_caps[0].decode_row_capacity == 40
++    assert recorded_caps[1].max_batch == 8
++    assert recorded_caps[1].decode_row_capacity is None
++
++
++def test_disk_engram_routes_immutable_checkpoint_ranges() -> None:
++    class DiskTable:
++        def __init__(self) -> None:
++            self.shards = []
++
++        def add_shard(self, index, path, offset, *, scale=False) -> None:
++            self.shards.append((index, path, offset, scale))
++
++    embedding = object.__new__(ParallelEngramEmbedding)
++    torch.nn.Module.__init__(embedding)
++    embedding.disk_plan = SimpleNamespace(
++        query=SimpleNamespace(table_rows=7),
++    )
++    embedding.disk_table = DiskTable()
++    weight = file_source_tensor(
++        FileTensorSource("weights.safetensors", 4096, (7, 256), torch.float8_e4m3fn)
++    )
++    scale = file_source_tensor(
++        FileTensorSource("scales.safetensors", 8192, (7, 8), torch.float8_e8m0fnu)
++    )
++
++    loaded = embedding.load_weights((("weight", weight), ("weight_scale_inv", scale)))
++
++    assert loaded == {"weight", "weight_scale_inv"}
++    assert embedding.disk_table.shards == [
++        (0, "weights.safetensors", 4096, False),
++        (0, "scales.safetensors", 8192, True),
++    ]
++
++
++def test_disk_engram_checkpoint_filter_is_exact() -> None:
++    model = object.__new__(DeepseekV41LLMForCausalLM)
++    torch.nn.Module.__init__(model)
++    model.model = SimpleNamespace(disk_engram=True)
++
++    assert model.checkpoint_file_weight_filter("layers.1.engram.embed.weight")
++    assert model.checkpoint_file_weight_filter("layers.14.engram.embed.scale")
++    assert not model.checkpoint_file_weight_filter("layers.1.engram.wkv.weight")
++    assert not model.checkpoint_file_weight_filter("model.layers.1.engram.embed.weight")
++
++
++def test_disk_engram_descriptor_reaches_leaf_loader(monkeypatch) -> None:
++    class RecordingEmbedding(torch.nn.Module):
++        def __init__(self) -> None:
++            super().__init__()
++            self.received: list[tuple[str, object]] = []
++
++        def load_weights(self, weights) -> set[str]:
++            current = list(weights)
++            self.received.extend(current)
++            return {name for name, _value in current}
++
++    model = object.__new__(DeepseekV4Model)
++    torch.nn.Module.__init__(model)
++    embedding = RecordingEmbedding()
++    layer = torch.nn.Module()
++    layer.engram = torch.nn.Module()
++    layer.engram.embed_tokens = embedding
++    model.layers = torch.nn.ModuleList([torch.nn.Identity(), layer])
++    model.disk_engram = True
++    model.config = SimpleNamespace(num_attention_heads=24)
++    model.quant_config = None
++    model.use_sequence_parallel = False
++    model.get_expert_mapping = lambda: []
++    monkeypatch.setattr(nvidia_model, "get_tensor_model_parallel_world_size", lambda: 3)
++    monkeypatch.setattr(nvidia_model, "get_tensor_model_parallel_rank", lambda: 0)
++    monkeypatch.setattr(nvidia_model, "is_pp_missing_parameter", lambda *_args: False)
++    weight_descriptor = object()
++    scale_descriptor = object()
++
++    loaded = model.load_weights(
++        (
++            ("layers.1.engram.embed_tokens.weight", weight_descriptor),
++            ("layers.1.engram.embed_tokens.weight_scale_inv", scale_descriptor),
++        )
++    )
++
++    assert loaded == {
++        "layers.1.engram.embed_tokens.weight",
++        "layers.1.engram.embed_tokens.weight_scale_inv",
++    }
++    assert embedding.received == [
++        ("weight", weight_descriptor),
++        ("weight_scale_inv", scale_descriptor),
++    ]
++
++
++def test_outer_model_preserves_disk_engram_descriptor_to_leaf(monkeypatch) -> None:
++    class RecordingEmbedding(torch.nn.Module):
++        def __init__(self) -> None:
++            super().__init__()
++            self.received: list[tuple[str, torch.Tensor]] = []
++
++        def load_weights(self, weights) -> set[str]:
++            current = list(weights)
++            assert all(
++                get_file_tensor_source(value) is not None for _name, value in current
++            )
++            self.received.extend(current)
++            return {name for name, _value in current}
++
++    backbone = object.__new__(DeepseekV4Model)
++    torch.nn.Module.__init__(backbone)
++    embedding = RecordingEmbedding()
++    layer = torch.nn.Module()
++    layer.engram = torch.nn.Module()
++    layer.engram.embed_tokens = embedding
++    backbone.layers = torch.nn.ModuleList([torch.nn.Identity(), layer])
++    backbone.disk_engram = True
++    backbone.config = SimpleNamespace(num_attention_heads=24)
++    backbone.quant_config = None
++    backbone.use_sequence_parallel = False
++    backbone.get_expert_mapping = lambda: []
++    backbone.finalize_mega_moe_weights = lambda: None
++    backbone.finalize_mhc_broadcast_weights = lambda: None
++    backbone.finalize_mega_attn_weights = lambda: None
++
++    language_model = object.__new__(DeepseekV41LLMForCausalLM)
++    torch.nn.Module.__init__(language_model)
++    language_model.model = backbone
++    language_model.hf_to_vllm_mapper = WeightsMapper()
++
++    outer = object.__new__(DeepseekV41VLForCausalLM)
++    torch.nn.Module.__init__(outer)
++    outer.language_model = language_model
++    outer.hf_to_vllm_mapper = vl_model._make_deepseek_v4_vl_weights_mapper(
++        "fp4", "weight_scale"
++    )
++
++    monkeypatch.setattr(nvidia_model, "get_tensor_model_parallel_world_size", lambda: 3)
++    monkeypatch.setattr(nvidia_model, "get_tensor_model_parallel_rank", lambda: 0)
++    monkeypatch.setattr(nvidia_model, "is_pp_missing_parameter", lambda *_args: False)
++    raw_name = "layers.1.engram.embed.weight"
++    descriptor = file_source_tensor(
++        FileTensorSource("weights.safetensors", 4096, (7, 256), torch.float8_e4m3fn)
++    )
++
++    assert outer.checkpoint_file_weight_filter(raw_name)
++    loaded = outer.load_weights(((raw_name, descriptor),))
++
++    assert "language_model.model.layers.1.engram.embed_tokens.weight" in loaded
++    assert embedding.received == [("weight", descriptor)]
+diff --git a/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py b/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
+index 83fceef018..8c59ed6c57 100644
+--- a/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
++++ b/tests/v1/attention/test_indexer_deepseek_v4_slot_mapping.py
+@@ -21,6 +21,7 @@ from vllm.v1.attention.backends.mla.indexer import (
+     DeepseekV4IndexerBackend,
+     DeepseekV32IndexerMetadataBuilder,
+     DeepseekV41IndexerBackend,
++    PrepareUniformDecodeKernel,
+ )
+ from vllm.v1.attention.backends.mla.sparse_utils import (
+     ConvertReqIndexToGlobalIndexKernel,
+@@ -170,7 +171,40 @@ def test_indexer_preserves_deepseek_v41_mla_block_size():
+     )
+ 
+ 
+-def test_indexer_warmup_normalizes_zero_compress_ratios():
++def test_deepseek_v41_sm12x_indexer_pages_hold_64_states(monkeypatch):
++    """Ratio-1 and ratio-2 pages must both fit DeepGEMM's SM12x kernel."""
++    import vllm.models.deepseek_v41.attention as attention
++    import vllm.v1.attention.backends.mla.indexer as indexer
++    from vllm.models.deepseek_v41.attention import DeepseekV4IndexerCache
++
++    for platform in (attention.current_platform, indexer.current_platform):
++        monkeypatch.setattr(platform, "is_cuda", lambda: True)
++        monkeypatch.setattr(
++            platform,
++            "is_device_capability_family",
++            lambda family: family == 120,
++        )
++
++    vllm_config = SimpleNamespace(
++        cache_config=SimpleNamespace(cache_dtype="nvfp4_ds_mla")
++    )
++    for ratio, expected_tokens in ((1, 64), (2, 128)):
++        cache = object.__new__(DeepseekV4IndexerCache)
++        cache.cache_config = SimpleNamespace(block_size=128)
++        cache.head_dim = 132
++        cache.dtype = torch.uint8
++        cache.compress_ratio = ratio
++        cache.sparse_logits = False
++
++        spec = cache.get_kv_cache_spec(vllm_config)
++        backend = cache.get_attn_backend()
++
++        assert spec.block_size == expected_tokens
++        assert spec.num_states == 64
++        assert select_common_block_size(spec.block_size, [backend]) == expected_tokens
++
++
++def test_indexer_warmup_uses_registered_compress_ratio_and_non_pcp_alignment():
+     config = SimpleNamespace(
+         scheduler_config=SimpleNamespace(max_num_batched_tokens=8),
+         model_config=SimpleNamespace(
+@@ -185,14 +219,37 @@ def test_indexer_warmup_normalizes_zero_compress_ratios():
+         ),
+     )
+ 
+-    keys = BuildPrefillChunkMetadataKernel().get_warmup_keys(config)
++    keys = BuildPrefillChunkMetadataKernel().get_warmup_keys(
++        config,
++        compress_ratio=0,
++    )
+ 
+-    assert {key.compress_ratio for key in keys} == {1, 4, 32, 128}
++    assert {key.compress_ratio for key in keys} == {1}
+     assert {(key.query_slice_start, key.query_slice_stop) for key in keys} == {
+         (query_slice_start, query_slice_stop)
+         for query_slice_start in (1, 2, 16)
+         for query_slice_stop in (1, 2, 16)
+     }
++    assert {
++        (
++            key.input_variant.is_aligned("uncompressed_seq_lens"),
++            key.input_variant.is_aligned("cu_compressed_seq_lens"),
++        )
++        for key in keys
++    } == {(False, True), (True, True)}
++
++
++def test_uniform_decode_warmup_uses_finalized_strides_and_decode_depths():
++    keys = PrepareUniformDecodeKernel().get_warmup_keys(
++        block_table_stride=64,
++        expanded_bt_stride=64,
++        max_decode_lens=range(1, 5),
++    )
++
++    assert {(key.block_table_stride, key.expanded_bt_stride) for key in keys} == {
++        (16, 16)
++    }
++    assert {key.max_decode_len for key in keys} == {1, 2}
+ 
+ 
+ def test_indexer_warmup_includes_pcp_normalized_dcp_key(monkeypatch):
+@@ -212,7 +269,10 @@ def test_indexer_warmup_includes_pcp_normalized_dcp_key(monkeypatch):
+         ),
+     )
+ 
+-    keys = BuildPrefillChunkMetadataKernel().get_warmup_keys(config)
++    keys = BuildPrefillChunkMetadataKernel().get_warmup_keys(
++        config,
++        compress_ratio=32,
++    )
+ 
+     # Triton's compile key normalizes generic i32 values to 2 and divisible
+     # i32 values (including zero) to 16.
+diff --git a/vllm/models/deepseek_v41/common/ops/cache_utils.py b/vllm/models/deepseek_v41/common/ops/cache_utils.py
+index 02fb0d5539..6060394e09 100644
+--- a/vllm/models/deepseek_v41/common/ops/cache_utils.py
++++ b/vllm/models/deepseek_v41/common/ops/cache_utils.py
+@@ -721,6 +721,7 @@ def compute_global_topk_indices_and_lens(
+     block_table: torch.Tensor,
+     block_size: int,
+     is_valid_token: torch.Tensor,
++    out: tuple[torch.Tensor, torch.Tensor] | None = None,
+ ) -> tuple[torch.Tensor, torch.Tensor]:
+     """Map local topk indices to global KV cache slots and count valid entries.
+ 
+@@ -730,8 +731,30 @@ def compute_global_topk_indices_and_lens(
+     3. Masking padding tokens to length 0
+     """
+     num_tokens = topk_indices.shape[0]
+-    global_topk_indices = torch.empty_like(topk_indices)
+-    topk_lens = torch.empty(num_tokens, dtype=torch.int32, device=topk_indices.device)
++    if out is None:
++        global_topk_indices = torch.empty_like(topk_indices)
++        topk_lens = torch.empty(
++            num_tokens, dtype=torch.int32, device=topk_indices.device
++        )
++    else:
++        global_topk_indices, topk_lens = out
++        if global_topk_indices.shape != topk_indices.shape:
++            raise ValueError(
++                "global top-k output must match the source shape, got "
++                f"{tuple(global_topk_indices.shape)} and "
++                f"{tuple(topk_indices.shape)}"
++            )
++        if global_topk_indices.dtype != torch.int32:
++            raise TypeError("global top-k output must use int32")
++        if topk_lens.shape != (num_tokens,) or topk_lens.dtype != torch.int32:
++            raise ValueError(
++                "top-k length output must be an int32 vector with one entry per token"
++            )
++        if (
++            global_topk_indices.device != topk_indices.device
++            or topk_lens.device != topk_indices.device
++        ):
++            raise ValueError("global top-k outputs must be on the source device")
+     _compute_global_topk_indices_and_lens_kernel[(num_tokens,)](
+         global_topk_indices,
+         global_topk_indices.stride(0),
+diff --git a/vllm/models/deepseek_v41/nvidia/b12x_attention.py b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+new file mode 100644
+index 0000000000..e511abe01d
+--- /dev/null
++++ b/vllm/models/deepseek_v41/nvidia/b12x_attention.py
+@@ -0,0 +1,861 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""DeepSeek V4.1 sparse attention through current B12X prepared plans.
++
++This adapter deliberately keeps the upstream V4.1 model, compressor, indexer,
++cache allocator, and output projection.  B12X owns only the sparse attention
++kernel and its caller-owned scratch.  That boundary makes the integration
++small enough to upstream and prevents an explicit ``B12X`` selection from
++silently running the FlashInfer implementation.
++"""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import TYPE_CHECKING, Any, ClassVar, cast
++
++import torch
++
++from vllm.config import VllmConfig
++from vllm.config.cache import CacheDType
++from vllm.forward_context import get_forward_context
++from vllm.models.deepseek_v4.nvidia.ops.o_proj import (
++    compute_fp8_einsum_recipe,
++    deep_gemm_fp8_o_proj,
++)
++from vllm.models.deepseek_v41.attention import DeepseekV4Attention
++from vllm.models.deepseek_v41.common.ops import (
++    compute_global_topk_indices_and_lens,
++)
++from vllm.models.deepseek_v41.sparse_mla import (
++    DeepseekV4FlashMLAMetadata,
++    DeepseekV4SparseMLABackend,
++    DeepseekV4SparseMLAMetadataBuilder,
++    DeepseekV41SparseSWAMetadataBuilder,
++)
++from vllm.platforms.interface import DeviceCapability
++from vllm.utils.b12x import B12xWarmupUnit, get_b12x_compressed_sparse_mla
++from vllm.utils.math_utils import cdiv
++from vllm.v1.attention.backend import AttentionCGSupport, MultipleOf
++from vllm.v1.attention.backends.mla.compressor_utils import (
++    get_dspark_swa_index_width,
++)
++from vllm.v1.attention.backends.mla.sparse_swa import DeepseekSparseSWABackend
++from vllm.v1.worker.workspace import current_workspace_manager
++
++if TYPE_CHECKING:
++    from vllm.v1.attention.backends.mla.sparse_swa import DeepseekSparseSWAMetadata
++
++
++class DeepseekV41B12xSparseMLAMetadataBuilder(DeepseekV4SparseMLAMetadataBuilder):
++    _cudagraph_support: ClassVar[AttentionCGSupport] = AttentionCGSupport.ALWAYS
++
++
++class DeepseekV41B12xBackend(DeepseekV4SparseMLABackend):
++    """Metadata/cache contract for B12X's native V4.1 attention kernel."""
++
++    supported_kv_cache_dtypes: ClassVar[list[CacheDType]] = [
++        "auto",
++        "fp8",
++        "nvfp4_ds_mla",
++    ]
++
++    @staticmethod
++    def get_name() -> str:
++        return "B12X_DSV41"
++
++    @staticmethod
++    def get_builder_cls() -> type[DeepseekV41B12xSparseMLAMetadataBuilder]:
++        return DeepseekV41B12xSparseMLAMetadataBuilder
++
++    @staticmethod
++    def get_supported_kernel_block_sizes() -> list[int | MultipleOf]:
++        return [MultipleOf(32)]
++
++    @classmethod
++    def supports_compute_capability(cls, capability: DeviceCapability) -> bool:
++        return capability.major == 12
++
++    @classmethod
++    def supports_combination(
++        cls,
++        head_size: int,
++        dtype: torch.dtype,
++        kv_cache_dtype: CacheDType | None,
++        block_size: int | None,
++        use_mla: bool,
++        has_sink: bool,
++        use_sparse: bool,
++        use_mm_prefix: bool,
++        device_capability: DeviceCapability,
++    ) -> str | None:
++        if device_capability.major != 12:
++            return "B12X_DSV41 requires SM120 or SM121"
++        if dtype != torch.bfloat16:
++            return "B12X_DSV41 requires bfloat16 activations"
++        if kv_cache_dtype not in (None, "auto", "fp8", "nvfp4_ds_mla"):
++            return "B12X_DSV41 requires the V4.1 MXFP8/NVFP4 cache"
++        module = get_b12x_compressed_sparse_mla()
++        if module is None:
++            return "Install the current B12X source tree"
++        required_api = (
++            "CacheWriterQuery",
++            "invocation_from_descriptors",
++            "plan_cache_writer",
++            "write_cache",
++        )
++        if any(not callable(getattr(module, name, None)) for name in required_api):
++            return "B12X_DSV41 requires B12X's prepared-plan API"
++        if not module.is_supported():
++            return "B12X compressed sparse MLA is not supported on this device"
++        return None
++
++
++class DeepseekV41B12xSWAMetadataBuilder(DeepseekV41SparseSWAMetadataBuilder):
++    _cudagraph_support: ClassVar[AttentionCGSupport] = AttentionCGSupport.ALWAYS
++
++
++class DeepseekV41B12xSWABackend(DeepseekSparseSWABackend):
++    @staticmethod
++    def get_name() -> str:
++        return "B12X_DSV41_SWA"
++
++    @staticmethod
++    def get_builder_cls() -> type[DeepseekV41B12xSWAMetadataBuilder]:
++        return DeepseekV41B12xSWAMetadataBuilder
++
++
++@dataclass(frozen=True)
++class _PlanSet:
++    decode: Any
++    extend: Any
++    swa_writer: Any
++    indexed_writer: Any | None
++    decode_rows: int
++    extend_rows: int
++    decode_swa_width: int
++    extend_swa_width: int
++    indexed_width: int
++
++
++_PLAN_CACHE: dict[tuple[Any, ...], Any] = {}
++_WRITER_PLAN_CACHE: dict[tuple[Any, ...], Any] = {}
++
++
++def _alignment(tensor: torch.Tensor) -> int:
++    pointer = tensor.data_ptr()
++    return min(16, pointer & -pointer) if pointer else 16
++
++
++def _descriptor(tensor: torch.Tensor) -> dict[str, object]:
++    return {
++        "shape": tuple(int(value) for value in tensor.shape),
++        "stride": tuple(int(value) for value in tensor.stride()),
++        "alignment": _alignment(tensor),
++        "dtype": str(tensor.dtype).removeprefix("torch."),
++    }
++
++
++def _flatten_cache(cache: torch.Tensor, *, name: str) -> torch.Tensor:
++    if cache.dtype != torch.uint8:
++        raise TypeError(f"{name} must use uint8 packed storage, got {cache.dtype}")
++    if cache.ndim < 2:
++        raise ValueError(f"{name} must have a page dimension")
++    return cache.view(cache.shape[0], -1)
++
++
++def _decode_plan_row_capacity(vllm_config: VllmConfig) -> int:
++    """Bound every decode-shaped batch exercised before serving.
++
++    Ordinary speculative decode uses ``1 + speculative_tokens`` rows per
++    request (twice the speculative width for parallel drafting).  vLLM's
++    kernel warmup deliberately adds one more row per request so the synthetic
++    prefill is distinct from a uniform decode.  DSpark can still present that
++    non-causal warmup through the decode-shaped SWA metadata, so prepare the
++    small decode plan for both shapes before weights are resident.
++    """
++    spec_config = vllm_config.speculative_config
++    speculative_tokens = (
++        0 if spec_config is None else int(spec_config.num_speculative_tokens)
++    )
++    spec_multiplier = (
++        2 if spec_config is not None and spec_config.parallel_drafting else 1
++    )
++    decode_query_len = 1 + spec_multiplier * speculative_tokens
++    warmup_query_len = decode_query_len + 1
++    return max(
++        1,
++        vllm_config.scheduler_config.max_num_seqs * warmup_query_len,
++        int(vllm_config.compilation_config.max_cudagraph_capture_size or 0),
++    )
++
++
++class DeepseekV41B12xAttention(DeepseekV4Attention):
++    """Upstream V4.1 semantics with B12X's SM12x sparse-attention kernel."""
++
++    backend_cls = DeepseekV41B12xBackend
++    swa_backend_cls = DeepseekV41B12xSWABackend
++    use_fp8_ds_mla_layout: ClassVar[bool] = True
++
++    @property
++    def packed_kv_cache_dtype(self) -> CacheDType:
++        # B12X's V4.1 ABI stores 528-byte MXFP8 SWA rows and 288-byte NVFP4
++        # compressed rows.  This changes cache representation, not checkpoint
++        # weights or model arithmetic.
++        return "nvfp4_ds_mla"
++
++    @property
++    def uses_v41_mxfp8_kv_record(self) -> bool:
++        return True
++
++    @classmethod
++    def get_padded_num_q_heads(cls, num_heads: int) -> int:
++        # Current B12X has native 24-head TP3 partitions; no virtual compute
++        # heads are needed at the kernel boundary.
++        return num_heads
++
++    def __init__(self, vllm_config: VllmConfig, *args, **kwargs) -> None:
++        self._vllm_config = vllm_config
++        super().__init__(vllm_config, *args, **kwargs)
++        if self.kv_cache_dtype != "nvfp4_ds_mla":
++            raise ValueError(
++                "DeepSeek V4.1 B12X requires --kv-cache-dtype auto, fp8, or "
++                "nvfp4_ds_mla so its MXFP8/NVFP4 cache ABI is unambiguous."
++            )
++        self._b12x = get_b12x_compressed_sparse_mla()
++        required_api = (
++            "CacheWriterQuery",
++            "invocation_from_descriptors",
++            "plan_cache_writer",
++            "write_cache",
++        )
++        if self._b12x is None or any(
++            not callable(getattr(self._b12x, name, None)) for name in required_api
++        ):
++            raise RuntimeError(
++                "DeepSeek V4.1 B12X requires the current prepared-plan API; "
++                "the published legacy B12X 1.3 interface is not sufficient."
++            )
++        self._plans: _PlanSet | None = None
++        self._einsum_recipe, self._tma_aligned_scales = compute_fp8_einsum_recipe(
++            self._o_proj_block_size
++        )
++        # The generic warmup driver calls this provider after KV caches bind and
++        # before CUDA graph capture. Bypass nn.Module.__setattr__: registering
++        # this module as its own child creates a cycle in named_modules().
++        object.__setattr__(self, "b12x_warmup_provider", self)
++
++    def _o_proj(self, attn_out: torch.Tensor, positions: torch.Tensor) -> torch.Tensor:
++        return deep_gemm_fp8_o_proj(
++            attn_out[:, : self.n_local_heads, :],
++            positions,
++            self.rotary_emb.cos_sin_cache,
++            self.wo_a,
++            self.wo_b,
++            n_groups=self.n_local_groups,
++            heads_per_group=self.n_local_heads // self.n_local_groups,
++            nope_dim=self.nope_head_dim,
++            rope_dim=self.rope_head_dim,
++            o_lora_rank=self.o_lora_rank,
++            einsum_recipe=self._einsum_recipe,
++            tma_aligned_scales=self._tma_aligned_scales,
++        )
++
++    def _plan(
++        self,
++        *,
++        mode: str,
++        rows: int,
++        swa_width: int,
++        swa_cache: torch.Tensor,
++        indexed_cache: torch.Tensor | None,
++        indexed_width: int,
++        indexed_page_size: int,
++    ) -> Any:
++        mla = self._b12x
++        assert mla is not None
++        swa_page_size = self.swa_cache_layer.block_size
++        max_page_table_width = max(
++            1,
++            cdiv(
++                self.max_model_len,
++                self._vllm_config.cache_config.block_size,
++            ),
++        )
++        cache_key = (
++            str(swa_cache.device),
++            mode,
++            rows,
++            self.n_local_heads,
++            swa_width,
++            indexed_width,
++            swa_page_size,
++            indexed_page_size,
++            max_page_table_width,
++            tuple(_descriptor(swa_cache).items()),
++            None
++            if indexed_cache is None
++            else tuple(_descriptor(indexed_cache).items()),
++        )
++        plan = _PLAN_CACHE.get(cache_key)
++        if plan is not None:
++            return plan
++        q_descriptor = {
++            "shape": (rows, self.n_local_heads, self.head_dim),
++            "stride": (self.n_local_heads * self.head_dim, self.head_dim, 1),
++            "alignment": 16,
++            "dtype": "bfloat16",
++        }
++        invocation = mla.invocation_from_descriptors(
++            q=q_descriptor,
++            swa_cache=_descriptor(swa_cache),
++            indexed_cache=(
++                None if indexed_cache is None else _descriptor(indexed_cache)
++            ),
++            attn_sink_present=True,
++            output_mode="provided",
++        )
++        # B12X's compressed decode contract names this capacity ``max_batch``
++        # but validates it against Q rows. Extend mode uses request batches.
++        max_batch = (
++            rows
++            if mode == "decode"
++            else self._vllm_config.scheduler_config.max_num_seqs
++        )
++        plan = mla.plan(
++            mla.Caps(
++                device=swa_cache.device,
++                num_q_heads=self.n_local_heads,
++                max_q_rows=rows,
++                max_width=swa_width + indexed_width,
++                max_batch=max_batch,
++                max_page_table_width=max_page_table_width,
++                swa_width=swa_width,
++                indexed_width=indexed_width,
++                swa_page_size=swa_page_size,
++                indexed_page_size=indexed_page_size,
++                cache_format="deepseek_v41",
++                mode=mode,
++                decode_row_capacity=rows if mode == "decode" else None,
++                use_cuda_graph=True,
++            ),
++            invocation=invocation,
++        )
++        _PLAN_CACHE[cache_key] = plan
++        return plan
++
++    def _writer_plan(
++        self,
++        *,
++        cache_kind: str,
++        page_size: int,
++        max_rows: int,
++        device: torch.device,
++    ) -> Any:
++        mla = self._b12x
++        assert mla is not None
++        key = (str(device), cache_kind, page_size, max_rows, "int64")
++        plan = _WRITER_PLAN_CACHE.get(key)
++        if plan is None:
++            plan = mla.plan_cache_writer(
++                mla.CacheWriterQuery(
++                    max_rows=max_rows,
++                    page_size=page_size,
++                    cache_kind=cache_kind,
++                    slot_dtype="int64",
++                ),
++                device=device,
++            )
++            _WRITER_PLAN_CACHE[key] = plan
++        return plan
++
++    def _ensure_plans(self) -> _PlanSet:
++        if self._plans is not None:
++            return self._plans
++        if torch.cuda.is_current_stream_capturing():
++            raise RuntimeError(
++                "DeepSeek V4.1 B12X plans must be declared before CUDA graph capture"
++            )
++        swa_cache = _flatten_cache(
++            self.swa_cache_layer.kv_cache, name="DeepSeek V4.1 SWA cache"
++        )
++        indexed_cache = (
++            None
++            if self.compress_ratio == 0
++            else _flatten_cache(
++                self._compressed_kv_cache(),
++                name="DeepSeek V4.1 compressed cache",
++            )
++        )
++        spec_config = self._vllm_config.speculative_config
++        speculative_tokens = (
++            0 if spec_config is None else int(spec_config.num_speculative_tokens)
++        )
++        decode_rows = _decode_plan_row_capacity(self._vllm_config)
++        extend_rows = self.max_num_batched_tokens
++        decode_swa_width = (
++            get_dspark_swa_index_width(self.window_size, speculative_tokens)
++            if self._vllm_config.attention_config.use_non_causal
++            else self.window_size
++        )
++        extend_swa_width = self.window_size
++        indexed_width = (
++            0
++            if self.compress_ratio == 0
++            else int(self._vllm_config.model_config.hf_config.index_topk)
++        )
++        indexed_page_size = max(
++            1,
++            self._vllm_config.cache_config.block_size // max(self.compress_ratio, 1),
++        )
++        max_writer_rows = max(decode_rows, extend_rows)
++        swa_writer = self._writer_plan(
++            cache_kind="swa",
++            page_size=self.swa_cache_layer.block_size,
++            max_rows=max_writer_rows,
++            device=swa_cache.device,
++        )
++        indexed_writer = (
++            self._writer_plan(
++                cache_kind="indexed",
++                page_size=indexed_page_size,
++                max_rows=max_writer_rows,
++                device=swa_cache.device,
++            )
++            if self.compressor is not None
++            else None
++        )
++        decode = self._plan(
++            mode="decode",
++            rows=decode_rows,
++            swa_width=decode_swa_width,
++            swa_cache=swa_cache,
++            indexed_cache=indexed_cache,
++            indexed_width=indexed_width,
++            indexed_page_size=indexed_page_size,
++        )
++        extend = self._plan(
++            mode="extend",
++            rows=extend_rows,
++            swa_width=extend_swa_width,
++            swa_cache=swa_cache,
++            indexed_cache=indexed_cache,
++            indexed_width=indexed_width,
++            indexed_page_size=indexed_page_size,
++        )
++        self._plans = _PlanSet(
++            decode=decode,
++            extend=extend,
++            swa_writer=swa_writer,
++            indexed_writer=indexed_writer,
++            decode_rows=decode_rows,
++            extend_rows=extend_rows,
++            decode_swa_width=decode_swa_width,
++            extend_swa_width=extend_swa_width,
++            indexed_width=indexed_width,
++        )
++        for plan in (decode, extend):
++            requests = [
++                (tuple(spec.shape), spec.dtype) for spec in plan.scratch_specs()
++            ]
++            if indexed_width:
++                requests.extend(
++                    [
++                        ((plan.query.query_rows, indexed_width), torch.int32),
++                        ((plan.query.query_rows,), torch.int32),
++                    ]
++                )
++            current_workspace_manager().get_simultaneous(*requests)
++        return self._plans
++
++    def get_b12x_warmup_unit(
++        self,
++        layer: object,
++        token_counts: tuple[int, ...],
++        output_dtype: torch.dtype,
++    ) -> B12xWarmupUnit:
++        del token_counts, output_dtype
++        if layer is not self:
++            raise ValueError("DeepSeek V4.1 B12X warmup owner mismatch")
++        plans = self._ensure_plans()
++        key = (
++            "DSV41_MLA",
++            plans.decode,
++            plans.extend,
++            plans.swa_writer,
++            plans.indexed_writer,
++        )
++        return B12xWarmupUnit(
++            name="DeepSeek V4.1 sparse MLA",
++            key=key,
++            compile=self._prepare_plans,
++        )
++
++    def _prepare_plans(self) -> None:
++        from b12x.preparation import PreparedCall, prepare_default
++
++        plans = self._ensure_plans()
++        mla = self._b12x
++        assert mla is not None
++        swa_cache = _flatten_cache(
++            self.swa_cache_layer.kv_cache, name="DeepSeek V4.1 SWA cache"
++        )
++        indexed_cache = (
++            None
++            if self.compress_ratio == 0
++            else _flatten_cache(
++                self._compressed_kv_cache(),
++                name="DeepSeek V4.1 compressed cache",
++            )
++        )
++
++        for mode, plan, swa_width in (
++            ("decode", plans.decode, plans.decode_swa_width),
++            ("extend", plans.extend, plans.extend_swa_width),
++        ):
++            if plan.prepared is not None:
++                continue
++
++            def prepare(state, *, plan=plan, swa_width=swa_width):
++                device = swa_cache.device
++                q = torch.zeros(
++                    (1, self.n_local_heads, self.head_dim),
++                    dtype=torch.bfloat16,
++                    device=device,
++                )
++                out = torch.empty_like(q)
++                swa_indices = torch.full(
++                    (1, swa_width), -1, dtype=torch.int32, device=device
++                )
++                swa_lengths = torch.zeros(1, dtype=torch.int32, device=device)
++                kwargs: dict[str, torch.Tensor] = {}
++                if plans.indexed_width:
++                    kwargs = {
++                        "indexed_indices": torch.full(
++                            (1, plans.indexed_width),
++                            -1,
++                            dtype=torch.int32,
++                            device=device,
++                        ),
++                        "indexed_lengths": torch.zeros(
++                            1, dtype=torch.int32, device=device
++                        ),
++                    }
++                scratch = [
++                    torch.empty(spec.shape, dtype=spec.dtype, device=device)
++                    for spec in state.scratch_specs()
++                ]
++                binding = state.bind_for_preparation(
++                    scratch=scratch,
++                    q=q,
++                    swa_indices=swa_indices,
++                    swa_lengths=swa_lengths,
++                    **kwargs,
++                )
++                return PreparedCall(
++                    run=lambda: state.run(
++                        binding,
++                        swa_k_cache=swa_cache,
++                        swa_page_size=self.swa_cache_layer.block_size,
++                        indexed_k_cache=indexed_cache,
++                        indexed_page_size=(
++                            self._vllm_config.cache_config.block_size
++                            // max(self.compress_ratio, 1)
++                        ),
++                        sm_scale=self.scale,
++                        attn_sink=self.attn_sink,
++                        out=out,
++                    ),
++                    output=out,
++                    owners=(*scratch, binding),
++                )
++
++            prepare_default(
++                plan.request(
++                    name=f"{self.prefix}.b12x_mla.{mode}",
++                    prepare_call=prepare,
++                )
++            )
++
++        writer_plans = [("swa", plans.swa_writer, swa_cache)]
++        if plans.indexed_writer is not None:
++            assert indexed_cache is not None
++            writer_plans.append(("indexed", plans.indexed_writer, indexed_cache))
++        for cache_kind, plan, cache in writer_plans:
++            if plan.prepared is not None:
++                continue
++
++            def prepare_writer(
++                state,
++                *,
++                cache=cache,
++            ):
++                kv = torch.zeros(
++                    (1, self.head_dim), dtype=torch.bfloat16, device=cache.device
++                )
++                slots = torch.full((1,), -1, dtype=torch.int64, device=cache.device)
++                return PreparedCall(
++                    run=lambda: state.run(kv, cache, slots),
++                    output=kv,
++                    owners=(kv, slots),
++                )
++
++            prepare_default(
++                plan.request(
++                    name=f"{self.prefix}.b12x_mla.{cache_kind}_writer",
++                    prepare_call=prepare_writer,
++                )
++            )
++
++    def _write_b12x_cache(
++        self,
++        kv: torch.Tensor,
++        cache: torch.Tensor,
++        slot_mapping: torch.Tensor,
++        *,
++        cache_kind: str,
++        page_size: int,
++        plan: Any,
++    ) -> None:
++        mla = self._b12x
++        assert mla is not None
++        mla.write_cache(
++            kv,
++            _flatten_cache(cache, name=f"DeepSeek V4.1 {cache_kind} cache"),
++            slot_mapping,
++            plan=plan,
++            page_size=page_size,
++            cache_kind=cache_kind,
++            cache_format="deepseek_v41",
++        )
++
++    def _fused_qnorm_rope_kv_insert(
++        self,
++        q: torch.Tensor,
++        kv: torch.Tensor,
++        positions: torch.Tensor,
++        attn_metadata: Any,
++    ) -> torch.Tensor:
++        if not isinstance(attn_metadata, dict):
++            return super()._fused_qnorm_rope_kv_insert(q, kv, positions, attn_metadata)
++        swa = cast(
++            "DeepseekSparseSWAMetadata | None",
++            attn_metadata.get(self.swa_cache_layer.prefix),
++        )
++        if swa is None:
++            raise RuntimeError("DeepSeek V4.1 B12X SWA metadata is missing")
++        # DeepSeek's rotary module broadcasts its [tokens, 1, rope] table
++        # across an explicit head axis.  The shared latent has no head axis,
++        # so expose its single replicated head while applying RoPE and remove
++        # that axis before handing the row to B12X's cache writer.
++        q, rotated_kv = self.rotary_emb(positions, q, kv.unsqueeze(-2))
++        assert rotated_kv is not None
++        rotated_kv = rotated_kv.squeeze(-2)
++        plans = self._ensure_plans()
++        self._write_b12x_cache(
++            rotated_kv,
++            self.swa_cache_layer.kv_cache,
++            swa.slot_mapping,
++            cache_kind="swa",
++            page_size=self.swa_cache_layer.block_size,
++            plan=plans.swa_writer,
++        )
++        return q
++
++    def _insert_compressed_cache(
++        self,
++        latent: torch.Tensor | None,
++        positions: torch.Tensor,
++    ) -> None:
++        if latent is None:
++            return
++        compressor = self.compressor
++        assert compressor is not None
++        context = get_forward_context()
++        if not isinstance(context.attn_metadata, dict):
++            return
++        metadata = context.attn_metadata[compressor.k_cache_prefix]
++        cache_positions = positions.div(
++            self.compress_ratio, rounding_mode="floor"
++        ).mul_(self.compress_ratio)
++        rotated = latent.clone().unsqueeze(-2)
++        rotated, _ = self.rotary_emb(cache_positions, rotated)
++        rotated = rotated.squeeze(-2)
++        plans = self._ensure_plans()
++        if plans.indexed_writer is None:
++            raise RuntimeError("DeepSeek V4.1 B12X indexed writer is missing")
++        self._write_b12x_cache(
++            rotated,
++            self._compressed_kv_cache(),
++            metadata.slot_mapping,
++            cache_kind="indexed",
++            page_size=(
++                self._vllm_config.cache_config.block_size // self.compress_ratio
++            ),
++            plan=plans.indexed_writer,
++        )
++
++    def _run_attention(
++        self,
++        *,
++        plan: Any,
++        q: torch.Tensor,
++        output: torch.Tensor,
++        swa_indices: torch.Tensor,
++        swa_lengths: torch.Tensor,
++        token_to_req_indices: torch.Tensor,
++        is_valid_token: torch.Tensor,
++        block_table: torch.Tensor,
++        indexed_indices: torch.Tensor | None,
++        indexed_cache: torch.Tensor | None,
++    ) -> None:
++        mla = self._b12x
++        assert mla is not None
++        requests = [(tuple(spec.shape), spec.dtype) for spec in plan.scratch_specs()]
++        if indexed_indices is not None:
++            requests = [
++                (tuple(indexed_indices.shape), torch.int32),
++                ((indexed_indices.shape[0],), torch.int32),
++                *requests,
++            ]
++        workspace = current_workspace_manager().get_simultaneous(*requests)
++        offset = 0
++        bind_kwargs: dict[str, torch.Tensor] = {}
++        if indexed_indices is not None:
++            physical_indices = workspace[0]
++            indexed_lengths = workspace[1]
++            compute_global_topk_indices_and_lens(
++                indexed_indices,
++                token_to_req_indices,
++                block_table,
++                self._vllm_config.cache_config.block_size // self.compress_ratio,
++                is_valid_token,
++                out=(physical_indices, indexed_lengths),
++            )
++            bind_kwargs = {
++                "indexed_indices": physical_indices,
++                "indexed_lengths": indexed_lengths,
++            }
++            offset = 2
++        scratch = workspace[offset:]
++        binding = mla.bind(
++            plan,
++            scratch=scratch,
++            q=q,
++            swa_indices=swa_indices,
++            swa_lengths=swa_lengths,
++            **bind_kwargs,
++        )
++        mla.run(
++            binding=binding,
++            swa_k_cache=_flatten_cache(
++                self.swa_cache_layer.kv_cache,
++                name="DeepSeek V4.1 SWA cache",
++            ),
++            swa_page_size=self.swa_cache_layer.block_size,
++            indexed_k_cache=indexed_cache,
++            indexed_page_size=(
++                None
++                if indexed_cache is None
++                else self._vllm_config.cache_config.block_size // self.compress_ratio
++            ),
++            sm_scale=self.scale,
++            attn_sink=self.attn_sink,
++            out=output,
++        )
++
++    def forward_mqa(
++        self,
++        q: torch.Tensor,
++        kv: torch.Tensor,
++        positions: torch.Tensor,
++        output: torch.Tensor,
++    ) -> None:
++        del kv, positions
++        context = get_forward_context()
++        if context.attn_metadata is None:
++            output.zero_()
++            return
++        if q.dtype != torch.bfloat16 or output.dtype != torch.bfloat16:
++            raise TypeError("DeepSeek V4.1 B12X attention requires bfloat16 Q/output")
++        if not q.is_contiguous() or not output.is_contiguous():
++            raise ValueError("DeepSeek V4.1 B12X requires contiguous Q/output")
++        metadata = context.attn_metadata
++        if not isinstance(metadata, dict):
++            output.zero_()
++            return
++        swa = cast(
++            "DeepseekSparseSWAMetadata | None",
++            metadata.get(self.swa_cache_layer.prefix),
++        )
++        if swa is None:
++            raise RuntimeError("DeepSeek V4.1 B12X SWA metadata is missing")
++        plans = self._ensure_plans()
++        indexed_cache = (
++            None
++            if self.compress_ratio == 0
++            else _flatten_cache(
++                self._compressed_kv_cache(),
++                name="DeepSeek V4.1 compressed cache",
++            )
++        )
++        # A mixed layer stack may populate the shared indexer output even when
++        # this particular layer is SWA-only.  Do not route those indices into
++        # an absent compressed cache (compress_ratio == 0).
++        topk = None if self.compress_ratio == 0 else self.topk_indices_buffer
++        if self.compress_ratio > 0 and topk is None:
++            raise RuntimeError("DeepSeek V4.1 B12X requires indexer top-k output")
++        if swa.token_to_req_indices is None or swa.is_valid_token is None:
++            raise RuntimeError("DeepSeek V4.1 B12X token metadata is incomplete")
++
++        # Top-k positions address the compressed KV cache, which can be owned
++        # by an earlier layer. SWA has a separate allocation and block table.
++        indexed_block_table = swa.block_table
++        if topk is not None:
++            compressed = cast(
++                "DeepseekV4FlashMLAMetadata | None",
++                metadata.get(self.compressed_cache_prefix),
++            )
++            if compressed is None or compressed.block_table is None:
++                raise RuntimeError(
++                    "DeepSeek V4.1 B12X compressed cache metadata is missing"
++                )
++            indexed_block_table = compressed.block_table
++
++        decode_tokens = swa.num_decode_tokens
++        if decode_tokens:
++            if swa.decode_swa_indices is None or swa.decode_swa_lens is None:
++                raise RuntimeError("DeepSeek V4.1 B12X decode metadata is incomplete")
++            self._run_attention(
++                plan=plans.decode,
++                q=q[:decode_tokens],
++                output=output[:decode_tokens],
++                swa_indices=swa.decode_swa_indices,
++                swa_lengths=swa.decode_swa_lens,
++                token_to_req_indices=swa.token_to_req_indices[:decode_tokens],
++                is_valid_token=swa.is_valid_token[:decode_tokens],
++                block_table=indexed_block_table[: swa.num_decodes],
++                indexed_indices=(None if topk is None else topk[:decode_tokens]),
++                indexed_cache=indexed_cache,
++            )
++
++        prefill_tokens = swa.num_prefill_tokens
++        if prefill_tokens:
++            if swa.prefill_swa_indices is None or swa.prefill_swa_lens is None:
++                raise RuntimeError("DeepSeek V4.1 B12X prefill metadata is incomplete")
++            token_slice = slice(decode_tokens, decode_tokens + prefill_tokens)
++            self._run_attention(
++                plan=plans.extend,
++                q=q[token_slice],
++                output=output[token_slice],
++                swa_indices=swa.prefill_swa_indices,
++                swa_lengths=swa.prefill_swa_lens,
++                token_to_req_indices=swa.token_to_req_indices[token_slice],
++                is_valid_token=swa.is_valid_token[token_slice],
++                block_table=indexed_block_table,
++                indexed_indices=(None if topk is None else topk[token_slice]),
++                indexed_cache=indexed_cache,
++            )
++
++
++__all__ = ["DeepseekV41B12xAttention", "DeepseekV41B12xBackend"]
+diff --git a/vllm/v1/attention/backends/mla/indexer.py b/vllm/v1/attention/backends/mla/indexer.py
+index 1ede0442bc..975939349c 100644
+--- a/vllm/v1/attention/backends/mla/indexer.py
++++ b/vllm/v1/attention/backends/mla/indexer.py
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++from collections.abc import Iterable
+ from dataclasses import dataclass
+ from typing import Any
+ 
+@@ -137,12 +138,18 @@ class PrepareUniformDecodeKernel(
+             max_decode_len=triton_scalar_specialization_rep(max_decode_len),
+         )
+ 
+-    def get_warmup_keys(self) -> list[CompileKey]:
++    def get_warmup_keys(
++        self,
++        *,
++        block_table_stride: int,
++        expanded_bt_stride: int,
++        max_decode_lens: Iterable[int],
++    ) -> list[CompileKey]:
+         return self._trace_dispatch(self.dispatch)(
+             block_size=self.BLOCK_SIZE,
+-            block_table_stride=(1, 2, 16),
+-            expanded_bt_stride=(1, 2, 16),
+-            max_decode_len=(1, 2, 16),
++            block_table_stride=block_table_stride,
++            expanded_bt_stride=expanded_bt_stride,
++            max_decode_len=tuple(max_decode_lens),
+         )
+ 
+     def warmup_inputs(self, compile_key: CompileKey) -> dict[str, Any]:
+@@ -275,6 +282,13 @@ class DeepseekV41IndexerBackend(DeepseekV4IndexerBackend):
+ 
+     @staticmethod
+     def get_supported_kernel_block_sizes() -> list[int | MultipleOf]:
++        if current_platform.is_cuda() and current_platform.is_device_capability_family(
++            120
++        ):
++            # DeepGEMM's arch-12 paged-MQA logits kernel supports 64 states per
++            # page. V4.1 ratio-1 and ratio-2 caches therefore use 64 and 128
++            # tokens respectively; both are physical kernel page sizes.
++            return [128, 64]
+         return [64 if current_platform.is_device_capability_family(90) else 128]
+ 
+ 
+@@ -500,9 +514,13 @@ class BuildPrefillChunkMetadataKernel(
+             input_variant=input_variant,
+         )
+ 
+-    def get_warmup_keys(self, vllm_config: VllmConfig) -> list[CompileKey]:
++    def get_warmup_keys(
++        self,
++        vllm_config: VllmConfig,
++        *,
++        compress_ratio: int,
++    ) -> list[CompileKey]:
+         max_tokens = max(1, min(vllm_config.scheduler_config.max_num_batched_tokens, 8))
+-        hf_text_config = vllm_config.model_config.hf_text_config
+         parallel_config = vllm_config.parallel_config
+         dcp_world = parallel_config.decode_context_parallel_size
+         dcp_interleave = parallel_config.cp_kv_cache_interleave_size
+@@ -515,18 +533,22 @@ class BuildPrefillChunkMetadataKernel(
+             # explicitly so one PCP rank cannot enter a collective while
+             # another rank is still compiling the first real inference batch.
+             dcp_cases.append(dict(DCP_RANK=0, DCP_WORLD=1))
+-        compress_ratios = tuple(
+-            dict.fromkeys(
+-                max(1, int(ratio))
+-                for ratio in (
+-                    *(getattr(hf_text_config, "compress_ratios", None) or (1,)),
+-                    getattr(hf_text_config, "index_kpool", 1) or 1,
+-                )
++        # A non-PCP batch owns cu_compressed_seq_lens as a fresh allocation,
++        # which is always aligned. PCP can pass the second row of a packed
++        # allocation and therefore needs both alignment classes.
++        compressed_alignments = (
++            (True, False)
++            if parallel_config.prefill_context_parallel_size > 1
++            else (True,)
++        )
++        input_variants = tuple(
++            TritonPointerInputVariant.from_alignment(
++                uncompressed_seq_lens=uncompressed_aligned,
++                cu_compressed_seq_lens=compressed_aligned,
+             )
++            for uncompressed_aligned in (True, False)
++            for compressed_aligned in compressed_alignments
+         )
+-        index_kpool = getattr(hf_text_config, "index_kpool", None)
+-        if index_kpool and index_kpool > 1 and index_kpool not in compress_ratios:
+-            compress_ratios = compress_ratios + (index_kpool,)
+         return self._trace_dispatch(self.dispatch)(
+             zip_inputs(*dcp_cases),
+             # Cover Triton's divisible, exact-one, and generic i32 classes.
+@@ -534,28 +556,11 @@ class BuildPrefillChunkMetadataKernel(
+             query_slice_stop=(1, 2 * max_tokens - 1, 2 * max_tokens),
+             DCP_INTERLEAVE=dcp_interleave,
+             BLOCK_SIZE=self.BLOCK_SIZE,
+-            COMPRESS_RATIO=list(compress_ratios),
++            COMPRESS_RATIO=max(1, int(compress_ratio)),
+             # PCP's global cumulative lengths are the second row of one packed
+             # allocation, so their pointer is not always 16-byte aligned.
+             # Prefill chunking can independently unalign uncompressed lengths.
+-            input_variant=(
+-                TritonPointerInputVariant.from_alignment(
+-                    uncompressed_seq_lens=True,
+-                    cu_compressed_seq_lens=True,
+-                ),
+-                TritonPointerInputVariant.from_alignment(
+-                    uncompressed_seq_lens=True,
+-                    cu_compressed_seq_lens=False,
+-                ),
+-                TritonPointerInputVariant.from_alignment(
+-                    uncompressed_seq_lens=False,
+-                    cu_compressed_seq_lens=True,
+-                ),
+-                TritonPointerInputVariant.from_alignment(
+-                    uncompressed_seq_lens=False,
+-                    cu_compressed_seq_lens=False,
+-                ),
+-            ),
++            input_variant=input_variants,
+         )
+ 
+     def warmup_inputs(self, compile_key: CompileKey) -> dict[str, Any]:
+@@ -994,6 +999,29 @@ class DeepseekV32IndexerMetadataBuilder(AttentionMetadataBuilder):
+         self.indexer_decode_block_table_buffer: torch.Tensor | None = None
+         self._max_num_batched_tokens = scheduler_config.max_num_batched_tokens
+ 
++        if getattr(
++            getattr(self.vllm_config, "kernel_config", None),
++            "enable_jit_warmup",
++            False,
++        ):
++            next_n = self.num_speculative_tokens + 1
++            adaptive = bool(
++                self.vllm_config.speculative_config
++                and self.vllm_config.speculative_config.enable_adaptive_verification
++            )
++            max_decode_lens: Iterable[int] = (
++                range(1, next_n + 1) if adaptive else (next_n,)
++            )
++            _PREPARE_UNIFORM_DECODE_KERNEL.register_warmup(
++                block_table_stride=block_table_width,
++                expanded_bt_stride=self.expanded_block_table_buffer.stride(0),
++                max_decode_lens=max_decode_lens,
++            )
++            _BUILD_PREFILL_CHUNK_METADATA_KERNEL.register_warmup(
++                vllm_config=self.vllm_config,
++                compress_ratio=self.compress_ratio,
++            )
++
+     def _dcp_localize_decode_seq_lens(
+         self,
+         seq_lens: torch.Tensor,
+-- 
+2.54.0 (Apple Git-157)
+

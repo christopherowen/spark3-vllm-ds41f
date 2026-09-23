@@ -1,0 +1,122 @@
+From 95769e49cf4a8927455460f7b5624e9114dd73e5 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Wed, 23 Sep 2026 09:31:55 +0200
+Subject: [PATCH] fix(vocab): align padded rows to TP3
+
+Upstream base: 0f2a15c9277f34c9afe141cf578d1f02b3bebdfe
+
+Rationale: Preserve token logits while making padded vocabulary divisible by tensor parallel size.
+Quality and speed: No change to real token rows; padding is inert.
+Tests: source replay, syntax parse, and diff check; target hardware qualification pending.
+Upstream status: local candidate, not submitted.
+---
+ .../core/test_vocab_parallel_embedding.py       | 15 +++++++++++++++
+ .../layers/vocab_parallel_embedding.py          | 17 ++++++++++++-----
+ 2 files changed, 27 insertions(+), 5 deletions(-)
+
+diff --git a/tests/kernels/core/test_vocab_parallel_embedding.py b/tests/kernels/core/test_vocab_parallel_embedding.py
+index b0038c084e..89add9f942 100644
+--- a/tests/kernels/core/test_vocab_parallel_embedding.py
++++ b/tests/kernels/core/test_vocab_parallel_embedding.py
+@@ -13,6 +13,7 @@ import pytest
+ import torch
+ 
+ from vllm import _custom_ops as ops
++from vllm.model_executor.layers import vocab_parallel_embedding as vocab_embedding
+ from vllm.model_executor.layers.vocab_parallel_embedding import (
+     VocabParallelEmbedding,
+     get_masked_input_and_mask,
+@@ -27,6 +28,20 @@ requires_cuda = pytest.mark.skipif(
+ )
+ 
+ 
++@pytest.mark.parametrize("tp_size", [1, 2, 3, 5, 8])
++def test_padding_alignment_includes_tp_size(monkeypatch, tp_size):
++    monkeypatch.setattr(vocab_embedding, "get_tensor_model_parallel_rank", lambda: 0)
++    monkeypatch.setattr(
++        vocab_embedding, "get_tensor_model_parallel_world_size", lambda: tp_size
++    )
++
++    embedding = VocabParallelEmbedding(129280, 8)
++
++    assert embedding.org_vocab_size_padded % 64 == 0
++    assert embedding.org_vocab_size_padded % tp_size == 0
++    assert embedding.num_embeddings_padded % tp_size == 0
++
++
+ def _shard_indices(vocab_size, org_vocab_size, tp_rank, tp_size, pad=64):
+     return VocabParallelEmbedding._get_indices(
+         pad_vocab_size(vocab_size, pad),
+diff --git a/vllm/model_executor/layers/vocab_parallel_embedding.py b/vllm/model_executor/layers/vocab_parallel_embedding.py
+index 72cafceb25..c79025a81c 100644
+--- a/vllm/model_executor/layers/vocab_parallel_embedding.py
++++ b/vllm/model_executor/layers/vocab_parallel_embedding.py
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import math
+ from collections.abc import Sequence
+ from dataclasses import dataclass
+ 
+@@ -30,6 +31,7 @@ from vllm.model_executor.layers.quantization.base_config import (
+ from vllm.model_executor.layers.utils import dispatch_unquantized_gemm
+ from vllm.model_executor.parameter import BasevLLMParameter
+ from vllm.model_executor.utils import set_weight_attrs
++from vllm.model_executor.weight_transfer import allocate_weights, copy_weight
+ from vllm.platforms import current_platform
+ 
+ DEFAULT_VOCAB_PADDING_SIZE = 64
+@@ -276,7 +278,9 @@ class VocabParallelEmbedding(PluggableLayer):
+             self.tp_size = get_tensor_model_parallel_world_size()
+         self.tp_rank = tp_rank
+         self.num_embeddings = num_embeddings
+-        self.padding_size = padding_size
++        # Preserve the requested storage alignment while also guaranteeing
++        # equal vocabulary shards for non-power-of-two TP sizes such as TP3.
++        self.padding_size = math.lcm(padding_size, self.tp_size)
+         self.org_vocab_size = org_num_embeddings or num_embeddings
+         num_added_embeddings = num_embeddings - self.org_vocab_size
+         self.org_vocab_size_padded = pad_vocab_size(
+@@ -347,7 +351,8 @@ class VocabParallelEmbedding(PluggableLayer):
+             and isinstance(quant_method, UnquantizedEmbeddingMethod)
+         )
+ 
+-        self.quant_method.create_weights(
++        allocate_weights(
++            self.quant_method.create_weights,
+             self,
+             self.embedding_dim,
+             [self.num_embeddings_per_partition],
+@@ -480,7 +485,7 @@ class VocabParallelEmbedding(PluggableLayer):
+             ):
+                 loaded_weight = loaded_weight.reshape(1)
+             assert param.data.shape == loaded_weight.shape
+-            param.data.copy_(loaded_weight)
++            copy_weight(param.data, loaded_weight)
+             return
+ 
+         # Shard indexes for loading the weight
+@@ -505,7 +510,7 @@ class VocabParallelEmbedding(PluggableLayer):
+ 
+         # Copy the data. Select chunk corresponding to current shard.
+         loaded_weight = loaded_weight.narrow(output_dim, start_idx, shard_size)
+-        param[: loaded_weight.shape[0]].data.copy_(loaded_weight)
++        copy_weight(param[: loaded_weight.shape[0]].data, loaded_weight)
+         param[loaded_weight.shape[0] :].data.fill_(0)
+ 
+     def forward(self, input_):
+@@ -617,7 +622,9 @@ class ParallelLMHead(VocabParallelEmbedding):
+             self.register_parameter("bias", None)
+ 
+     def _register_bias(self):
+-        data = torch.empty(self.num_embeddings_per_partition, dtype=self.params_dtype)
++        data = allocate_weights(
++            torch.empty, self.num_embeddings_per_partition, dtype=self.params_dtype
++        )
+         self.bias = Parameter(data, requires_grad=False)
+         weight_attrs = dict(output_dim=0, weight_loader=self.weight_loader)
+         set_weight_attrs(weight=self.bias, weight_attrs=weight_attrs)
+-- 
+2.54.0 (Apple Git-157)
+

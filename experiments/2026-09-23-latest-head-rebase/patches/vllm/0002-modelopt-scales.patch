@@ -1,0 +1,87 @@
+From dacc28d80b8a572e570582229612d6cb8cdc2b7b Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Wed, 23 Sep 2026 09:31:55 +0200
+Subject: [PATCH] fix(modelopt): materialize lazy MXFP8 scales for transforms
+
+Upstream base: 0f2a15c9277f34c9afe141cf578d1f02b3bebdfe
+
+Rationale: Materialize only scales requiring row expansion before the existing ModelOpt transform.
+Quality and speed: Scale values, dtype, and expansion are preserved.
+Tests: source replay, syntax parse, and diff check; target hardware qualification pending.
+Upstream status: local candidate, not submitted.
+---
+ tests/quantization/test_modelopt.py           | 25 +++++++++++++++++++
+ .../layers/quantization/modelopt.py           |  7 ++++--
+ 2 files changed, 30 insertions(+), 2 deletions(-)
+
+diff --git a/tests/quantization/test_modelopt.py b/tests/quantization/test_modelopt.py
+index ae8548c370..1bd401d943 100644
+--- a/tests/quantization/test_modelopt.py
++++ b/tests/quantization/test_modelopt.py
+@@ -29,6 +29,7 @@ from vllm.model_executor.layers.fused_moe import RoutedExperts
+ from vllm.model_executor.layers.linear import UnquantizedLinearMethod
+ from vllm.model_executor.layers.quantization.modelopt import (
+     LINEAR_ALGOS,
++    KMxfp8Static,
+     ModelOptFp8Config,
+     ModelOptLinearMethod,
+     ModelOptMixedPrecisionConfig,
+@@ -144,6 +145,30 @@ def test_modelopt_mxfp8_preserves_per_row_checkpoint_scales(dist_init, monkeypat
+     assert torch.equal(linear.weight_scale, scales)
+ 
+ 
++def test_modelopt_mxfp8_materializes_scales_before_row_expansion(monkeypatch):
++    """Numerical transforms must own lazy checkpoint values before execution."""
++    scales = torch.arange(8, dtype=torch.uint8).reshape(2, 4)
++    materialized = scales.clone()
++    materialize = Mock(return_value=materialized)
++    monkeypatch.setattr(
++        "vllm.model_executor.layers.quantization.modelopt.materialize_weight",
++        materialize,
++    )
++    weight_loader = Mock()
++    ctx = Mock(scale_block_size=(3, 32))
++
++    loader = KMxfp8Static.get_scale_weight_loader(weight_loader, ctx)
++    parameter = Mock()
++    loader(parameter, scales, shard_id=1)
++
++    materialize.assert_called_once_with(scales)
++    weight_loader.assert_called_once()
++    args, kwargs = weight_loader.call_args
++    assert args[0] is parameter
++    assert torch.equal(args[1], materialized.repeat_interleave(3, dim=0))
++    assert kwargs == {"shard_id": 1}
++
++
+ def test_modelopt_mxfp8_pre_processed_weights_follow_kernel(monkeypatch):
+     """The weight cache daemon can only serve MXFP8 layers whose kernel needs
+     no post-load state beyond the parameters it exports."""
+diff --git a/vllm/model_executor/layers/quantization/modelopt.py b/vllm/model_executor/layers/quantization/modelopt.py
+index 364c52b4c8..3db4814cdf 100644
+--- a/vllm/model_executor/layers/quantization/modelopt.py
++++ b/vllm/model_executor/layers/quantization/modelopt.py
+@@ -106,6 +106,7 @@ from vllm.model_executor.utils import (
+     replace_parameter,
+     set_weight_attrs,
+ )
++from vllm.model_executor.weight_transfer import materialize_weight
+ from vllm.utils.math_utils import cdiv
+ 
+ if TYPE_CHECKING:
+@@ -2206,8 +2207,10 @@ class KMxfp8Static(QuantKeyScheme):
+ 
+         def scaled_loader(param, loaded_weight, *args, **kwargs):
+             assert loaded_weight.dtype in (torch.uint8, torch.float8_e8m0fnu)
+-            loaded_weight = loaded_weight.view(torch.uint8).repeat_interleave(
+-                block_rows, dim=0
++            loaded_weight = (
++                materialize_weight(loaded_weight)
++                .view(torch.uint8)
++                .repeat_interleave(block_rows, dim=0)
+             )
+             return weight_loader(param, loaded_weight, *args, **kwargs)
+ 
+-- 
+2.54.0 (Apple Git-157)
+

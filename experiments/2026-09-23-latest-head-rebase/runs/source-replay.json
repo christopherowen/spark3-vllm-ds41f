@@ -1,0 +1,19 @@
+{
+  "time_utc": "2026-09-23T07:32:00Z",
+  "commands": [
+    "python3 experiments/2026-09-23-latest-head-rebase/prepare-sources --local-source-root .work/validation/head-rebase-audit",
+    "python3 experiments/2026-09-23-latest-head-rebase/prepare-sources"
+  ],
+  "first_attempt": {
+    "status": "failed before patch application",
+    "reason": "local partial clone could not serve missing promisor objects to git fetch; source repository was not corrupt",
+    "action": "removed the local-source shortcut from prepare-sources"
+  },
+  "canonical_fetch": {
+    "status": "passed",
+    "vllm_head": "efa5e032c9254a80941ec25ee9ddeaf02d582972",
+    "vllm_tree": "eddf87778c8d3617eb5b40b57d05cae8b95ec0c2",
+    "b12x_head": "efc58696a860f5a0fa120cbc24c8619c34258f40",
+    "b12x_tree": "de6142a42059d7075623d348fe71f52724926a94"
+  }
+}

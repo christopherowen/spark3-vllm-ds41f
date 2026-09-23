@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Prepare and verify the pinned September 23 upstream source candidate."""
+
+import argparse
+import json
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+
+EXPERIMENT = Path(__file__).resolve().parent
+REPO = EXPERIMENT.parents[1]
+UPSTREAMS = {
+    "vllm": "https://github.com/vllm-project/vllm.git",
+    "b12x": "https://github.com/local-inference-lab/b12x.git",
+}
+
+
+def git(directory, *args, capture=False):
+    result = subprocess.run(
+        ["git", *args],
+        cwd=directory,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE if capture else None,
+    )
+    return result.stdout.strip() if capture else None
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "destination",
+        nargs="?",
+        type=Path,
+        default=REPO / ".work/experiments/2026-09-23-latest-head-rebase",
+    )
+    args = parser.parse_args()
+    destination = args.destination.resolve()
+    series = json.loads((EXPERIMENT / "series.json").read_text())
+    if any((destination / project).exists() for project in UPSTREAMS):
+        parser.error("destination already contains a prepared project")
+    destination.mkdir(parents=True, exist_ok=True)
+
+    for project, upstream in UPSTREAMS.items():
+        record = series[project]
+        temporary = Path(tempfile.mkdtemp(prefix=f".{project}.", dir=destination))
+        try:
+            git(temporary, "init", "--quiet")
+            git(temporary, "remote", "add", "upstream", upstream)
+            git(
+                temporary,
+                "fetch", "--quiet", "--filter=blob:none", "--no-tags",
+                "upstream", record["upstream_base"],
+            )
+            git(temporary, "switch", "--quiet", "--create", "spark3/ds41f-latest", "FETCH_HEAD")
+            for item in record["patches"]:
+                git(
+                    temporary,
+                    "-c", "user.name=Christopher Owen",
+                    "-c", "user.email=root@your.mom",
+                    "am", "--quiet", "--committer-date-is-author-date",
+                    str(EXPERIMENT / item["patch"]),
+                )
+            actual = git(temporary, "rev-parse", "HEAD^{tree}", capture=True)
+            if actual != record["expected_tree"]:
+                raise RuntimeError(
+                    f"{project}: expected tree {record['expected_tree']}, got {actual}"
+                )
+            actual_head = git(temporary, "rev-parse", "HEAD", capture=True)
+            if actual_head != record["patch_head"]:
+                raise RuntimeError(
+                    f"{project}: expected patch head {record['patch_head']}, "
+                    f"got {actual_head}"
+                )
+            git(temporary, "diff", "--check", record["upstream_base"], "HEAD")
+            git(temporary, "submodule", "update", "--init", "--recursive")
+            temporary.rename(destination / project)
+            print(f"{project}: exact tree {actual}")
+        except BaseException:
+            shutil.rmtree(temporary, ignore_errors=True)
+            raise
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,7 @@
+{
+  "repository_commit": "848ac01a79143bd7bfd90f1389b436125728759d",
+  "promoted_baseline": "manifests/baselines/2026-09-20-live.json",
+  "running_image_id": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
+  "running_vllm_tree": "92aa9f7d15c88b69bc6117963e2dcb52b81a55e5",
+  "running_b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+}

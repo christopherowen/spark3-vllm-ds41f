@@ -1,0 +1,767 @@
+From 079eb25a85ea8fea931472a620277ab797230651 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <root@your.mom>
+Date: Wed, 23 Sep 2026 09:31:55 +0200
+Subject: [PATCH] feat(deepseek-v41): compose virtual heads for TP3
+
+Upstream base: 0f2a15c9277f34c9afe141cf578d1f02b3bebdfe
+
+Rationale: Map checkpoint groups through native loaders into virtual TP3 attention geometry.
+Quality and speed: Preserves original 64/8 computation and native weight transforms.
+Tests: source replay, syntax parse, and diff check; target hardware qualification pending.
+Upstream status: local candidate, not submitted.
+---
+ .../models/test_deepseek_v41_virtual_heads.py | 170 ++++++++++++++++++
+ vllm/models/deepseek_v41/attention.py         |  77 +++++---
+ vllm/models/deepseek_v41/nvidia/model.py      | 116 +++++++++++-
+ vllm/models/deepseek_v41/virtual_heads.py     | 156 ++++++++++++++++
+ 4 files changed, 490 insertions(+), 29 deletions(-)
+ create mode 100644 tests/models/test_deepseek_v41_virtual_heads.py
+ create mode 100644 vllm/models/deepseek_v41/virtual_heads.py
+
+diff --git a/tests/models/test_deepseek_v41_virtual_heads.py b/tests/models/test_deepseek_v41_virtual_heads.py
+new file mode 100644
+index 0000000000..e006f4c32b
+--- /dev/null
++++ b/tests/models/test_deepseek_v41_virtual_heads.py
+@@ -0,0 +1,170 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from types import SimpleNamespace
++
++import pytest
++import torch
++
++from vllm.model_executor.weight_transfer import (
++    copy_weight,
++    materialize_weight,
++    weight_transfer,
++)
++from vllm.models.deepseek_v41.virtual_heads import (
++    _E8M0,
++    _fill_zero_group,
++    _wrap_parameter,
++    wrap_attention,
++)
++
++
++def _parameter(shape: tuple[int, ...], dimension: str, dim: int):
++    parameter = torch.nn.Parameter(torch.empty(shape), requires_grad=False)
++    setattr(parameter, dimension, dim)
++    parameter.weight_loader = lambda param, weight: copy_weight(param.data, weight)
++    return parameter
++
++
++def _linear(shape: tuple[int, ...], dimension: str, dim: int, tp_rank: int):
++    linear = torch.nn.Module()
++    linear.register_parameter("weight", _parameter(shape, dimension, dim))
++    linear.tp_rank = tp_rank
++    return linear
++
++
++def test_virtual_group_duplicates_inputs_and_zeros_output() -> None:
++    attention = SimpleNamespace(
++        n_groups=9,
++        wq_b=_linear((3, 2), "output_dim", 0, 2),
++        wo_a=_linear((3, 2), "output_dim", 0, 2),
++        wo_b=_linear((2, 3), "input_dim", 1, 2),
++    )
++    config = SimpleNamespace(virtual_heads_from={"o_groups": 8})
++
++    assert wrap_attention(attention, 3, config) == 3
++
++    input_weight = torch.arange(16, dtype=torch.float32).reshape(8, 2)
++    output_weight = torch.arange(16, dtype=torch.float32).reshape(2, 8)
++    attention.wq_b.weight.weight_loader(attention.wq_b.weight, input_weight)
++    attention.wo_a.weight.weight_loader(attention.wo_a.weight, input_weight)
++    attention.wo_b.weight.weight_loader(attention.wo_b.weight, output_weight)
++
++    expected_input = input_weight[[6, 7, 7]]
++    assert torch.equal(attention.wq_b.weight, expected_input)
++    assert torch.equal(attention.wo_a.weight, expected_input)
++    assert torch.equal(attention.wo_b.weight[:, :2], output_weight[:, 6:8])
++    assert torch.count_nonzero(attention.wo_b.weight[:, 2]) == 0
++
++
++@pytest.mark.parametrize(
++    ("tp_rank", "expected_groups"),
++    [(0, [0, 1, 2]), (1, [3, 4, 5]), (2, [6, 7, 7])],
++)
++def test_duplicate_loader_maps_each_tp_rank(tp_rank, expected_groups) -> None:
++    parameter = _parameter((3, 2), "output_dim", 0)
++    assert _wrap_parameter(parameter, 0, 8, 9, "duplicate", tp_rank, 3)
++
++    weight = torch.arange(16, dtype=torch.float32).reshape(8, 2)
++    parameter.weight_loader(parameter, weight)
++    assert torch.equal(parameter, weight[expected_groups])
++
++
++def test_duplicate_loader_routes_only_selected_lazy_groups() -> None:
++    parameter = _parameter((3, 2), "output_dim", 0)
++    assert _wrap_parameter(parameter, 0, 8, 9, "duplicate", 2, 3)
++
++    expected = torch.arange(16, dtype=torch.float32).reshape(8, 2)
++    source = torch.empty_like(expected, device="meta")
++
++    class Writer:
++        offsets = []
++
++        def __call__(self, destination, loaded):
++            self.offsets.append(loaded.storage_offset())
++            destination.copy_(
++                expected.as_strided(
++                    loaded.shape,
++                    loaded.stride(),
++                    loaded.storage_offset(),
++                )
++            )
++            return True
++
++        def flush(self):
++            pass
++
++    writer = Writer()
++    with weight_transfer(writer):
++        parameter.weight_loader(parameter, source)
++
++    assert writer.offsets == [12, 14]
++    assert torch.equal(parameter, expected[[6, 7, 7]])
++
++
++def test_virtual_loader_composes_with_scale_row_expansion() -> None:
++    parameter = _parameter((5120, 48), "input_dim", 1)
++
++    def scale_loader(param, loaded):
++        loaded = materialize_weight(loaded).repeat_interleave(32, dim=0)
++        copy_weight(param.data, loaded)
++
++    parameter.weight_loader = scale_loader
++    assert _wrap_parameter(parameter, 1, 8, 9, "duplicate", 2, 3)
++
++    expected = torch.arange(160 * 128, dtype=torch.float32).reshape(160, 128)
++    source = torch.empty_like(expected, device="meta")
++
++    class Writer:
++        offsets = []
++
++        def __call__(self, destination, loaded):
++            return False
++
++        def materialize(self, loaded):
++            self.offsets.append(loaded.storage_offset())
++            return expected.as_strided(
++                loaded.shape,
++                loaded.stride(),
++                loaded.storage_offset(),
++            ).clone()
++
++        def flush(self):
++            pass
++
++    writer = Writer()
++    with weight_transfer(writer):
++        parameter.weight_loader(parameter, source)
++
++    selected = torch.cat((expected[:, 96:112], expected[:, 112:128]), dim=1)
++    selected = torch.cat((selected, expected[:, 112:128]), dim=1)
++    assert writer.offsets == [96, 112]
++    assert torch.equal(parameter, selected.repeat_interleave(32, dim=0))
++
++
++def test_virtual_padding_is_opt_in() -> None:
++    attention = SimpleNamespace(n_groups=9)
++    assert wrap_attention(attention, 3, SimpleNamespace()) == 0
++    assert (
++        wrap_attention(
++            attention,
++            1,
++            SimpleNamespace(virtual_heads_from={"o_groups": 8}),
++        )
++        == 0
++    )
++
++
++def test_virtual_groups_must_divide_tp_size() -> None:
++    parameter = _parameter((3, 2), "output_dim", 0)
++    with pytest.raises(ValueError, match="must divide tensor parallel size"):
++        _wrap_parameter(parameter, 0, 8, 10, "duplicate", 2, 3)
++
++
++@pytest.mark.skipif(_E8M0 is None, reason="Torch does not expose E8M0")
++def test_e8m0_zero_uses_unit_scale_encoding() -> None:
++    scales = torch.empty(4, dtype=_E8M0)
++    _fill_zero_group(scales)
++    assert torch.equal(
++        scales.view(torch.uint8), torch.full((4,), 127, dtype=torch.uint8)
++    )
+diff --git a/vllm/models/deepseek_v41/attention.py b/vllm/models/deepseek_v41/attention.py
+index d0e69fb358..188434b3bc 100644
+--- a/vllm/models/deepseek_v41/attention.py
++++ b/vllm/models/deepseek_v41/attention.py
+@@ -52,8 +52,10 @@ from vllm.model_executor.layers.attention_layer_base import AttentionLayerBase
+ from vllm.model_executor.layers.layernorm import RMSNorm
+ from vllm.model_executor.layers.quantization import QuantizationConfig
+ from vllm.model_executor.models.utils import extract_layer_index
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.models.deepseek_v41.common.rope import build_deepseek_v4_rope
+ from vllm.models.deepseek_v41.compressor import DeepseekCompressor
++from vllm.models.deepseek_v41.virtual_heads import wrap_attention
+ from vllm.platforms import current_platform
+ from vllm.triton_utils import tl, triton
+ from vllm.utils.multi_stream_utils import (
+@@ -116,14 +118,23 @@ def _fill_short_context_topk_indices(
+     )
+ 
+ 
+-# Which packed fp8_ds_mla record a V4.1 layer writes. FlashMLA decodes
++# Which packed DeepSeek MLA record a V4.1 layer writes. FlashMLA decodes
+ # DeepSeek's V4.1 record -- all 512 dims (RoPE included) as fp8 e4m3 with one
+ # UE8M0 scale per 32 dims, 512 data bytes + 16 scale bytes per token, pages
+-# rounded to the kernel's 512 B TMA stride -- only in its SM100 sparse-decode
+-# kernels. Every other arch keeps the V4 record: 448 fp8 NoPE + 64 bf16 RoPE
+-# plus 7 UE8M0 scales of 64 dims and a pad byte (584 B, 576 B pages).
+-def _use_v41_mxfp8_kv_record() -> bool:
+-    return current_platform.is_device_capability_family(100)
++# rounded to the kernel's 512 B TMA stride -- in its SM100 sparse-decode
++# kernels. NVFP4 explicitly names the V4.1 split record and may be supplied by
++# another backend. Other fp8_ds_mla providers keep the V4 record: 448 fp8 NoPE
++# + 64 bf16 RoPE plus 7 UE8M0 scales of 64 dims and a pad byte (584 B, 576 B
++# pages).
++def _use_v41_mxfp8_kv_record(
++    kv_cache_dtype: CacheDType | None = None,
++) -> bool:
++    # NVFP4 is defined only for the V4.1 split record: MXFP8 SWA plus an
++    # NVFP4 compressed cache. Unlike fp8_ds_mla, its identity is sufficient
++    # to select the 528-byte SWA ABI on providers outside SM100.
++    return kv_cache_dtype == "nvfp4_ds_mla" or (
++        current_platform.is_device_capability_family(100)
++    )
+ 
+ 
+ def _resolve_dsv4_kv_cache_dtype(
+@@ -218,6 +229,17 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+         """
+         return "fp8_ds_mla"
+ 
++    @property
++    def uses_v41_mxfp8_kv_record(self) -> bool:
++        """Whether packed SWA rows use DeepSeek V4.1's 528-byte record.
++
++        FlashMLA currently exposes that record only on SM100, but other
++        backends may implement the same cache ABI on a different architecture.
++        Keep that backend choice explicit rather than inferring it globally
++        from the device capability.
++        """
++        return _use_v41_mxfp8_kv_record()
++
+     @classmethod
+     @abstractmethod
+     def get_padded_num_q_heads(cls, num_heads: int) -> int:
+@@ -347,7 +369,9 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+         # Sink padded to the same head count, initialized to -inf (no sink
+         # effect). Weight loading fills the first n_local_heads slots.
+         self.attn_sink = nn.Parameter(
+-            torch.full((self.padded_heads,), -float("inf"), dtype=torch.float32),
++            allocate_weights(
++                torch.full, (self.padded_heads,), -float("inf"), dtype=torch.float32
++            ),
+             requires_grad=False,
+         )
+ 
+@@ -394,6 +418,7 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+         # Set by ``bind_gemm_rs`` when the decoder layer runs sequence
+         # parallel and the fused GEMM + reduce-scatter kernel accepts wo_b.
+         self.gemm_rs: GemmRsAr | None = None
++        wrap_attention(self, tp_size, config)
+ 
+         # Initialize rotary embedding before the indexer/compressor consume it.
+         self.rotary_emb = build_deepseek_v4_rope(
+@@ -500,7 +525,7 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+             cache_config,
+             self.packed_kv_cache_dtype,
+         )
+-        self.kv_mxfp8 = _use_v41_mxfp8_kv_record()
++        self.kv_mxfp8 = self.uses_v41_mxfp8_kv_record
+         self.swa_bytes_per_token = 528 if self.kv_mxfp8 else 584
+         # nvfp4_ds_mla keeps the MXFP8 sliding-window record and stores the
+         # compressed cache as NVFP4 (256 B of e2m1 pairs + 32 e4m3 scales).
+@@ -612,15 +637,6 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+ 
+                 _COMPRESSED_SLOT_MAPPING_KERNEL.register_warmup()
+ 
+-            if self.indexer is not None:
+-                from vllm.v1.attention.backends.mla.indexer import (
+-                    _BUILD_PREFILL_CHUNK_METADATA_KERNEL,
+-                    _PREPARE_UNIFORM_DECODE_KERNEL,
+-                )
+-
+-                _PREPARE_UNIFORM_DECODE_KERNEL.register_warmup()
+-                _BUILD_PREFILL_CHUNK_METADATA_KERNEL.register_warmup()
+-
+             spec_config = vllm_config.speculative_config
+             if spec_config is not None and spec_config.use_dspark():
+                 from vllm.v1.attention.backends.mla.sparse_swa import (
+@@ -856,7 +872,7 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+         if compressor is not None:
+             indexer_result, _ = maybe_execute_in_parallel(
+                 prepare_indexer,
+-                lambda: compressor.insert_cache(latent, positions, self.rotary_emb),
++                lambda: self._insert_compressed_cache(latent, positions),
+                 self.ln_events[0],
+                 self.ln_events[1],
+                 aux_stream,
+@@ -876,6 +892,15 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase, ABC):
+             attn_out,
+         )
+ 
++    def _insert_compressed_cache(
++        self,
++        latent: torch.Tensor | None,
++        positions: torch.Tensor,
++    ) -> None:
++        """Publish a compressed latent through the selected backend's layout."""
++        assert self.compressor is not None
++        self.compressor.insert_cache(latent, positions, self.rotary_emb)
++
+     def _fused_wqa_wkv_gemm(self, hidden_states: torch.Tensor) -> torch.Tensor:
+         # Override point: the ROCm layer preshuffles this weight in place, so
+         # it cannot go through fused_wqa_wkv directly.
+@@ -1173,10 +1198,22 @@ class DeepseekV4IndexerCache(torch.nn.Module, AttentionLayerBase):
+             "nvfp4_ds_mla",
+         )
+         page_alignment = (
+-            576 if uses_fp8_ds_mla_layout and not _use_v41_mxfp8_kv_record() else 512
++            576
++            if uses_fp8_ds_mla_layout
++            and not _use_v41_mxfp8_kv_record(vllm_config.cache_config.cache_dtype)
++            else 512
+         )
++        block_size = self.cache_config.block_size
++        if current_platform.is_cuda() and current_platform.is_device_capability_family(
++            120
++        ):
++            # DeepGEMM's arch-12 paged-MQA logits kernel accepts 64 states per
++            # page. Keep that state geometry for both V4.1 compression ratios:
++            # 64 tokens for ratio 1 and 128 tokens for ratio 2. This is an
++            # indexer-cache property; the main MLA cache keeps its own page.
++            block_size = 64 * max(1, self.compress_ratio)
+         return MLAAttentionSpec(
+-            block_size=self.cache_config.block_size,
++            block_size=block_size,
+             num_kv_heads=1,
+             head_size=self.head_dim,
+             dtype=self.dtype,
+diff --git a/vllm/models/deepseek_v41/nvidia/model.py b/vllm/models/deepseek_v41/nvidia/model.py
+index 22674bf705..7adfcc28bb 100644
+--- a/vllm/models/deepseek_v41/nvidia/model.py
++++ b/vllm/models/deepseek_v41/nvidia/model.py
+@@ -57,6 +57,12 @@ from vllm.model_executor.models.utils import (
+     make_layers,
+     maybe_prefix,
+ )
++from vllm.model_executor.weight_transfer import (
++    allocate_weights,
++    copy_weight,
++    flush_weight_transfers,
++    materialize_weight,
++)
+ from vllm.models.common.ops.sequence_parallel import (
+     sp_all_gather,
+     sp_padding_mask,
+@@ -72,6 +78,9 @@ from vllm.models.deepseek_v4.nvidia.model import (
+     prepare_mega_gate_routing_metadata,
+ )
+ from vllm.models.deepseek_v41.attention import DeepseekV4Attention
++from vllm.models.deepseek_v41.nvidia.b12x_attention import (
++    DeepseekV41B12xAttention,
++)
+ from vllm.models.deepseek_v41.nvidia.flash_mla_mega_attn import (
+     DeepseekV4MegaAttnAttention,
+ )
+@@ -144,6 +153,10 @@ def _select_dsv4_attn_cls(vllm_config: VllmConfig) -> type[DeepseekV4Attention]:
+     """
+     backend = vllm_config.attention_config.backend
+     device_capability = current_platform.get_device_capability()
++    if backend is AttentionBackendEnum.B12X:
++        if device_capability is None or device_capability.major != 12:
++            raise ValueError("DeepSeek V4.1 B12X requires an SM120/SM121 GPU")
++        return DeepseekV41B12xAttention
+     if backend in (
+         AttentionBackendEnum.FLASHINFER_MLA_SPARSE,
+         AttentionBackendEnum.FLASHINFER_MLA_SPARSE_SM120,
+@@ -344,7 +357,8 @@ class DeepseekV4DecoderLayer(nn.Module):
+         mix_hc = (2 + self.hc_mult) * self.hc_mult
+         hc_dim = self.hc_mult * self.hidden_size
+         self.hc_attn_fn = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 (mix_hc, hc_dim),
+                 dtype=torch.float32,
+             ),
+@@ -352,35 +366,40 @@ class DeepseekV4DecoderLayer(nn.Module):
+         )
+         self.hc_attn_fn_broadcast: torch.Tensor | None = None
+         self.hc_ffn_fn = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 (mix_hc, hc_dim),
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_attn_base = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 mix_hc,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_ffn_base = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 mix_hc,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_attn_scale = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 3,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_ffn_scale = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 3,
+                 dtype=torch.float32,
+             ),
+@@ -656,6 +675,11 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         self.engram_dp_shared_memory = bool(
+             vllm_config.engram_config and vllm_config.engram_config.dp_shared_memory
+         )
++        self.disk_engram = bool(
++            self.engram_layout is not None
++            and vllm_config.engram_config
++            and vllm_config.engram_config.table_memory == "disk"
++        )
+         self.engram_swa_prefix: str | None = None
+         if self.engram_layout is not None:
+             local_engram = any(
+@@ -671,6 +695,19 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                     vllm_config, self.engram_layout, swa_cache_module
+                 )
+                 self.engram_swa_prefix = swa_cache_module.prefix
++        if self.disk_engram:
++            self.register_buffer(
++                "prepared_engram_hashes",
++                torch.empty(
++                    (
++                        vllm_config.scheduler_config.max_num_batched_tokens,
++                        len(self.engram_layout.layer_ids),
++                        self.engram_layout.n_hash_cols,
++                    ),
++                    dtype=torch.int32,
++                ),
++                persistent=False,
++            )
+ 
+         if get_pp_group().is_last_rank:
+             self.norm = RMSNorm(config.hidden_size, self.rms_norm_eps)
+@@ -690,6 +727,45 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         else:
+             self._mtp_hidden_buffer = None
+ 
++    def prepare_disk_engram(
++        self,
++        input_ids: torch.Tensor,
++        positions: torch.Tensor,
++        query_start_loc: torch.Tensor,
++        lookback_token_ids: torch.Tensor,
++    ) -> None:
++        if not self.disk_engram or self.engram_hash is None:
++            return
++        if torch.compiler.is_compiling() or torch.cuda.is_current_stream_capturing():
++            raise RuntimeError("disk Engram preparation must run outside capture")
++        token_count = input_ids.shape[0]
++        image_mask = image_sentinel_mask(input_ids)
++        hashes = self.engram_hash(
++            input_ids,
++            positions,
++            query_start_loc,
++            image_mask,
++            lookback_token_ids,
++            image_sentinel_mask(lookback_token_ids),
++            None,
++            None,
++        )
++        prepared = self.prepared_engram_hashes[:token_count]
++        prepared.copy_(hashes)
++        for layer in islice(self.layers, self.start_layer, self.end_layer):
++            engram = getattr(layer, "engram", None)
++            if engram is not None:
++                engram.prepare_disk(prepared[:, engram.layer_hash_index])
++
++    def prepare_dummy_disk_engram(self, num_tokens: int) -> None:
++        if not self.disk_engram:
++            return
++        self.prepared_engram_hashes[:num_tokens].fill_(-1)
++        for layer in islice(self.layers, self.start_layer, self.end_layer):
++            engram = getattr(layer, "engram", None)
++            if engram is not None:
++                engram.prepare_dummy_disk(num_tokens)
++
+     def embed_input_ids(self, input_ids: torch.Tensor) -> torch.Tensor:
+         return self.embed_tokens(input_ids)
+ 
+@@ -746,7 +822,10 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         # profile runs (KV cache unbound).
+         engram_hashes: torch.Tensor | None = None
+         engram_mask: torch.Tensor | None = None
+-        if (
++        if self.disk_engram and input_ids is not None:
++            engram_hashes = self.prepared_engram_hashes[: input_ids.shape[0]]
++            engram_mask = ~image_sentinel_mask(input_ids)
++        elif (
+             self.engram_hash is not None
+             and input_ids is not None
+             and is_forward_context_available()
+@@ -788,7 +867,7 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                 # DP-sharded lookups are collective, so a replica skipping the
+                 # hash still has to reach them.
+                 engram_hashes, engram_mask = self.engram_hash.dummy_hashes(input_ids)
+-            if engram_hashes is not None:
++            if engram_hashes is not None and not self.disk_engram:
+                 # Gather all Engram rows before entering the decoder layers.
+                 # One gather feeds every layer sharing the DP-split table.
+                 gathered_hashes = gather_engram_hashes(
+@@ -934,6 +1013,16 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                 # Vision weights are loaded by the outer multimodal wrapper.
+                 logger.warning_once("Skipping non-text weight: %s", name)
+                 continue
++            if self.disk_engram and ".engram.embed_tokens." in name:
++                if is_pp_missing_parameter(name, self):
++                    continue
++                module_name, _, leaf = name.rpartition(".")
++                embedding = self.get_submodule(module_name)
++                loaded_params.update(
++                    f"{module_name}.{loaded}"
++                    for loaded in embedding.load_weights(((leaf, loaded_weight),))
++                )
++                continue
+             if pad_shared_expert and ".shared_experts." in name:
+                 loaded_weight = self._pad_shared_expert_weight(
+                     self.quant_config, name, loaded_weight
+@@ -1001,7 +1090,7 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                         continue
+                     narrow_weight = loaded_weight[head_rank_start:head_rank_end]
+                     n = narrow_weight.shape[0]
+-                    params_dict[name][:n].copy_(narrow_weight)
++                    copy_weight(params_dict[name][:n], narrow_weight)
+                     loaded_params.add(name)
+                     continue
+                 else:
+@@ -1047,6 +1136,7 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         pad = cdiv(loaded_weight.shape[dim], mult) * mult - loaded_weight.shape[dim]
+         if pad == 0:
+             return loaded_weight
++        loaded_weight = materialize_weight(loaded_weight)
+         pad_shape = list(loaded_weight.shape)
+         pad_shape[dim] = pad
+         return torch.cat([loaded_weight, loaded_weight.new_zeros(pad_shape)], dim=dim)
+@@ -1273,6 +1363,13 @@ class DeepseekV41LLMForCausalLM(
+         self.num_moe_layers = len(self.moe_layers)
+         self.extract_moe_parameters(example_moe)
+ 
++    def checkpoint_file_weight_filter(self, name: str) -> bool:
++        return (
++            self.model.disk_engram
++            and re.fullmatch(r"layers\.\d+\.engram\.embed\.(?:weight|scale)", name)
++            is not None
++        )
++
+     def embed_input_ids(self, input_ids: torch.Tensor) -> torch.Tensor:
+         return self.model.embed_input_ids(input_ids)
+ 
+@@ -1328,6 +1425,7 @@ class DeepseekV41LLMForCausalLM(
+     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
+         loader = AutoWeightsLoader(self)
+         loaded_params = loader.load_weights(weights, mapper=self.hf_to_vllm_mapper)
++        flush_weight_transfers()
+         self.process_weights_after_loading()
+         return loaded_params
+ 
+diff --git a/vllm/models/deepseek_v41/virtual_heads.py b/vllm/models/deepseek_v41/virtual_heads.py
+new file mode 100644
+index 0000000000..a91e5bb418
+--- /dev/null
++++ b/vllm/models/deepseek_v41/virtual_heads.py
+@@ -0,0 +1,156 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Quality-preserving attention padding for DeepSeek V4.1."""
++
++import torch
++
++from vllm.model_executor.weight_transfer import flush_weight_transfers
++
++_E8M0 = getattr(torch, "float8_e8m0fnu", None)
++
++
++def _fill_zero_group(destination: torch.Tensor) -> None:
++    """Write the encoded zero used by a virtual output-projection group."""
++    if destination.element_size() == 1:
++        fill = 127 if _E8M0 is not None and destination.dtype == _E8M0 else 0
++        destination.view(torch.uint8).fill_(fill)
++    else:
++        destination.zero_()
++
++
++def _virtual_source(config) -> dict | None:
++    """Return the unpadded attention geometry recorded in the model config."""
++    for candidate in (config, getattr(config, "text_config", None)):
++        value = (
++            getattr(candidate, "virtual_heads_from", None)
++            if candidate is not None
++            else None
++        )
++        if value:
++            return value if isinstance(value, dict) else dict(value)
++    return None
++
++
++def _wrap_parameter(
++    parameter: torch.nn.Parameter,
++    dim: int,
++    real_groups: int,
++    padded_groups: int,
++    mode: str,
++    tp_rank: int,
++    tp_size: int,
++) -> bool:
++    """Replace one loader with a group-aware TP loader."""
++    original = getattr(parameter, "weight_loader", None)
++    if original is None:
++        return False
++
++    if padded_groups % tp_size:
++        raise ValueError("virtual attention groups must divide tensor parallel size")
++
++    def loader(param, loaded_weight, *args, **kwargs):
++        if loaded_weight.ndim <= dim or loaded_weight.shape[dim] % real_groups:
++            return original(param, loaded_weight, *args, **kwargs)
++
++        source_group_width = loaded_weight.shape[dim] // real_groups
++        local_groups = padded_groups // tp_size
++        if param.data.shape[dim] % local_groups:
++            return original(param, loaded_weight, *args, **kwargs)
++        destination_group_width = param.data.shape[dim] // local_groups
++
++        first_group = tp_rank * local_groups
++        virtual_count = padded_groups - real_groups
++        parameter_data = param.data
++        had_sharded = hasattr(param, "is_sharded_weight")
++        previous_sharded = getattr(param, "is_sharded_weight", None)
++        had_tp_rank = hasattr(param, "tp_rank")
++        previous_tp_rank = getattr(param, "tp_rank", None)
++        loaded_groups = {}
++        duplicate_copies = []
++        try:
++            # The wrapper has already selected this rank's group. Tell both
++            # legacy and v2 linear loaders not to shard it a second time.
++            param.is_sharded_weight = True
++            if had_tp_rank:
++                param.tp_rank = 0
++            for local_group in range(local_groups):
++                global_group = first_group + local_group
++                destination = parameter_data.narrow(
++                    dim,
++                    local_group * destination_group_width,
++                    destination_group_width,
++                )
++                if global_group < real_groups:
++                    source_group = global_group
++                elif mode == "duplicate":
++                    source_group = global_group - virtual_count
++                elif mode == "zero":
++                    _fill_zero_group(destination)
++                    continue
++                else:
++                    raise ValueError(f"unknown virtual-head padding mode {mode!r}")
++
++                if source_group in loaded_groups:
++                    duplicate_copies.append((destination, loaded_groups[source_group]))
++                    continue
++
++                source = loaded_weight.narrow(
++                    dim,
++                    source_group * source_group_width,
++                    source_group_width,
++                )
++                param.data = destination
++                original(param, source, *args, **kwargs)
++                loaded_groups[source_group] = destination
++        finally:
++            param.data = parameter_data
++            if had_tp_rank:
++                param.tp_rank = previous_tp_rank
++            if had_sharded:
++                param.is_sharded_weight = previous_sharded
++            else:
++                del param.is_sharded_weight
++
++        if duplicate_copies:
++            flush_weight_transfers()
++            for destination, source in duplicate_copies:
++                destination.copy_(source)
++
++    try:
++        parameter.weight_loader = loader
++    except AttributeError:
++        parameter._weight_loader = loader
++    return True
++
++
++def wrap_attention(attention, tp_size: int, config) -> int:
++    """Pad virtual attention groups before standard TP loaders shard weights."""
++    source = _virtual_source(config)
++    if tp_size <= 1 or not source:
++        return 0
++    real_groups = int(source["o_groups"])
++    padded_groups = int(attention.n_groups)
++    if padded_groups <= real_groups:
++        return 0
++
++    wrapped = 0
++    specifications = (
++        (attention.wq_b, "output_dim", "duplicate"),
++        (attention.wo_a, "output_dim", "duplicate"),
++        (attention.wo_b, "input_dim", "zero"),
++    )
++    for linear, attribute, mode in specifications:
++        for parameter in linear.parameters(recurse=False):
++            dim = getattr(parameter, attribute, None)
++            if dim is None:
++                dim = 0 if attribute == "output_dim" else 1
++            wrapped += _wrap_parameter(
++                parameter,
++                dim,
++                real_groups,
++                padded_groups,
++                mode,
++                linear.tp_rank,
++                tp_size,
++            )
++    return wrapped
+-- 
+2.54.0 (Apple Git-157)
+
