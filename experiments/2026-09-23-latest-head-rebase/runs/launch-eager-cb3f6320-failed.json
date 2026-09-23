@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "result": "failed_after_weight_load_at_startup_memory_floor",
+  "configuration": "cluster-eager.json at e7a9a38a7a83a6a8b4b79ace05a16bec48e3c856",
+  "image_id": "sha256:cb3f63207ea7ddc3dd416ad836dd78cfac0408c619e0cb8fa9c89a96698a8102",
+  "image_source": {
+    "vllm_patch_head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
+    "b12x_patch_head": "a4b6b18b5ccdf9b8d40508ce17298da8281f94bf"
+  },
+  "observed": {
+    "dgx3_preweight_jit_seconds": 24.31,
+    "dgx3_weight_loading_seconds": 31.30,
+    "dgx3_last_loader_message": "Using B12xExperts after weight loading",
+    "first_nvidia_allocation_failure_utc": "2026-09-23T09:13:12Z",
+    "nvidia_kernel_message": "NV_ERR_NO_MEMORY from _memdescAllocInternal",
+    "memguard_kill_utc": "2026-09-23T09:13:18Z",
+    "memguard_available_kib": 5209256,
+    "memguard_startup_floor_kib": 5242880,
+    "dgx3_exit_code": 137,
+    "docker_oom_killed": false
+  },
+  "recovery": "launcher removed all candidate containers; coordinated cluster-rollback.json start restored known working patch0029 image on all three nodes with active 3 GiB steady guards and API readiness",
+  "logs": "runs/failed-starts/20260923T091323Z-dsv41-latest-1b6675-a4b6b1-eager-r1/ (preserved locally; large raw logs ignored by Git)",
+  "next_gate": "verify current vLLM loader lifecycle and reclaim unused CUDA cache before another guarded TP3 start; do not lower memory guard or promote this image"
+}

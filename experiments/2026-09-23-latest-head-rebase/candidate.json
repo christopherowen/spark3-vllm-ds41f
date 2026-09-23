@@ -11,13 +11,13 @@
     },
     "b12x": {
       "upstream_commit": "0332cc5089137753d3af43d1c643516b4350359f",
-      "patch_head": "a4b6b18b5ccdf9b8d40508ce17298da8281f94bf",
-      "source_tree": "670645de7d1f6214260cffe56dada9c47794efdd",
+      "patch_head": "7c77e74dbaddadcaa9b92650d97da269f7d7f34e",
+      "source_tree": "b5eaa87c207a221fc9b550c3a8c210582714cebf",
       "concept_patches": 4
     }
   },
   "omitted_local_behavior": [
-    "B12X managed-weight pool adaptation: superseded by current upstream ordinary-weight bounce/GDS loader"
+    "B12X managed-weight pool adaptation: current upstream uses ordinary CUDA weights; this may increase GB10 memory pressure and remains under investigation"
   ],
-  "status": "native image built; first guarded load found missing B12X/vLLM progress API and rolled back safely"
+  "status": "new loader-lifecycle source patch pending rebuild; prior image reached guarded startup memory floor and was rolled back; known working patch0029 service restored"
 }

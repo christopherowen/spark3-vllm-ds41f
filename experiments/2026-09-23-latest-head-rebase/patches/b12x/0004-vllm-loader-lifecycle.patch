@@ -1,0 +1,156 @@
+From 7c77e74dbaddadcaa9b92650d97da269f7d7f34e Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Wed, 23 Sep 2026 11:00:29 +0200
+Subject: [PATCH] fix(loader): finish checkpoint transfers on current vLLM
+
+Current vLLM no longer calls the B12X _log_loading_time hook. Finish queued checkpoint transfers at load_weights completion, publish progress there, and release unused CUDA cache before weight preparation. This preserves checkpoint values and keeps the startup allocation peak below the guard where possible.
+
+The obsolete private progress-output imports remain removed. A lifecycle test checks that loading, transfer completion, and cache release happen in order.
+---
+ b12x/integration/vllm/loader.py | 46 ++++++++++++---------------------
+ tests/loader/test_vllm.py       | 36 ++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+), 30 deletions(-)
+
+diff --git a/b12x/integration/vllm/loader.py b/b12x/integration/vllm/loader.py
+index bb1584c..9de9197 100644
+--- a/b12x/integration/vllm/loader.py
++++ b/b12x/integration/vllm/loader.py
+@@ -3,7 +3,6 @@
+ from __future__ import annotations
+ 
+ import dataclasses
+-from contextlib import ExitStack
+ import heapq
+ import json
+ import math
+@@ -103,9 +102,6 @@ class B12xModelLoader(DefaultModelLoader):
+         return model
+ 
+     def load_weights(self, model, model_config):
+-        from vllm.utils.system_utils import undecorated_log_stream
+-        from vllm.v1.executor._b12x_output import PreparationOutput
+-
+         session = self._session
+         group = session.shared_read_group if session is not None else None
+         if group is not None:
+@@ -114,16 +110,9 @@ class B12xModelLoader(DefaultModelLoader):
+             group._gather(None)
+         progress = CheckpointDisplay(
+             enabled=enable_tqdm(self.load_config.use_tqdm_on_load),
+-            stream=undecorated_log_stream(sys.stderr),
++            stream=sys.stderr,
+         )
+-        with ExitStack() as stack:
+-            output = stack.enter_context(PreparationOutput(
+-                progress.write_output, enabled=progress._enabled and progress._stream.isatty(),
+-            ))
+-            if output.stream is not None:
+-                progress._stream = output.stream
+-            stack.enter_context(progress)
+-            stack.callback(output.stop)
++        with progress:
+             self._progress = progress
+             if session is not None:
+                 session.progress = progress.phase
+@@ -131,6 +120,20 @@ class B12xModelLoader(DefaultModelLoader):
+                 group.progress = progress.phase
+             try:
+                 super().load_weights(model, model_config)
++                if session is not None:
++                    session.finish()
++                    stats = session.stats(flush=False)
++                    summary = dict(group.summary) if group is not None else dict(
++                        ranks=1,
++                        payload_bytes=stats["payload_bytes"],
++                        physical_bytes=stats["physical_bytes"],
++                    )
++                    summary["load_seconds"] = (
++                        time.perf_counter() - self.counter_before_loading_weights
++                    )
++                    progress.complete(summary)
++                torch.cuda.synchronize()
++                torch.cuda.empty_cache()
+             finally:
+                 self._progress = None
+                 if session is not None:
+@@ -138,23 +141,6 @@ class B12xModelLoader(DefaultModelLoader):
+                 if group is not None:
+                     group.progress = None
+ 
+-    def _log_loading_time(self):
+-        session, progress = self._session, self._progress
+-        if session is not None and progress is not None:
+-            group = session.shared_read_group
+-            if group is not None and not group.epoch:
+-                raise RuntimeError("device checkpoint loading requires vLLM's finish_weight_transfers routing hook")
+-            session.flush()
+-            stats = session.stats(flush=False)
+-            summary = dict(group.summary) if group is not None else dict(
+-                ranks=1, payload_bytes=stats["payload_bytes"],
+-                physical_bytes=stats["physical_bytes"],
+-            )
+-            summary["load_seconds"] = self.counter_after_loading_weights - self.counter_before_loading_weights
+-            progress.complete(summary)
+-            progress.stop()
+-        super()._log_loading_time()
+-
+     @staticmethod
+     def _needs_values(entry):
+         return math.prod(entry.shape) == 1 or entry.name.rsplit(".", 1)[-1] in {
+diff --git a/tests/loader/test_vllm.py b/tests/loader/test_vllm.py
+index aa3e3a9..9b70c74 100644
+--- a/tests/loader/test_vllm.py
++++ b/tests/loader/test_vllm.py
+@@ -1,6 +1,7 @@
+ """The adapter preserves vLLM's indexed source selection and owned inputs."""
+ 
+ import json
++import time
+ from types import SimpleNamespace
+ 
+ import pytest
+@@ -18,6 +19,41 @@ from b12x.loader._checkpoint import DirectWeightSession
+ from b12x.loader._progress import CheckpointDisplay
+ 
+ 
++def test_loader_finishes_transfers_and_releases_cache_before_weight_preparation(
++    monkeypatch,
++):
++    events = []
++
++    class Session:
++        shared_read_group = None
++        progress = None
++
++        def finish(self):
++            events.append("finish")
++
++        def stats(self, *, flush=True):
++            assert not flush
++            events.append("stats")
++            return {"payload_bytes": 16, "physical_bytes": 16}
++
++    loader = B12xModelLoader(LoadConfig(load_format="b12x", use_tqdm_on_load=False))
++    loader._session = Session()
++    loader.counter_before_loading_weights = time.perf_counter()
++    monkeypatch.setattr(
++        DefaultModelLoader,
++        "load_weights",
++        lambda self, model, config: events.append("load"),
++    )
++    monkeypatch.setattr(torch.cuda, "synchronize", lambda: events.append("sync"))
++    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: events.append("release"))
++
++    loader.load_weights(None, None)
++
++    assert events == ["load", "finish", "stats", "sync", "release"]
++    assert loader._session.progress is None
++    assert loader._progress is None
++
++
+ @pytest.mark.parametrize("show_progress", [True, False])
+ @pytest.mark.parametrize("read_mode", ["auto", "bounce"])
+ def test_draft_iterator_uses_index_and_retained_tensors_keep_their_bytes(
+-- 
+2.54.0 (Apple Git-157)
+

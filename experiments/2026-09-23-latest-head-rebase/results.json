@@ -6,12 +6,12 @@
   "rocenante_c_syntax": "pass: gcc -std=gnu11 -fsyntax-only -Wall -Wextra on dgx1",
   "build_inputs": "pass: latest-head source and deployment identities on the local host and dgx1",
   "dockerfile_check": "pass: docker buildx build --check on dgx1, no warnings",
-  "live_service_observation": "prior patch-0029 service stopped by authorized coordinated stop; first latest-head launch rolled back; all ranks currently stopped",
-  "native_build": "pass: sha256:d25a2e054421e72da1e3ca4c58f4abd6cd1d56bf71b39e581fb256761164a0ab; old 3-patch B12X source, then superseded by patch 0004",
-  "target_hardware_tests": "8 GiB GPU/native-loader smoke passed; first guarded TP3 load failed at removed B12X progress-stream import; all new containers rolled back without OOM",
+  "live_service_observation": "known working patch0029 image restored on all three nodes; API ready and 3 GiB steady guards active",
+  "native_build": "pass: initial 3-patch image sha256:d25a2e05 and 4-patch image sha256:cb3f6320 built; latter is superseded by pending loader-lifecycle source patch",
+  "target_hardware_tests": "8 GiB GPU/native-loader smoke passed for sha256:cb3f6320; guarded TP3 load reached dgx3 5 GiB startup floor after weight loading and rolled back; runs/launch-eager-cb3f6320-failed.json",
   "quality_comparison": "not run",
-  "performance_comparison": "not run: consolidated latest-head image has not been built or launched",
+  "performance_comparison": "not run: consolidated latest-head image has not reached API readiness",
   "interim_live_comparison": "performance-bridge.md: weekend promoted service versus running patch-0029; all eight matched cases slower on patch-0029",
-  "patch_author_replay": "pass: 13 local commits reauthored to GitHub noreply identity; exact vLLM and B12X source trees unchanged; runs/source-replay-identity.json",
-  "b12x_progress_fix": "pass: patch 0004 exact replay at a4b6b18b5ccdf9b8d40508ce17298da8281f94bf; d4c5337e bounded GPU smoke found second private progress API and prompted same-concept simplification; new image and guarded load pending"
+  "patch_author_replay": "pass: initial 13 local commits reauthored to GitHub noreply identity; later loader patch also authored and committed as Christopher Owen",
+  "b12x_loader_lifecycle": "patch 0004 removes stale private progress APIs and dead _log_loading_time hook; it finishes transfers and releases CUDA cache before post-load preparation; exact replay, image rebuild and guarded run pending"
 }
