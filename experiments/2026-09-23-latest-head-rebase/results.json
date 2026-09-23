@@ -2,6 +2,8 @@
   "source_replay": "pass: exact pinned patch heads and source trees from canonical upstream fetch on the local host and dgx1",
   "python_syntax": "pass: parsed 82 changed vLLM and 6 changed B12X Python files before final regrouping",
   "diff_check": "pass: both source deltas are whitespace-clean",
+  "diagnostics_audit": "pass: no added print, breakpoint, pdb, NaN probe, or debug logger statements",
+  "rocenante_c_syntax": "pass: gcc -std=gnu11 -fsyntax-only -Wall -Wextra on dgx1",
   "build_inputs": "pass: latest-head source and deployment identities on the local host and dgx1",
   "dockerfile_check": "pass: docker buildx build --check on dgx1, no warnings",
   "live_service_observation": "patch-0029 containers and memory guards active on dgx1, dgx2, and dgx3; unchanged",
