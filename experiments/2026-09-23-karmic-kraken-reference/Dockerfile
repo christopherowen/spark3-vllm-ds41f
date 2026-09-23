@@ -11,6 +11,9 @@ FROM ${BASE_IMAGE} AS vllm-native-builder
 USER root
 
 COPY --from=vllm-source . /workspace/vllm/
+# CUTLASS headers come from a host-side checkout of the tag vLLM pins.
+COPY --from=cutlass-source . /workspace/cutlass/
+ENV VLLM_CUTLASS_SRC_DIR=/workspace/cutlass
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -20,9 +23,11 @@ RUN apt-get update \
 ENV TORCH_CUDA_ARCH_LIST=12.1a
 ARG VLLM_COMPILE_JOBS=8
 ARG VLLM_NVCC_THREADS=2
-# GitHub intermittently answers anonymous clones from this network with 401.
-# FetchContent keeps completed checkouts in .deps, so a configure retry only
-# fetches the dependencies that are still missing.
+# Only the two stable extensions are rebuilt; the external projects (DeepGEMM,
+# FlashMLA, flash-attention, Triton kernels, ...) produce other native modules
+# that are taken prebuilt from the base image. Skip their configure-time
+# clones: GitHub intermittently answers anonymous clones from this network with
+# 401. A configure retry remains for any residual fetch.
 RUN --mount=type=secret,id=github_token,required=false \
     set -eu; \
     if [ -s /run/secrets/github_token ]; then \
@@ -33,6 +38,10 @@ RUN --mount=type=secret,id=github_token,required=false \
       export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $github_auth"; \
     fi; \
     python_path=$(python3 -c 'import sys; print(":".join(sys.path))'); \
+    sed -i -E 's#^([[:space:]]*)include\(cmake/external_projects/[a-z0-9_]+\.cmake\)#\1message(STATUS "spark3: external project skipped")#' \
+      /workspace/vllm/CMakeLists.txt; \
+    if grep -n 'include(cmake/external_projects/' /workspace/vllm/CMakeLists.txt; then exit 1; fi; \
+    grep -q '#define CUTLASS_MAJOR 4' /workspace/cutlass/include/cutlass/version.h; \
     attempt=1; \
     until cmake -S /workspace/vllm -B /tmp/vllm-native -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \

@@ -15,6 +15,7 @@ EXPERIMENT = Path(__file__).resolve().parent
 REPO = EXPERIMENT.parents[1]
 SOURCES = REPO / ".work/experiments" / EXPERIMENT.name
 WHEELS = REPO / ".work/wheels/cutlass-dsl"
+CUTLASS = REPO / ".work/deps/cutlass-v4.7.1"
 GIB = 1024**3
 MIN_BUILD_AVAILABLE_GIB = 64
 BUILD_MEMORY_RESERVE_GIB = 24
@@ -114,6 +115,8 @@ def main():
         if git(source, "rev-parse", "HEAD^{tree}") != record["expected_tree"]:
             raise SystemExit(f"{project}: prepared tree differs from sources.json")
         heads[project] = git(source, "rev-parse", "HEAD")
+    if not (CUTLASS / "include/cutlass/cutlass.h").is_file():
+        raise SystemExit(f"CUTLASS v4.7.1 checkout is missing at {CUTLASS}")
     if len(list(WHEELS.glob("nvidia_cutlass_dsl*.whl"))) != 5:
         raise SystemExit("CuTe DSL wheels are missing; run scripts/fetch-cutlass-dsl-wheels")
     if args.mode == "check":
@@ -156,6 +159,7 @@ def main():
         "--build-context", f"vllm-source={source_root / 'vllm'}",
         "--build-context", f"b12x-source={source_root / 'b12x'}",
         "--build-context", f"cutlass-dsl-wheels={WHEELS}",
+        "--build-context", f"cutlass-source={CUTLASS}",
         "--build-arg", f"VLLM_REVISION={vllm['revision']}",
         "--build-arg", f"VLLM_TREE={vllm['expected_tree']}",
         "--build-arg", f"B12X_REVISION={b12x['revision']}",
