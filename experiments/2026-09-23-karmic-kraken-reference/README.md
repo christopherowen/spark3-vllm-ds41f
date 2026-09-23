@@ -86,3 +86,24 @@ differs from what prefill writes for the same tokens.
 a diagnostic copy of LIL's `DeepseekV41ModelState` that logs the Engram
 lookback window and input ids per step on TP rank 0. It tests whether decode
 feeds Engram the wrong n-grams.
+
+## Trace results (no DSpark, per-step device synchronize)
+
+- Engram lookback and input ids matched the true token sequence at all 181
+  steps of a traced request (`runs/kktrace/kktrace-lookback.jsonl`), so decode
+  feeds Engram the correct n-grams.
+- That first request after startup passed. Five repeats then failed, even
+  with a full device synchronize before every step. An unsynchronized
+  per-step race is not the cause.
+- Five requests with a unique `cache_salt` each (`probe_quality_salted.py`)
+  also failed, so cross-request prefix reuse is not the cause.
+- The compressor state cache is FP32 (`CircularBufferSpec`), so a
+  reduced-precision state cache is not the explanation either.
+
+Ruled out so far: RoCEnante all-reduce, B12X FP8/8-head split decode (checked
+on the canonical-main stack), Engram lookback, prefix-cache reuse, DSpark, and
+a per-step race. Established: decode-written state drifts from what prefill
+writes for the same tokens. At most 16 consecutive decode steps stay correct;
+48 or more do not. The defect is shared by weekend R37, LIL beta and the
+canonical-main candidate. Every stack also shares TP3 head padding, B12X
+cache writers and kernels, and disk Engram.
