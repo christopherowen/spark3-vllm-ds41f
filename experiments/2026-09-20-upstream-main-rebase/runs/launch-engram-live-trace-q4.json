@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "result": "fail",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 500
+  },
+  "first_non_finite": {
+    "stage": "layer-1 Engram staged_rows before TP all-reduce",
+    "shape": [
+      5,
+      24,
+      256
+    ],
+    "dtype": "bfloat16",
+    "nan_count": 94
+  },
+  "configuration": "cluster-engram-hash-trace.json",
+  "repository_commit": "171bdf27f5d5da60ac0809066f1aab37ba308fd1",
+  "nodes": {
+    "dgx1": {
+      "container_id": "ca086c13dda1f832a1eaf06b58562b3ff0568ebca6a32d45655ac4e29265d838",
+      "exit_code": 0,
+      "oom_killed": false,
+      "prepare_disk_traces": 0,
+      "staged_nan": 94
+    },
+    "dgx2": {
+      "container_id": "f027961f844632c8cec0150be8d83c0f08f10dff8f165b8ec198c156e7cf124c",
+      "exit_code": 0,
+      "oom_killed": false,
+      "prepare_disk_traces": 0,
+      "staged_nan": 94
+    },
+    "dgx3": {
+      "container_id": "e1c2159edd2e5bafe88f2ef08a05b96427d9936d8110bf4cbe36ced6ea58d4c0",
+      "exit_code": 0,
+      "oom_killed": false,
+      "prepare_disk_traces": 0,
+      "staged_nan": 94
+    }
+  }
+}

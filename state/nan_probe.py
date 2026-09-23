@@ -80,6 +80,11 @@ def _wrap_engram_prepare(owner: type[Any]) -> None:
     def checked(self: Any, hash_ids: torch.Tensor) -> None:
         armed = os.path.exists(_ARM_FILE)
         stage = f"Engram[{self.layer_hash_index}]"
+        print(
+            f"spark3 NaN probe: {stage}.prepare_disk invoked "
+            f"armed={armed} tokens={hash_ids.shape[0]}",
+            flush=True,
+        )
         if armed:
             raw = hash_ids.detach().contiguous().view(torch.uint8).cpu()
             digest = hashlib.sha256(raw.numpy().tobytes()).hexdigest()
@@ -115,6 +120,48 @@ def _wrap_engram_prepare(owner: type[Any]) -> None:
             )
 
     owner.prepare_disk = checked
+
+
+def _wrap_model_state(owner: type[Any], default_owner: type[Any]) -> None:
+    original_init = owner.__init__
+    original_prepare = owner.prepare_inputs
+    base_prepare = default_owner.prepare_inputs
+
+    @functools.wraps(original_init)
+    def checked_init(self: Any, *args: Any, **kwargs: Any) -> None:
+        original_init(self, *args, **kwargs)
+        print(
+            "spark3 NaN probe: model_state initialized "
+            f"type={type(self).__name__} "
+            f"lookback={None if self.lookback_token_ids is None else tuple(self.lookback_token_ids.shape)} "
+            f"disk_engram_models={len(self.disk_engram_models)}",
+            flush=True,
+        )
+
+    @functools.wraps(original_prepare)
+    def checked_prepare(self: Any, *args: Any, **kwargs: Any) -> Any:
+        if os.path.exists(_ARM_FILE):
+            print(
+                "spark3 NaN probe: custom model_state.prepare_inputs "
+                f"lookback_present={self.lookback_token_ids is not None} "
+                f"disk_engram_models={len(self.disk_engram_models)}",
+                flush=True,
+            )
+        return original_prepare(self, *args, **kwargs)
+
+    @functools.wraps(base_prepare)
+    def checked_base_prepare(self: Any, *args: Any, **kwargs: Any) -> Any:
+        if os.path.exists(_ARM_FILE):
+            print(
+                "spark3 NaN probe: base model_state.prepare_inputs "
+                f"type={type(self).__name__}",
+                flush=True,
+            )
+        return base_prepare(self, *args, **kwargs)
+
+    owner.__init__ = checked_init
+    owner.prepare_inputs = checked_prepare
+    default_owner.prepare_inputs = checked_base_prepare
 
 
 def _wrap_engram(owner: type[Any]) -> None:
@@ -320,7 +367,10 @@ def _install() -> None:
         DeepseekV41B12xAttention,
     )
     from vllm.models.deepseek_v41.nvidia.engram import Engram
+    from vllm.models.deepseek_v41.nvidia.model_state import DeepseekV41ModelState
+    from vllm.v1.worker.gpu.model_states.default import DefaultModelState
 
+    _wrap_model_state(DeepseekV41ModelState, DefaultModelState)
     _wrap_engram_prepare(Engram)
     _wrap_engram(Engram)
     _wrap_method(Engram, "embed", "embed")
