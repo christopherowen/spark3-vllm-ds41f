@@ -227,6 +227,12 @@ def _wrap_method(
         _check(f"{prefix}.{label}.output", output)
         if label == "embed" and isinstance(output, torch.Tensor):
             _trace(f"{prefix}.{label}.output", output)
+        if label in ("attention", "moe", "decoder", "logits"):
+            for index, tensor in enumerate(_tensors(output)):
+                if index >= (2 if label == "decoder" else 1):
+                    break
+                if tensor.is_floating_point():
+                    _trace(f"{prefix}.{label}.output[{index}]", tensor)
         return output
 
     setattr(owner, method_name, checked)
@@ -338,8 +344,18 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
         if armed:
             torch.cuda.synchronize(output.device)
             finite = torch.isfinite(output)
+            assert expected is not None
+            error = (output.float() - expected.float()).abs()
+            print(
+                "spark3 NaN probe: "
+                f"{prefix}.b12x_native_vs_reference "
+                f"max_abs={float(error.max().item())} "
+                f"mean_abs={float(error.mean().item())} "
+                f"native_max={float(output.float().abs().max().item())} "
+                f"reference_max={float(expected.float().abs().max().item())}",
+                flush=True,
+            )
             if not bool(finite.all().item()):
-                assert expected is not None
                 raise RuntimeError(
                     "spark3 NaN probe: B12X native output is non-finite while "
                     f"the live-cache reference is finite; shape={tuple(output.shape)}, "

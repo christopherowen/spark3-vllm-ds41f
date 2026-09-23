@@ -2,6 +2,25 @@
 
 Last updated: 2026-09-23 (Europe/Belgrade)
 
+## Latest live finding
+
+The candidate's `VLLM_USE_V2_MODEL_RUNNER=0` selected
+`vllm/v1/worker/gpu_model_runner.py`, which does not initialize
+`DeepseekV41ModelState` or call the disk Engram preparation path. A guarded
+live request exposed 94 NaNs in layer-1 `staged_rows` **before** TP reduction
+on every rank; an instrumented `Engram.prepare_disk` wrapper was never called.
+These were stale/unwritten staged rows, not a RoCEnante or WKV result. See the
+q3/q4 receipts in `runs/`.
+
+An otherwise identical V2-runner launch initialized `DeepseekV41ModelState`
+on all three ranks with one disk Engram model and a three-token lookback.
+`prepare_disk` ran for every request step, staged rows, WKV, and gate were
+finite, and the deterministic request returned HTTP 200. Its text was still
+garbled (`" selectsbedaelanibit"` for `"1 + 1 ="` at temperature zero), so
+correctness is unresolved. See `runs/launch-v2-live-trace-q6.json`. The next
+diagnostic compares live layer-0 B12X attention output against its compressed
+reference and records attention/MoE/decoder activation ranges by layer.
+
 ## Review correction: disk Engram collective
 
 Source review found that the proposed dim-0 all-gather probe does **not**
@@ -192,21 +211,18 @@ difference.
 
 ## Suggested next steps
 
-1. Rerun the revised real-row probe with a new rendezvous port and its 8 GiB
-   cap on all three ranks. Check whether loaded/packed weights or the numerical
-   WKV projection differ, and retain a run receipt.
-2. If WKV has a real numerical discrepancy, fix the proven loader or kernel
-   cause and repeat the probe. If the discrepancy is benign, instrument the
-   real hidden state and fused Engram boundary during a guarded live request.
-3. Only after the complete isolated Engram pipeline is understood should another
-   full launch be considered. Keep it target-only with CUDA graphs `NONE`,
-   2 GiB KV, the 5/3 GiB memory guards, the completed compilation cache, and a
-   single tiny deterministic request. Add compact probes before/after all-reduce,
-   WKV, and final gate; record only shapes, finite counts, ranges,
-   and hashes.  Stop the candidate immediately after the request.
-4. Once a minimal source fix passes both the isolated pipeline and guarded live
-   request, add focused regressions, refresh the candidate/run receipts, and
-   decide whether the change belongs upstream in B12X or vLLM before promotion.
+1. Run the bounded V2 configuration `cluster-v2-trace.json` with the updated
+   attention and per-layer activation probe. Preserve the old stopped service
+   containers; use a distinct container name and rendezvous port. Keep target
+   only, CUDA graphs `NONE`, 2 GiB KV, the 5/3 GiB memory guards, and one
+   tiny deterministic request.
+2. Compare native layer-0 B12X attention against the live-cache compressed
+   reference. Locate the first layer with a large activation jump. Isolate
+   that layer's attention, MHC, or MoE output and fix the proven numerical
+   cause; repeat the guarded request.
+3. After the deterministic request produces correct text, run several prompt
+   and decode checks and refresh the run receipts. Then decide which minimal
+   fixes belong upstream in B12X or vLLM before promotion.
 
 ## Relevant source paths
 

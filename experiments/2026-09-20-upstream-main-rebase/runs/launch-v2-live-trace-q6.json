@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "result": "api_ok_incorrect_text",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 200,
+    "text": " selectsbedaelanibit",
+    "token_logprobs": [
+      -3.43644642829895,
+      -1.5490508079528809,
+      -2.0258359909057617,
+      -1.871392011642456
+    ]
+  },
+  "configuration": "cluster-v2-trace.json",
+  "repository_commit": "e9407142fccf5dc2189948cb7f3ac1c2599a2d40",
+  "nodes": {
+    "dgx1": {
+      "container_id": "f384ce8659ccda86664a35b9e153b3fbca40cd84471cff1059ee8b4bee0004de",
+      "exit_code": 0,
+      "oom_killed": false,
+      "model_state_initialized": true,
+      "disk_prepare_calls": 8,
+      "non_finite_activation_errors": 0
+    },
+    "dgx2": {
+      "container_id": "9512f6ab72d1694933b23e8f58cf812aa226566d70a8482b6971c9fc054a6bd8",
+      "exit_code": 0,
+      "oom_killed": false,
+      "model_state_initialized": true,
+      "disk_prepare_calls": 8,
+      "non_finite_activation_errors": 0
+    },
+    "dgx3": {
+      "container_id": "4b749bde7878240052f308a68ade7b039920b3f38daf2d294a1416f92c2241ac",
+      "exit_code": 0,
+      "oom_killed": false,
+      "model_state_initialized": true,
+      "disk_prepare_calls": 8,
+      "non_finite_activation_errors": 0
+    }
+  }
+}
