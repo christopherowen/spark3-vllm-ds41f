@@ -326,9 +326,9 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
         if os.path.exists(_ARM_FILE) and kwargs.get("indexed_indices") is not None:
             from vllm.forward_context import get_forward_context
 
-            assert self.compressor is not None
+            assert self.compressed_cache_prefix is not None
             compressed = get_forward_context().attn_metadata[
-                self.compressor.k_cache_prefix
+                self.compressed_cache_prefix
             ]
             if getattr(self, "layer_id", None) == 2:
                 print(

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "result": "diagnostic_wrapper_assertion",
+  "configuration": "cluster-v2-blockfix.json",
+  "repository_commit": "c6379f0f27cfc0b91462645a2ed3f833d1300ce7",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 500
+  },
+  "cause": "The probe assumed every compressed attention layer owns a compressor. Shared-cache consumer layers have compressor=None; metadata must be keyed by compressed_cache_prefix. This is probe error, not model evidence.",
+  "nodes": {
+    "dgx1": {
+      "container_id": "b01a163d383b0d53bab843b80df41838fdd065bba79106ae99086089b8c5ebe1",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx2": {
+      "container_id": "d4dbc18d04d4a370c446e085f0d15ec36c8acdc6daabfb3a92ff4127028bf513",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx3": {
+      "container_id": "663f5b1bcf325b3e2dcf8d389c73dbc06cf80146118d3c3ae796bf6da92548f6",
+      "exit_code": 0,
+      "oom_killed": false
+    }
+  }
+}
