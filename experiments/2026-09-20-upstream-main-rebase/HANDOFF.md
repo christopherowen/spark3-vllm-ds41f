@@ -181,18 +181,24 @@ NCCL, with no reported RoCEnante transport errors or OOM kills. This clears
 the synthetic collective geometry; it does not yet validate the real rows after
 reduction.
 
+The real-row TP3 probe also passed checkpoint row verification (40 slices per
+rank) and RoCEnante/NCCL bitwise equality. The reduced rows are identical on
+all ranks and finite. The WKV output and fused gate are finite, but WKV hashes
+differ by rank despite identical reduced input. See
+`runs/probe-engram-real-pipeline-454c8e0.json`. The probe now records loaded
+and packed WKV hashes and compares the first 32 projected columns against an
+independent dequantized MXFP8 reference to identify the source of that
+difference.
+
 ## Suggested next steps
 
-1. Run the bounded `probe_engram_pipeline.py` on all three ranks. It reads the
-   real prompt rows, compares their RoCEnante reduction with NCCL, then runs
-   the checkpoint WKV and fused gate with finite test hidden states. Use a new
-   rendezvous port, the candidate network environment, and an 8 GiB container
-   cap. Stop only the exact probe containers if any rank fails or stalls.
-2. If the real reduction differs from NCCL, isolate the transport boundary and
-   use NCCL for this geometry until a minimal B12X fix passes. If WKV or the
-   gate first becomes non-finite, inspect that input and its loaded weights.
-   Add a focused regression for the proven cause.
-3. Only after the complete isolated Engram pipeline is finite should another
+1. Rerun the revised real-row probe with a new rendezvous port and its 8 GiB
+   cap on all three ranks. Check whether loaded/packed weights or the numerical
+   WKV projection differ, and retain a run receipt.
+2. If WKV has a real numerical discrepancy, fix the proven loader or kernel
+   cause and repeat the probe. If the discrepancy is benign, instrument the
+   real hidden state and fused Engram boundary during a guarded live request.
+3. Only after the complete isolated Engram pipeline is understood should another
    full launch be considered. Keep it target-only with CUDA graphs `NONE`,
    2 GiB KV, the 5/3 GiB memory guards, the completed compilation cache, and a
    single tiny deterministic request. Add compact probes before/after all-reduce,

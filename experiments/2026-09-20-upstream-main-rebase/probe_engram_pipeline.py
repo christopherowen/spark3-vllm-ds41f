@@ -55,6 +55,31 @@ def _summary(tensor: torch.Tensor) -> dict[str, Any]:
     }
 
 
+def _quantize_rows(source: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    rows, width = map(int, source.shape)
+    blocked = source.float().reshape(rows, width // 32, 32)
+    max_abs = blocked.abs().amax(dim=-1)
+    safe = torch.where(max_abs > 0.0, max_abs / 448.0, torch.ones_like(max_abs))
+    exponent = torch.ceil(torch.log2(safe)).clamp(-127, 127)
+    scale_u8 = (exponent + 127).to(torch.uint8)
+    scale = scale_u8.view(torch.float8_e8m0fnu).float()
+    values = (
+        (blocked / scale[..., None])
+        .clamp(-448.0, 448.0)
+        .to(torch.float8_e4m3fn)
+        .reshape(rows, width)
+        .contiguous()
+    )
+    return values, scale_u8.contiguous()
+
+
+def _dequantize_rows(values: torch.Tensor, scales: torch.Tensor) -> torch.Tensor:
+    scale = scales.view(torch.float8_e8m0fnu).float()
+    return (values.float().reshape(values.shape[0], -1, 32) * scale[..., None]).reshape(
+        values.shape
+    )
+
+
 def _benchmark(path: pathlib.Path) -> Any:
     spec = importlib.util.spec_from_file_location("engram_pipeline_benchmark", path)
     if spec is None or spec.loader is None:
@@ -140,7 +165,7 @@ def _real_wkv_and_gate(
     checkpoint: pathlib.Path,
     rows: torch.Tensor,
     eps: float,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     prefix = "layers.1.engram"
     index = checkpoint / "model.safetensors.index.json"
     weight_map = json.loads(index.read_text())["weight_map"]
@@ -195,6 +220,17 @@ def _real_wkv_and_gate(
         )(scale, raw_scale)
         session.flush()
         torch.cuda.synchronize()
+        reference_rows = 32
+        reference_weight = weight[:reference_rows].detach().clone()
+        reference_scale = scale[:reference_rows].detach().clone()
+        loaded_report = {
+            "q_sha256": _sha256(q),
+            "k_sha256": _sha256(k),
+            "weight_sha256": _sha256(weight),
+            "scale_sha256": _sha256(scale),
+            "scale_ff_bytes": int((scale == 0xFF).sum().item()),
+            "io": session.stats(),
+        }
 
         layer = torch.nn.Module()
         layer.prefix = "diagnostic.layers.1.engram.wkv"
@@ -202,6 +238,9 @@ def _real_wkv_and_gate(
         layer.weight_scale = scale
         kernel = object.__new__(B12xMxfp8LinearKernel)
         kernel.process_weights_after_loading(layer)
+        packed = layer.b12x_mxfp8_packed_weight.weight
+        loaded_report["packed_weight_sha256"] = _sha256(packed.values)
+        loaded_report["packed_scale_sha256"] = _sha256(packed.scale_mma)
         unit = kernel.get_b12x_pre_profile_unit(
             layer, tuple(sorted({1, rows.shape[0]})), torch.bfloat16
         )
@@ -211,6 +250,21 @@ def _real_wkv_and_gate(
         kv_report = _summary(kv)
         if kv_report["finite"] != kv_report["total"]:
             raise RuntimeError("real-row WKV output is non-finite")
+        input_values, input_scales = _quantize_rows(rows.flatten(1).contiguous())
+        expected = (
+            _dequantize_rows(input_values, input_scales)
+            @ _dequantize_rows(reference_weight, reference_scale).T
+        ).to(kv.dtype)
+        selected = kv[:, :reference_rows]
+        kv_report["reference"] = {
+            "rows": reference_rows,
+            "expected_sha256": _sha256(expected),
+            "actual_sha256": _sha256(selected),
+            "exact_bf16": bool(torch.equal(selected, expected)),
+            "max_abs_error": float(
+                (selected.float() - expected.float()).abs().max().item()
+            ),
+        }
 
         torch.manual_seed(20260923)
         hidden = (
@@ -244,7 +298,7 @@ def _real_wkv_and_gate(
         gate_report = _summary(output)
         if gate_report["finite"] != gate_report["total"]:
             raise RuntimeError("real-row Engram gate output is non-finite")
-        return kv_report, gate_report
+        return loaded_report, kv_report, gate_report
 
 
 def main() -> None:
@@ -325,13 +379,16 @@ def main() -> None:
             reduced_report = _summary(actual)
             if not equal or reduced_report["finite"] != reduced_report["total"]:
                 raise RuntimeError("real-row RoCEnante reduction differs from NCCL")
-            kv_report, gate_report = _real_wkv_and_gate(args.checkpoint, actual, eps)
+            loaded_report, kv_report, gate_report = _real_wkv_and_gate(
+                args.checkpoint, actual, eps
+            )
             report = {
                 "rank": rank,
                 "token_ids": token_ids,
                 "local": local_report,
                 "reduced_equal_nccl": equal,
                 "reduced": reduced_report,
+                "loaded": loaded_report,
                 "wkv": kv_report,
                 "gate": gate_report,
                 "runtime_stats": runtime.stats(),

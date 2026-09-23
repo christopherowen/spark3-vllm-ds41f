@@ -1,0 +1,388 @@
+{
+  "container_name": "engram-real-pipeline-454c8e0",
+  "image_id": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
+  "master_port": 29632,
+  "memory_limit_gib": 8,
+  "nodes": {
+    "dgx1": {
+      "container_id": "01f40dc705cf0dc14dbc7b6f2622ee233c08cc7693deb407d8b32f76b44ac7e0",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "gate": {
+          "finite": 102400,
+          "finite_max": 5.15625,
+          "finite_min": -4.9375,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "d3234fb399b9ac6e148fb6afbd16271732f147243133b21640c5b47d9eda47ea",
+          "shape": [
+            5,
+            4,
+            5120
+          ],
+          "total": 102400
+        },
+        "local": {
+          "direct_checkpoint_rows_checked": 40,
+          "hash_sha256": "86ccd773ea3e0f57f6b7584382710b376ebad960738b683ec8f29616ccd56bfe",
+          "local_rows": {
+            "finite": 30720,
+            "finite_max": 3.0,
+            "finite_min": -3.0,
+            "inf": 0,
+            "nan": 0,
+            "sha256": "0cd4af273c63a865bcfee0a3d16bab7d3932543ff4c1566decb1d033b0363c76",
+            "shape": [
+              5,
+              24,
+              256
+            ],
+            "total": 30720
+          }
+        },
+        "rank": 0,
+        "reduced": {
+          "finite": 30720,
+          "finite_max": 3.0,
+          "finite_min": -3.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "742fe6c429b7a070cfc8d9cbe6f7096af2615192a9fbd47add6b964a2ff2b54f",
+          "shape": [
+            5,
+            24,
+            256
+          ],
+          "total": 30720
+        },
+        "reduced_equal_nccl": true,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f0",
+            "roceP2p1s0f0",
+            "rocep1s0f1",
+            "roceP2p1s0f1"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "1": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ],
+            "2": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ]
+          },
+          "rank": 0,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "token_ids": [
+          19,
+          940,
+          223,
+          19,
+          438
+        ],
+        "wkv": {
+          "finite": 128000,
+          "finite_max": 98.0,
+          "finite_min": -60.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "4933382914268b2f545b4055689626f1211c113515074dabf86ba6a8bc6128f7",
+          "shape": [
+            5,
+            25600
+          ],
+          "total": 128000
+        }
+      }
+    },
+    "dgx2": {
+      "container_id": "bf08d213a622d14fab5fcbca7e5c697399f44bfe16cd783ecaec4b998eb6ca25",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "gate": {
+          "finite": 102400,
+          "finite_max": 5.15625,
+          "finite_min": -4.9375,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "7d1de65de7df3dfcd8915afe98d5098ed06902381d5b7834f3eed5602cbfedcb",
+          "shape": [
+            5,
+            4,
+            5120
+          ],
+          "total": 102400
+        },
+        "local": {
+          "direct_checkpoint_rows_checked": 40,
+          "hash_sha256": "86ccd773ea3e0f57f6b7584382710b376ebad960738b683ec8f29616ccd56bfe",
+          "local_rows": {
+            "finite": 30720,
+            "finite_max": 3.0,
+            "finite_min": -2.5,
+            "inf": 0,
+            "nan": 0,
+            "sha256": "ab8cdaf353c2fb81b58b9a3e65a3273ca40fb69bdedff870b1d540d10a190417",
+            "shape": [
+              5,
+              24,
+              256
+            ],
+            "total": 30720
+          }
+        },
+        "rank": 1,
+        "reduced": {
+          "finite": 30720,
+          "finite_max": 3.0,
+          "finite_min": -3.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "742fe6c429b7a070cfc8d9cbe6f7096af2615192a9fbd47add6b964a2ff2b54f",
+          "shape": [
+            5,
+            24,
+            256
+          ],
+          "total": 30720
+        },
+        "reduced_equal_nccl": true,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f1",
+            "roceP2p1s0f1",
+            "rocep1s0f0",
+            "roceP2p1s0f0"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "0": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ],
+            "2": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ]
+          },
+          "rank": 1,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "token_ids": [
+          19,
+          940,
+          223,
+          19,
+          438
+        ],
+        "wkv": {
+          "finite": 128000,
+          "finite_max": 97.5,
+          "finite_min": -60.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "f8e388451e5352ef0fa876dba1b90986b167060a866bc51aeab5681927697d20",
+          "shape": [
+            5,
+            25600
+          ],
+          "total": 128000
+        }
+      }
+    },
+    "dgx3": {
+      "container_id": "5c8f7cacc44748c5fcbcf3283587606aadcb6a01a128e363da09652bc7709e74",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "gate": {
+          "finite": 102400,
+          "finite_max": 5.15625,
+          "finite_min": -4.9375,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "965b4863b101fa769abb40224134f0b9ac3fe3e800e54e1dfa0da4fde658f621",
+          "shape": [
+            5,
+            4,
+            5120
+          ],
+          "total": 102400
+        },
+        "local": {
+          "direct_checkpoint_rows_checked": 40,
+          "hash_sha256": "86ccd773ea3e0f57f6b7584382710b376ebad960738b683ec8f29616ccd56bfe",
+          "local_rows": {
+            "finite": 30720,
+            "finite_max": 2.75,
+            "finite_min": -3.25,
+            "inf": 0,
+            "nan": 0,
+            "sha256": "edd8df491ba454b0d873b2185bc81571f88e87f3cf2a39d5515e0439b9ff17c7",
+            "shape": [
+              5,
+              24,
+              256
+            ],
+            "total": 30720
+          }
+        },
+        "rank": 2,
+        "reduced": {
+          "finite": 30720,
+          "finite_max": 3.0,
+          "finite_min": -3.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "742fe6c429b7a070cfc8d9cbe6f7096af2615192a9fbd47add6b964a2ff2b54f",
+          "shape": [
+            5,
+            24,
+            256
+          ],
+          "total": 30720
+        },
+        "reduced_equal_nccl": true,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f0",
+            "roceP2p1s0f0",
+            "rocep1s0f1",
+            "roceP2p1s0f1"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "0": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ],
+            "1": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ]
+          },
+          "rank": 2,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "token_ids": [
+          19,
+          940,
+          223,
+          19,
+          438
+        ],
+        "wkv": {
+          "finite": 128000,
+          "finite_max": 97.5,
+          "finite_min": -60.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "19eb5b41147b621e5ee80e57533aad8228545fb757cd40cc6d439e1400a98983",
+          "shape": [
+            5,
+            25600
+          ],
+          "total": 128000
+        }
+      }
+    }
+  },
+  "probe": "probe_engram_pipeline.py",
+  "recorded_at": "2026-09-23T00:40:05.658363+00:00",
+  "reduced_hashes_identical": true,
+  "repository_commit": "454c8e0d6c5eba977c20b021548b2dc793e53bfb",
+  "result": "finite-but-wkv-output-differs-across-ranks",
+  "schema_version": 1,
+  "timeout_seconds": 300,
+  "wkv_hashes_identical": false
+}
