@@ -1,0 +1,7 @@
+{
+  "container": "dsv41-kkref-r3",
+  "outcome": "startup memguard kills on dgx1 (5,125,760 KiB) and dgx3 (5,238,024 KiB) after B12X bind preparation, during CUDA graph capture; rollback clean",
+  "phases": "weights 97.48 GiB in 31.9 s; B12X weights preparation with autotune off made 0 compilations; KV 2 GiB = 585,403 tokens; state and bind preparation completed; kill follows",
+  "interpretation": "Compilation is not the cause with autotune off. The envelope (7 draft tokens, capture to 32, 8192 batched tokens) exceeds the weekend's by more than the guard margin.",
+  "next": "r4: weekend envelope where it drives memory - 3 draft tokens, capture sizes to 24, 4096 batched tokens; LIL draft TP 3 retained"
+}
