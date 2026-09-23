@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "result": "api_ok_incorrect_text",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 200,
+    "text": " Checklistsvez sterIntermediate"
+  },
+  "configuration": "cluster-v2-attn.json",
+  "repository_commit": "5e36319584ff54896bc631fde5450aef49c4c78d",
+  "comparison_validity": "layer-2 reference omitted indexed cache stream; its large native/reference difference cannot be interpreted as a native kernel error",
+  "nodes": {
+    "dgx1": {
+      "container_id": "404569934a00b5c39b2ff77801f5c30cd096c4d12103d80a77936ab049ba877e",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx2": {
+      "container_id": "7f5a515258d05d2bae366d66114f59a66db3c2396ff9617b4d76afdbe38ea72f",
+      "exit_code": 0,
+      "oom_killed": false
+    },
+    "dgx3": {
+      "container_id": "556673abd37f531935d85e22da21387c3e99e62bc1793d87d99ba15fab993682",
+      "exit_code": 0,
+      "oom_killed": false
+    }
+  }
+}

@@ -34,6 +34,12 @@ are about ±4 and ±6. The next trace extends the live-cache native/reference
 B12X attention comparison to layers 1 and 2. See
 `runs/launch-v2-mhc-q8.json`.
 
+The first layer-2 comparison omitted that layer's indexed cache stream, so its
+large native/reference difference is **not** evidence of a native-kernel fault.
+The layer-0/1 comparisons are valid because those layers are SWA-only. The
+next probe includes the physical indexed IDs, lengths, compressed cache, and
+page size in the reference. See `runs/launch-v2-attn-q9.json`.
+
 ## Review correction: disk Engram collective
 
 Source review found that the proposed dim-0 all-gather probe does **not**

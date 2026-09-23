@@ -336,6 +336,9 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
             from vllm.models.deepseek_v41.nvidia.b12x_attention import (
                 _flatten_cache,
             )
+            from vllm.models.deepseek_v41.common.ops import (
+                compute_global_topk_indices_and_lens,
+            )
 
             q = kwargs["q"]
             indices = kwargs["swa_indices"]
@@ -345,6 +348,29 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
                 self.swa_cache_layer.kv_cache,
                 name="DeepSeek V4.1 SWA cache",
             )
+            extra: dict[str, Any] = {}
+            indexed_indices = kwargs["indexed_indices"]
+            if indexed_indices is not None:
+                indexed_cache = kwargs["indexed_cache"]
+                assert indexed_cache is not None
+                indexed_page_size = (
+                    self._vllm_config.cache_config.block_size // self.compress_ratio
+                )
+                physical_indices, indexed_lengths = (
+                    compute_global_topk_indices_and_lens(
+                        indexed_indices,
+                        kwargs["token_to_req_indices"],
+                        kwargs["block_table"],
+                        indexed_page_size,
+                        kwargs["is_valid_token"],
+                    )
+                )
+                extra = {
+                    "extra_k_cache": indexed_cache,
+                    "extra_indices": physical_indices,
+                    "extra_topk_lengths": indexed_lengths,
+                    "extra_page_size": indexed_page_size,
+                }
             expected = compressed_sparse_mla_reference(
                 q,
                 cache,
@@ -354,12 +380,13 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
                 cache_format="deepseek_v41",
                 sm_scale=self.scale,
                 attn_sink=sink,
+                **extra,
             )
             _check(f"{prefix}.b12x_reference.output", expected)
             valid = indices >= 0
             valid_indices = indices[valid]
             print(
-                "spark3 NaN probe: live layer-0 B12X inputs "
+                f"spark3 NaN probe: {prefix}.b12x_inputs "
                 f"q={tuple(q.shape)} rows={int(q.shape[0])} "
                 f"swa_width={int(indices.shape[1])} "
                 f"lengths={lengths.detach().cpu().tolist()} "
@@ -367,6 +394,7 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
                 f"index_min={int(valid_indices.min().item()) if valid_indices.numel() else -1} "
                 f"index_max={int(valid_indices.max().item()) if valid_indices.numel() else -1} "
                 f"sink_finite={int(torch.isfinite(sink).sum().item())}/{sink.numel()} "
+                f"indexed_lengths={indexed_lengths.detach().cpu().tolist() if indexed_indices is not None else None} "
                 f"reference_finite={int(torch.isfinite(expected).sum().item())}/{expected.numel()}",
                 flush=True,
             )
