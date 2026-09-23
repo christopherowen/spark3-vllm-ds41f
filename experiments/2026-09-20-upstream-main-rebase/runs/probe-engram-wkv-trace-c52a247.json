@@ -1,0 +1,500 @@
+{
+  "checks": {
+    "loaded.k_sha256_identical": true,
+    "loaded.packed_scale_sha256_identical": true,
+    "loaded.packed_weight_sha256_identical": true,
+    "loaded.q_sha256_identical": true,
+    "loaded.scale_sha256_identical": true,
+    "loaded.weight_sha256_identical": true,
+    "reduced.sha256_identical": true,
+    "wkv.reference.actual_sha256_identical": false,
+    "wkv.reference.expected_sha256_identical": true,
+    "wkv.sha256_identical": false
+  },
+  "container_name": "engram-wkv-trace-c52a247",
+  "image_id": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
+  "master_port": 29633,
+  "memory_limit_gib": 8,
+  "nodes": {
+    "dgx1": {
+      "container_id": "d2616e0281a198fd2d71ed84d4dc3f6a449686bc51b6a5ba67cfd12b3a4b5d7f",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "gate": {
+          "finite": 102400,
+          "finite_max": 5.1875,
+          "finite_min": -4.9375,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "82d91aa73a83a3391fd7630ab1dbfcc433e5b46952e8c6393dc9c8482a45fae7",
+          "shape": [
+            5,
+            4,
+            5120
+          ],
+          "total": 102400
+        },
+        "loaded": {
+          "io": {
+            "batches": 1,
+            "descriptors": 4,
+            "destination_bytes": 157495296,
+            "execution_seconds": 0.015560126,
+            "inplace_aligned_bytes": 157495296,
+            "inplace_transform_bytes": 0,
+            "loaded_tensors": 4,
+            "metadata_bytes": 0,
+            "metadata_host_copy_bytes": 0,
+            "payload_bytes": 157521920,
+            "physical_bytes": 157651800,
+            "reads": 32,
+            "realigned_bytes": 27288,
+            "scratch_bytes": 75497472,
+            "strided_copy_bytes": 0,
+            "torch_copy_bytes": 4915200,
+            "transform_bytes": 0,
+            "transform_scratch_bytes": 0
+          },
+          "k_sha256": "61152efdabab20ca8c29fe2e087d7de9c5c1684bfef930fa00541efe58fff422",
+          "packed_scale_sha256": "3492465d0e461c82321b947cf9dfc005739bdeab3eab915a027297c966958e40",
+          "packed_weight_sha256": "44d799d6444a3f728ae96c873c8199bdff49cafbc0b5d703a0bf07be948d0447",
+          "q_sha256": "0aca22a679f1a2479e8065a7b3c64e035b13fe1fa63189644e3556b0a333da56",
+          "scale_ff_bytes": 0,
+          "scale_sha256": "ac31680924a31a0f9f00b74dc44060590b2131d208f925c298767d747ea634d4",
+          "weight_sha256": "44d799d6444a3f728ae96c873c8199bdff49cafbc0b5d703a0bf07be948d0447"
+        },
+        "local": {
+          "direct_checkpoint_rows_checked": 40,
+          "hash_sha256": "86ccd773ea3e0f57f6b7584382710b376ebad960738b683ec8f29616ccd56bfe",
+          "local_rows": {
+            "finite": 30720,
+            "finite_max": 3.0,
+            "finite_min": -3.0,
+            "inf": 0,
+            "nan": 0,
+            "sha256": "0cd4af273c63a865bcfee0a3d16bab7d3932543ff4c1566decb1d033b0363c76",
+            "shape": [
+              5,
+              24,
+              256
+            ],
+            "total": 30720
+          }
+        },
+        "rank": 0,
+        "reduced": {
+          "finite": 30720,
+          "finite_max": 3.0,
+          "finite_min": -3.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "742fe6c429b7a070cfc8d9cbe6f7096af2615192a9fbd47add6b964a2ff2b54f",
+          "shape": [
+            5,
+            24,
+            256
+          ],
+          "total": 30720
+        },
+        "reduced_equal_nccl": true,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f0",
+            "roceP2p1s0f0",
+            "rocep1s0f1",
+            "roceP2p1s0f1"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "1": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ],
+            "2": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ]
+          },
+          "rank": 0,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "token_ids": [
+          19,
+          940,
+          223,
+          19,
+          438
+        ],
+        "wkv": {
+          "finite": 128000,
+          "finite_max": 98.0,
+          "finite_min": -60.25,
+          "inf": 0,
+          "nan": 0,
+          "reference": {
+            "actual_sha256": "04fed89c2c4a640ae65802c0ef405cc5af75de858e6eb742280598b72dc0b5a2",
+            "exact_bf16": false,
+            "expected_sha256": "4852352630aa83179e24141ca3c3e1ffa91a6cef0b93e011094f658d145ed23b",
+            "max_abs_error": 0.00390625,
+            "rows": 32
+          },
+          "sha256": "1fca98ef55ffa2303e1f00f6ec171eac4c6ce9d8e3fcb57b970df3cebbc9b197",
+          "shape": [
+            5,
+            25600
+          ],
+          "total": 128000
+        }
+      }
+    },
+    "dgx2": {
+      "container_id": "ac98fc35dbd0c387a01ad911e203f0fea8755010cd4c5197668724bfba988e9f",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "gate": {
+          "finite": 102400,
+          "finite_max": 5.1875,
+          "finite_min": -4.9375,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "18a73f88aea53f9bc9c25c0117216fc75377cab181b3a0d89f9bb4bbd8fb6728",
+          "shape": [
+            5,
+            4,
+            5120
+          ],
+          "total": 102400
+        },
+        "loaded": {
+          "io": {
+            "batches": 1,
+            "descriptors": 4,
+            "destination_bytes": 157495296,
+            "execution_seconds": 0.016354526,
+            "inplace_aligned_bytes": 157495296,
+            "inplace_transform_bytes": 0,
+            "loaded_tensors": 4,
+            "metadata_bytes": 0,
+            "metadata_host_copy_bytes": 0,
+            "payload_bytes": 157521920,
+            "physical_bytes": 157651800,
+            "reads": 32,
+            "realigned_bytes": 27288,
+            "scratch_bytes": 75497472,
+            "strided_copy_bytes": 0,
+            "torch_copy_bytes": 4915200,
+            "transform_bytes": 0,
+            "transform_scratch_bytes": 0
+          },
+          "k_sha256": "61152efdabab20ca8c29fe2e087d7de9c5c1684bfef930fa00541efe58fff422",
+          "packed_scale_sha256": "3492465d0e461c82321b947cf9dfc005739bdeab3eab915a027297c966958e40",
+          "packed_weight_sha256": "44d799d6444a3f728ae96c873c8199bdff49cafbc0b5d703a0bf07be948d0447",
+          "q_sha256": "0aca22a679f1a2479e8065a7b3c64e035b13fe1fa63189644e3556b0a333da56",
+          "scale_ff_bytes": 0,
+          "scale_sha256": "ac31680924a31a0f9f00b74dc44060590b2131d208f925c298767d747ea634d4",
+          "weight_sha256": "44d799d6444a3f728ae96c873c8199bdff49cafbc0b5d703a0bf07be948d0447"
+        },
+        "local": {
+          "direct_checkpoint_rows_checked": 40,
+          "hash_sha256": "86ccd773ea3e0f57f6b7584382710b376ebad960738b683ec8f29616ccd56bfe",
+          "local_rows": {
+            "finite": 30720,
+            "finite_max": 3.0,
+            "finite_min": -2.5,
+            "inf": 0,
+            "nan": 0,
+            "sha256": "ab8cdaf353c2fb81b58b9a3e65a3273ca40fb69bdedff870b1d540d10a190417",
+            "shape": [
+              5,
+              24,
+              256
+            ],
+            "total": 30720
+          }
+        },
+        "rank": 1,
+        "reduced": {
+          "finite": 30720,
+          "finite_max": 3.0,
+          "finite_min": -3.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "742fe6c429b7a070cfc8d9cbe6f7096af2615192a9fbd47add6b964a2ff2b54f",
+          "shape": [
+            5,
+            24,
+            256
+          ],
+          "total": 30720
+        },
+        "reduced_equal_nccl": true,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f1",
+            "roceP2p1s0f1",
+            "rocep1s0f0",
+            "roceP2p1s0f0"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "0": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ],
+            "2": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ]
+          },
+          "rank": 1,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "token_ids": [
+          19,
+          940,
+          223,
+          19,
+          438
+        ],
+        "wkv": {
+          "finite": 128000,
+          "finite_max": 97.5,
+          "finite_min": -60.25,
+          "inf": 0,
+          "nan": 0,
+          "reference": {
+            "actual_sha256": "a7c74b2a41fece1acbae2bfa2e0f733b9241cb4cc685f68401fee59ce9fb075c",
+            "exact_bf16": false,
+            "expected_sha256": "4852352630aa83179e24141ca3c3e1ffa91a6cef0b93e011094f658d145ed23b",
+            "max_abs_error": 0.03125,
+            "rows": 32
+          },
+          "sha256": "f2885205fa96fa276e5af55aa12cc0b21fbaf15524ba4fd37735864ae104e53f",
+          "shape": [
+            5,
+            25600
+          ],
+          "total": 128000
+        }
+      }
+    },
+    "dgx3": {
+      "container_id": "e6924b08ced387cfff69cce712ad57d5f1bae1a2c17291ee54ad4760e218c65e",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "gate": {
+          "finite": 102400,
+          "finite_max": 5.15625,
+          "finite_min": -4.9375,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "16551ca44351495204f9570a75f92dea911521fe302fc835f7295bf687160613",
+          "shape": [
+            5,
+            4,
+            5120
+          ],
+          "total": 102400
+        },
+        "loaded": {
+          "io": {
+            "batches": 1,
+            "descriptors": 4,
+            "destination_bytes": 157495296,
+            "execution_seconds": 0.015478984000000001,
+            "inplace_aligned_bytes": 157495296,
+            "inplace_transform_bytes": 0,
+            "loaded_tensors": 4,
+            "metadata_bytes": 0,
+            "metadata_host_copy_bytes": 0,
+            "payload_bytes": 157521920,
+            "physical_bytes": 157651800,
+            "reads": 32,
+            "realigned_bytes": 27288,
+            "scratch_bytes": 75497472,
+            "strided_copy_bytes": 0,
+            "torch_copy_bytes": 4915200,
+            "transform_bytes": 0,
+            "transform_scratch_bytes": 0
+          },
+          "k_sha256": "61152efdabab20ca8c29fe2e087d7de9c5c1684bfef930fa00541efe58fff422",
+          "packed_scale_sha256": "3492465d0e461c82321b947cf9dfc005739bdeab3eab915a027297c966958e40",
+          "packed_weight_sha256": "44d799d6444a3f728ae96c873c8199bdff49cafbc0b5d703a0bf07be948d0447",
+          "q_sha256": "0aca22a679f1a2479e8065a7b3c64e035b13fe1fa63189644e3556b0a333da56",
+          "scale_ff_bytes": 0,
+          "scale_sha256": "ac31680924a31a0f9f00b74dc44060590b2131d208f925c298767d747ea634d4",
+          "weight_sha256": "44d799d6444a3f728ae96c873c8199bdff49cafbc0b5d703a0bf07be948d0447"
+        },
+        "local": {
+          "direct_checkpoint_rows_checked": 40,
+          "hash_sha256": "86ccd773ea3e0f57f6b7584382710b376ebad960738b683ec8f29616ccd56bfe",
+          "local_rows": {
+            "finite": 30720,
+            "finite_max": 2.75,
+            "finite_min": -3.25,
+            "inf": 0,
+            "nan": 0,
+            "sha256": "edd8df491ba454b0d873b2185bc81571f88e87f3cf2a39d5515e0439b9ff17c7",
+            "shape": [
+              5,
+              24,
+              256
+            ],
+            "total": 30720
+          }
+        },
+        "rank": 2,
+        "reduced": {
+          "finite": 30720,
+          "finite_max": 3.0,
+          "finite_min": -3.25,
+          "inf": 0,
+          "nan": 0,
+          "sha256": "742fe6c429b7a070cfc8d9cbe6f7096af2615192a9fbd47add6b964a2ff2b54f",
+          "shape": [
+            5,
+            24,
+            256
+          ],
+          "total": 30720
+        },
+        "reduced_equal_nccl": true,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f0",
+            "roceP2p1s0f0",
+            "rocep1s0f1",
+            "roceP2p1s0f1"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "0": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ],
+            "1": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ]
+          },
+          "rank": 2,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        "token_ids": [
+          19,
+          940,
+          223,
+          19,
+          438
+        ],
+        "wkv": {
+          "finite": 128000,
+          "finite_max": 98.0,
+          "finite_min": -60.25,
+          "inf": 0,
+          "nan": 0,
+          "reference": {
+            "actual_sha256": "a140c51444bb4173ad1a415476c1e4fc5ee8186326651bee103b6a9a7039ba7a",
+            "exact_bf16": false,
+            "expected_sha256": "4852352630aa83179e24141ca3c3e1ffa91a6cef0b93e011094f658d145ed23b",
+            "max_abs_error": 0.03125,
+            "rows": 32
+          },
+          "sha256": "cd9a55e0a189f4a32c8590783b2e3fbe2a42ea6abe304367e3deb1f642c20e6d",
+          "shape": [
+            5,
+            25600
+          ],
+          "total": 128000
+        }
+      }
+    }
+  }
+}

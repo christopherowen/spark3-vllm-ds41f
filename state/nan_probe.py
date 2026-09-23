@@ -17,7 +17,6 @@ from typing import Any
 
 import torch
 
-
 _ARM_FILE = "/tmp/spark3-nan-probe"
 
 
@@ -57,6 +56,66 @@ def _check(stage: str, value: Any) -> None:
         )
 
 
+def _trace(stage: str, tensor: torch.Tensor) -> None:
+    if not os.path.exists(_ARM_FILE):
+        return
+    values = tensor.detach().float()
+    finite = torch.isfinite(values)
+    good = values[finite]
+    print(
+        "spark3 NaN probe: "
+        f"{stage} shape={tuple(tensor.shape)} dtype={tensor.dtype} "
+        f"finite={int(finite.sum().item())}/{tensor.numel()} "
+        f"min={float(good.min().item()) if good.numel() else None} "
+        f"max={float(good.max().item()) if good.numel() else None}",
+        flush=True,
+    )
+
+
+def _wrap_engram(owner: type[Any]) -> None:
+    original = owner.forward
+
+    @functools.wraps(original)
+    def checked(
+        self: Any,
+        hidden_states: torch.Tensor,
+        hash_ids: torch.Tensor,
+        token_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if os.path.exists(_ARM_FILE):
+            stage = getattr(self, "prefix", "Engram")
+            staged = self.staged_rows[: hash_ids.shape[0]]
+            _check(f"{stage}.staged_rows", staged)
+            _check(f"{stage}.hidden", hidden_states)
+            _trace(f"{stage}.staged_rows", staged)
+            _trace(f"{stage}.hidden", hidden_states)
+        output = original(self, hidden_states, hash_ids, token_mask)
+        _check(f"{getattr(self, 'prefix', 'Engram')}.output", output)
+        _trace(f"{getattr(self, 'prefix', 'Engram')}.output", output)
+        return output
+
+    owner.forward = checked
+
+
+def _wrap_b12x_wkv(owner: type[Any]) -> None:
+    original = owner.apply_weights
+
+    @functools.wraps(original)
+    def checked(self: Any, layer: Any, x: torch.Tensor, bias: Any = None) -> Any:
+        stage = getattr(layer, "prefix", "")
+        selected = os.path.exists(_ARM_FILE) and stage.endswith(".engram.wkv")
+        if selected:
+            _check(f"{stage}.input", x)
+            _trace(f"{stage}.input", x)
+        output = original(self, layer, x, bias)
+        if selected:
+            _check(f"{stage}.output", output)
+            _trace(f"{stage}.output", output)
+        return output
+
+    owner.apply_weights = checked
+
+
 def _wrap_method(
     owner: type[Any],
     method_name: str,
@@ -74,6 +133,8 @@ def _wrap_method(
         if check_mutated_inputs:
             _check(f"{prefix}.{label}.mutated", (args, kwargs))
         _check(f"{prefix}.{label}.output", output)
+        if label == "embed" and isinstance(output, torch.Tensor):
+            _trace(f"{prefix}.{label}.output", output)
         return output
 
     setattr(owner, method_name, checked)
@@ -204,6 +265,7 @@ def _wrap_b12x_attention(owner: type[Any]) -> None:
 
 def _install() -> None:
     import vllm.models.deepseek_v41.nvidia.model as model
+    from vllm.model_executor.kernels.linear.mxfp8.b12x import B12xMxfp8LinearKernel
     from vllm.model_executor.layers.logits_processor import LogitsProcessor
     from vllm.model_executor.layers.vocab_parallel_embedding import (
         VocabParallelEmbedding,
@@ -212,7 +274,11 @@ def _install() -> None:
     from vllm.models.deepseek_v41.nvidia.b12x_attention import (
         DeepseekV41B12xAttention,
     )
+    from vllm.models.deepseek_v41.nvidia.engram import Engram
 
+    _wrap_engram(Engram)
+    _wrap_method(Engram, "embed", "embed")
+    _wrap_b12x_wkv(B12xMxfp8LinearKernel)
     _wrap_method(VocabParallelEmbedding, "forward", "embedding")
     for method_name in (
         "_run_parallel_input_projections",
