@@ -20,6 +20,9 @@ RUN apt-get update \
 ENV TORCH_CUDA_ARCH_LIST=12.1a
 ARG VLLM_COMPILE_JOBS=8
 ARG VLLM_NVCC_THREADS=2
+# GitHub intermittently answers anonymous clones from this network with 401.
+# FetchContent keeps completed checkouts in .deps, so a configure retry only
+# fetches the dependencies that are still missing.
 RUN --mount=type=secret,id=github_token,required=false \
     set -eu; \
     if [ -s /run/secrets/github_token ]; then \
@@ -30,7 +33,8 @@ RUN --mount=type=secret,id=github_token,required=false \
       export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $github_auth"; \
     fi; \
     python_path=$(python3 -c 'import sys; print(":".join(sys.path))'); \
-    cmake -S /workspace/vllm -B /tmp/vllm-native -G Ninja \
+    attempt=1; \
+    until cmake -S /workspace/vllm -B /tmp/vllm-native -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DVLLM_TARGET_DEVICE=cuda \
       -DVLLM_PYTHON_EXECUTABLE=/usr/bin/python3 \
@@ -39,7 +43,11 @@ RUN --mount=type=secret,id=github_token,required=false \
       -DCMAKE_JOB_POOL_COMPILE:STRING=compile \
       -DCMAKE_JOB_POOLS:STRING=compile=${VLLM_COMPILE_JOBS} \
       -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
-      -DNVCC_THREADS=${VLLM_NVCC_THREADS}; \
+      -DNVCC_THREADS=${VLLM_NVCC_THREADS}; do \
+      if [ "$attempt" -ge 8 ]; then exit 1; fi; \
+      echo "cmake configure attempt $attempt failed; retrying in 45 s"; \
+      attempt=$((attempt + 1)); sleep 45; \
+    done; \
     cmake --build /tmp/vllm-native -j=${VLLM_COMPILE_JOBS} \
       --target _C_stable_libtorch _moe_C_stable_libtorch; \
     cmake --install /tmp/vllm-native --prefix /opt/vllm-native \
