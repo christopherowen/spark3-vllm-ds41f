@@ -15,11 +15,13 @@ effect of patch consolidation.
 - Interim: `../2026-09-20-upstream-main-rebase/cluster-v2-patch0029.json`,
   image `vllm-ds41f-upstream-main:d9ddab37ab97-b69feee3022c-d4243ad067ab8`,
   raw receipts in `runs/patch0029-live/`.
-- Client: the identical `../2026-09-20-upstream-main-rebase/benchmark_serving.py`
-  on dgx1, SHA-256
+- Client: the identical `../2026-09-20-upstream-main-rebase/benchmark_serving.py`,
+  SHA-256
   `888fcfebc223dd971c362474f2f543c48443437484021adcfc0cfad5797528ef`.
   Both sets use the same model snapshot, prompts, temperature 0, seed 42,
-  256 requested completion tokens, and HTTP streaming via dgx1 localhost.
+  256 requested completion tokens, and HTTP streaming. The interim client ran
+  on dgx1 against localhost. The weekend receipts identify the script but do
+  not record the client host or URL, so its network path is unknown.
 
 The interim sequence used one 64-token prose warmup, then prose and code at
 concurrency 1, 2, 4, and 8. Each case was run once, sequentially; both
