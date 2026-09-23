@@ -127,3 +127,10 @@ cause.
 bisect with `--block-size 256`, which gives FlashInfer's required 64-entry
 compressed page. It isolates the B12X attention/cache path from the other
 shared components: TP3 virtual heads, disk Engram, and B12X MoE/linear.
+
+Result: startup failed cleanly before serving: "The resolved KV cache layout
+(BLHNC) does not store blocks as dense, unpadded pages ... so a manager block
+cannot be split into 2 kernel blocks of 128". With the current consolidated
+image, canonical FlashInfer attention cannot run on SM121 at either block
+size. The minimum available memory was 9.6 GiB. A pure-canonical reference
+needs its own build without the B12X/SM12x cache-geometry patches.

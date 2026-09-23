@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "lru_gate": {
+    "weekend_control_kv2": {"passes": 1, "requests": 5, "failures": ["valueerk", "valueerk", "value splash", "value splash"], "receipt": "runs/weekend-control-kv2/lru.json"},
+    "consolidated_nccl": {"passes": 0, "requests": 5, "failures": ["valueerk x5 (one also with a line-1 syntax error)"], "receipt": "runs/consolidated-nccl-lru.json"},
+    "consolidated_roce": {"passes": 0, "requests": 5, "receipt": "../2026-09-23-consolidated-quality/runs/roce-current.json"},
+    "consolidated_bf16_decode": {"passes": 0, "requests": 5, "failures": ["syntax x2", "valueerk x3"], "receipt": "runs/consolidated-bf16dec/lru.json"}
+  },
+  "serving_tps_aggregate": {
+    "columns": ["sep20_weekend", "weekend_control_today", "patch0029", "consolidated_eager"],
+    "prose_c1": [31.4, 34.6, 10.1, 9.1],
+    "prose_c2": [53.2, 57.6, 12.1, 11.8],
+    "prose_c4": [77.7, 76.0, 24.0, 23.6],
+    "prose_c8": [57.8, 83.1, 47.7, 47.3],
+    "code_c1": [44.3, 44.0, 10.1, 8.9],
+    "code_c2": [64.9, 65.4, 12.0, 11.9],
+    "code_c4": [94.4, 96.0, 23.7, 23.9],
+    "code_c8": [76.1, 71.9, 46.9, 47.4]
+  },
+  "startup": {
+    "weekend_control_r1": "startup guard kill at 5.0-5.2 GiB: FlashInfer sampling JIT after graph capture",
+    "weekend_control_kv2_r2": "startup guard kill at 4.8-5.2 GiB: same JIT",
+    "weekend_control_kv2_r3": "ready with prebuilt FlashInfer sampler; steady 6.5-6.9 GiB available",
+    "consolidated_fi_attn_b128": "clean failure: FlashInfer SM120 decode needs compressed page 64",
+    "consolidated_bf16_decode": "ready; minimum 9.2 GiB during startup",
+    "consolidated_fi_attn_b256": "clean failure: 256 manager block cannot split into 128 kernel pages"
+  }
+}
