@@ -58,8 +58,8 @@
   },
   "b12x": {
     "upstream_base": "0332cc5089137753d3af43d1c643516b4350359f",
-    "expected_tree": "b5eaa87c207a221fc9b550c3a8c210582714cebf",
-    "patch_head": "7c77e74dbaddadcaa9b92650d97da269f7d7f34e",
+    "expected_tree": "10d92859133e063e82a57d57d02eafe3ba212290",
+    "patch_head": "355611878e2ee316a74fd22d913d4db8d23c9306",
     "patches": [
       {
         "concept": "cutlass_dsl_alignment",
@@ -80,6 +80,11 @@
         "concept": "vllm_loader_lifecycle",
         "patch": "patches/b12x/0004-vllm-loader-lifecycle.patch",
         "files": 2
+      },
+      {
+        "concept": "managed_model_weights",
+        "patch": "patches/b12x/0005-managed-model-weights.patch",
+        "files": 6
       }
     ]
   }

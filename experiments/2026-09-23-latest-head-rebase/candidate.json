@@ -1,7 +1,7 @@
 {
   "intended_variable": "upstream source revisions from the pinned September 23 heads",
   "configuration_delta": {},
-  "runtime_action": "guarded TP3 qualification in progress",
+  "runtime_action": "bounded managed-weight qualification before one guarded TP3 cutover",
   "source_delta": {
     "vllm": {
       "upstream_commit": "0f2a15c9277f34c9afe141cf578d1f02b3bebdfe",
@@ -11,13 +11,11 @@
     },
     "b12x": {
       "upstream_commit": "0332cc5089137753d3af43d1c643516b4350359f",
-      "patch_head": "7c77e74dbaddadcaa9b92650d97da269f7d7f34e",
-      "source_tree": "b5eaa87c207a221fc9b550c3a8c210582714cebf",
-      "concept_patches": 4
+      "patch_head": "355611878e2ee316a74fd22d913d4db8d23c9306",
+      "source_tree": "10d92859133e063e82a57d57d02eafe3ba212290",
+      "concept_patches": 5
     }
   },
-  "omitted_local_behavior": [
-    "B12X managed-weight pool adaptation: current upstream uses ordinary CUDA weights; this may increase GB10 memory pressure and remains under investigation"
-  ],
-  "status": "loader-lifecycle image sha256:c068aebe built and bounded smoke passed; prior image reached guarded startup memory floor; new guarded TP3 load pending"
+  "omitted_local_behavior": [],
+  "status": "loader-lifecycle image sha256:c068aebe also reached dgx3 startup memory floor after weight loading; scoped managed-weight patch added and awaits bounded GPU qualification"
 }

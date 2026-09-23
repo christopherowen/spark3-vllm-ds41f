@@ -12,7 +12,7 @@ Fetched at 2026-09-23 07:30 UTC:
 | Project | Canonical branch | Pinned commit | Local concept patches |
 | --- | --- | --- | ---: |
 | vLLM | `main` | `0f2a15c9277f34c9afe141cf578d1f02b3bebdfe` | 10 |
-| B12X | `master` | `0332cc5089137753d3af43d1c643516b4350359f` | 4 |
+| B12X | `master` | `0332cc5089137753d3af43d1c643516b4350359f` | 5 |
 
 Run `prepare-sources` to fetch the pinned bases, replay the patches, and verify
 the exact trees in `series.json`. The source candidate is isolated in `.work/`.
@@ -32,10 +32,9 @@ their memory guards active.
 
 ## Changes from the qualified September 20 candidate
 
-- B12X's managed-weight loader compatibility patch is omitted. Upstream now
-  uses ordinary CUDA weight allocations and a bounce/GDS reader with the
-  current vLLM transfer hook. Reapplying our old pool patch would replace that
-  path and remove upstream's current loader behavior.
+- Upstream B12X replaced managed final weights with ordinary CUDA allocations.
+  Patch 0005 restores only scoped managed final-weight allocation on GB10; it
+  retains upstream's bounded bounce/GDS reader and ordinary runtime buffers.
 - The switchless RoCEnante patch retains upstream's traffic-class setting,
   checks it across ranks, and passes it through the C proxy alongside peer
   route stripes.
@@ -58,15 +57,16 @@ patch0029 image was restored on all three nodes with active guards and API
 readiness. Neither candidate passed semantic, quality, long-context, or speed
 qualification. See `runs/launch-eager-cb3f6320-failed.json`.
 
-Patch 0004 now groups current-vLLM loader lifecycle compatibility: removed
+Patch 0004 groups current-vLLM loader lifecycle compatibility: removed
 private progress imports, explicit transfer completion at `load_weights`, and
 CUDA cache release before post-load weight preparation. The superseded
 `_log_loading_time` callback is removed because current vLLM does not call it.
-This patch replays exactly and image `sha256:c068aebe` passed bounded loader and
-GPU smoke; a guarded three-rank runtime check remains.
-The ordinary CUDA weight allocation introduced by upstream B12X remains a
-separate possible memory contributor; the deleted managed pool has not been
-restored without evidence that the smaller lifecycle fix is insufficient.
+Image `sha256:c068aebe` passed bounded loader and GPU smoke, but its guarded
+three-rank load also reached dgx3's 5 GiB startup floor immediately after
+weight loading. See `runs/launch-eager-c068aebe-failed.json`. This rules out
+the loader-lifecycle fix alone as sufficient. Patch 0005 restores scoped
+managed final weights as the next single causal change; bounded copy and
+three-rank qualification remain.
 
 `performance-bridge.md` records a same-script serving comparison between the
 successful weekend baseline and patch0029. It is an interim measurement;
@@ -86,4 +86,5 @@ The first guarded launch of image `sha256:d25a2e05` exposed a removed B12X
 progress import. Image `sha256:d4c5337e` exposed a second private output import
 in a bounded GPU smoke. Image `sha256:cb3f6320` passed that smoke but reached
 the startup memory floor after checkpoint loading. The guards and rollback
-worked as designed; no candidate is currently serving.
+worked as designed. Image `sha256:c068aebe` then repeated the post-load memory
+failure. The known working patch0029 image is serving with active guards.

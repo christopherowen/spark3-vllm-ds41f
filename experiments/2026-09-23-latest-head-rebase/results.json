@@ -8,10 +8,11 @@
   "dockerfile_check": "pass: docker buildx build --check on dgx1, no warnings",
   "live_service_observation": "known working patch0029 image restored on all three nodes; API ready and 3 GiB steady guards active",
   "native_build": "pass: sha256:c068aebee34047f8c2334ace19d5dc5f6a5b8847c6b157bfe20668b72de9a814 with exact consolidated source and rebuilt vLLM stable extensions; runs/build-c068aebe-validation.json",
-  "target_hardware_tests": "1 loader-lifecycle unit test passed in a 3 GiB container; 8 GiB GPU/native-loader smoke passed on dgx1 for sha256:c068aebe; prior sha256:cb3f6320 guarded TP3 load reached dgx3 5 GiB startup floor and rolled back",
+  "target_hardware_tests": "loader-lifecycle unit test and 8 GiB GPU/native-loader smoke passed for sha256:c068aebe; both sha256:cb3f6320 and sha256:c068aebe guarded TP3 loads reached dgx3 5 GiB startup floor after weights; managed-weight patch 0005 awaits bounded native test",
   "quality_comparison": "not run",
   "performance_comparison": "not run: consolidated latest-head image has not reached API readiness",
   "interim_live_comparison": "performance-bridge.md: weekend promoted service versus running patch-0029; all eight matched cases slower on patch-0029",
   "patch_author_replay": "pass: initial 13 local commits reauthored to GitHub noreply identity; later loader patch also authored and committed as Christopher Owen",
-  "b12x_loader_lifecycle": "patch 0004 removes stale private progress APIs and dead _log_loading_time hook; it finishes transfers and releases CUDA cache before post-load preparation; exact replay and rebuilt image passed, guarded TP3 run pending"
+  "b12x_loader_lifecycle": "patch 0004 removes stale private progress APIs and dead _log_loading_time hook; it finishes transfers and releases CUDA cache before post-load preparation; exact replay and bounded tests passed, guarded TP3 startup still failed the memory floor",
+  "b12x_managed_weights": "patch 0005 restores only scoped coherent final-weight allocations for GB10; upstream bounded bounce/GDS readers remain; bounded native copy and guarded TP3 qualification pending"
 }

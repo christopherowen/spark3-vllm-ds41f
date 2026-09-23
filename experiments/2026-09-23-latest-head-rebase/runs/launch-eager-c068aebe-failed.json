@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "result": "failed_after_weight_load_at_startup_memory_floor",
+  "configuration": "cluster-eager.json at b9da974856783fa9e24c83cb79007c51d852b626",
+  "image_id": "sha256:c068aebee34047f8c2334ace19d5dc5f6a5b8847c6b157bfe20668b72de9a814",
+  "image_source": {
+    "vllm_patch_head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
+    "b12x_patch_head": "7c77e74dbaddadcaa9b92650d97da269f7d7f34e"
+  },
+  "observed": {
+    "dgx3_preweight_jit_seconds": 24.39,
+    "dgx3_weight_loading_seconds": 30.89,
+    "dgx3_last_loader_message": "Using B12xExperts after weight loading",
+    "first_nvidia_allocation_failure_utc": "2026-09-23T09:58:37Z",
+    "nvidia_kernel_message": "NV_ERR_NO_MEMORY from _memdescAllocInternal",
+    "memguard_kill_utc": "2026-09-23T09:58:37Z",
+    "memguard_available_kib": 5164244,
+    "memguard_startup_floor_kib": 5242880,
+    "dgx3_exit_code": 137,
+    "docker_oom_killed": false
+  },
+  "recovery": "launcher removed candidate containers; coordinated patch0029 service start restored API readiness and 3 GiB steady guards on all three nodes",
+  "logs": "runs/failed-starts/20260923T095847Z-dsv41-latest-1b6675-7c77e7-eager-r2/ (preserved locally; large raw logs ignored by Git)",
+  "next_gate": "bounded coherent managed-weight copy test on GB10 before one guarded TP3 cutover; retain memory floors and target-only quality settings"
+}

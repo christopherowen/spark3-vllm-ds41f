@@ -1,0 +1,256 @@
+From 355611878e2ee316a74fd22d913d4db8d23c9306 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Wed, 23 Sep 2026 12:06:00 +0200
+Subject: [PATCH] fix(loader): restore scoped managed model weights on GB10
+
+Upstream base: 0332cc5089137753d3af43d1c643516b4350359f.
+
+Rationale: upstream replaced managed model-weight storage with ordinary CUDA allocations for its TP4 test configuration. Three-rank GB10 loading reaches the 5 GiB startup memory floor after weight preparation. Scope managed allocation to final model weights while retaining the current bounded bounce reader and ordinary runtime buffers.
+
+Quality: checkpoint bytes and tensor dtypes are unchanged. The copy path validates managed CUDA ranges; unsupported devices fail closed.
+
+Tests: Python compilation and diff check passed locally; capped GB10 native copy test and guarded TP3 load remain.
+
+Upstream status: candidate compatibility patch for review after live qualification.
+---
+ b12x/integration/vllm/loader.py   | 17 +++++++---
+ b12x/loader/_cuda_range.h         |  2 +-
+ b12x/loader/_managed_pool.c       | 41 ++++++++++++++++++++++++
+ b12x/loader/_managed_pool.py      | 52 +++++++++++++++++++++++++++++++
+ b12x/loader/_storage.c            |  2 ++
+ tests/loader/test_managed_pool.py | 30 ++++++++++++++++++
+ 6 files changed, 139 insertions(+), 5 deletions(-)
+ create mode 100644 b12x/loader/_managed_pool.c
+ create mode 100644 b12x/loader/_managed_pool.py
+ create mode 100644 tests/loader/test_managed_pool.py
+
+diff --git a/b12x/integration/vllm/loader.py b/b12x/integration/vllm/loader.py
+index 9de9197..cfdc3a2 100644
+--- a/b12x/integration/vllm/loader.py
++++ b/b12x/integration/vllm/loader.py
+@@ -3,6 +3,7 @@
+ from __future__ import annotations
+ 
+ import dataclasses
++from contextlib import nullcontext
+ import heapq
+ import json
+ import math
+@@ -20,6 +21,7 @@ from vllm.model_executor.model_loader.weight_utils import (
+ )
+ 
+ from b12x.loader._checkpoint import DirectWeightSession
++from b12x.loader._managed_pool import managed_weight_pool
+ from b12x.loader._progress import CheckpointDisplay
+ 
+ logger = init_logger("vllm.model_executor.model_loader.b12x")
+@@ -61,21 +63,28 @@ class B12xModelLoader(DefaultModelLoader):
+         index = torch.cuda.current_device() if device.index is None else device.index
+         shared_read_group = None
+         read_mode = self.read_mode
+-        if read_mode == "auto":
+-            from b12x.loader import capabilities
++        from b12x.loader import capabilities
+ 
+-            read_mode = "bounce" if capabilities(index)["host_page_tables"] else "gds"
++        caps = capabilities(index)
++        if read_mode == "auto":
++            read_mode = "bounce" if caps["host_page_tables"] else "gds"
+         if read_mode == "gds":
+             from vllm.distributed.parallel_state import get_tp_group
+             from b12x.loader._shared_checkpoint import SharedReadGroup
+ 
+             shared_read_group = SharedReadGroup(get_tp_group().cpu_group, index)
++        allocation = (
++            managed_weight_pool(index)
++            if read_mode == "bounce" and caps["host_page_tables"]
++            else nullcontext(None)
++        )
+         with (
++            allocation as allocate,
+             DirectWeightSession(
+                 index, io_threads=self.io_threads,
+                 shared_read_group=shared_read_group, read_mode=read_mode,
+             ) as session,
+-            weight_transfer(session),
++            weight_transfer(session, allocator=allocate),
+         ):
+             self._session = session
+             try:
+diff --git a/b12x/loader/_cuda_range.h b/b12x/loader/_cuda_range.h
+index 17e54bf..865d219 100644
+--- a/b12x/loader/_cuda_range.h
++++ b/b12x/loader/_cuda_range.h
+@@ -11,7 +11,7 @@ static bool device_range(uintptr_t pointer, uint64_t bytes, int device) {
+         CUdeviceptr base;
+         size_t size;
+         if (cuPointerGetAttribute(&kind, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, pointer) != CUDA_SUCCESS ||
+-            kind != CU_MEMORYTYPE_DEVICE ||
++            (kind != CU_MEMORYTYPE_DEVICE && kind != CU_MEMORYTYPE_UNIFIED) ||
+             cuPointerGetAttribute(&ordinal, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL, pointer) != CUDA_SUCCESS ||
+             ordinal != device ||
+             cuMemGetAddressRange(&base, &size, pointer) != CUDA_SUCCESS ||
+diff --git a/b12x/loader/_managed_pool.c b/b12x/loader/_managed_pool.c
+new file mode 100644
+index 0000000..045613b
+--- /dev/null
++++ b/b12x/loader/_managed_pool.c
+@@ -0,0 +1,41 @@
++/* PyTorch owns suballocation and stream bookkeeping for final model weights. */
++#include <sys/mman.h>
++
++/* MemPool retains a raw allocator pointer past Python scope exit. */
++static PyObject *managed_allocators;
++
++static PyObject *py_keep_managed_allocator(PyObject *self, PyObject *allocator) {
++    (void)self;
++    if (!managed_allocators) managed_allocators = PyList_New(0);
++    if (!managed_allocators || PyList_Append(managed_allocators, allocator) < 0)
++        return NULL;
++    Py_RETURN_NONE;
++}
++
++void *b12x_managed_alloc(size_t bytes, int device, cudaStream_t stream) {
++    (void)stream;
++    void *pointer = NULL;
++    int previous;
++    if (cudaGetDevice(&previous) != cudaSuccess || cudaSetDevice(device) != cudaSuccess)
++        return NULL;
++    size_t length = bytes ? bytes : 1;
++    cudaError_t status = cudaMallocManaged(&pointer, length, cudaMemAttachGlobal);
++    if (status == cudaSuccess && mlock(pointer, length) != 0) {
++        fprintf(stderr, "b12x could not lock managed model weights: %s\n", strerror(errno));
++        cudaFree(pointer);
++        pointer = NULL;
++    } else if (status != cudaSuccess) {
++        fprintf(stderr, "b12x managed model allocation failed: %s\n",
++                cudaGetErrorString(status));
++    }
++    cudaSetDevice(previous);
++    return pointer;
++}
++
++void b12x_managed_free(void *pointer, size_t bytes, int device, cudaStream_t stream) {
++    (void)device;
++    (void)stream;
++    if (!pointer) return;
++    munlock(pointer, bytes ? bytes : 1);
++    cudaFree(pointer);
++}
+diff --git a/b12x/loader/_managed_pool.py b/b12x/loader/_managed_pool.py
+new file mode 100644
+index 0000000..3c2908d
+--- /dev/null
++++ b/b12x/loader/_managed_pool.py
+@@ -0,0 +1,52 @@
++"""Scope coherent model weights to a PyTorch CUDA memory pool."""
++
++from __future__ import annotations
++
++from contextlib import contextmanager
++
++from ._native import load
++
++
++@contextmanager
++def managed_weight_pool(device: int):
++    import torch
++
++    caps = load().capabilities(device)
++    if not all(
++        caps[key]
++        for key in (
++            "managed_memory",
++            "concurrent_managed_access",
++            "pageable_memory_access",
++            "host_page_tables",
++        )
++    ):
++        raise RuntimeError("coherent managed model weights require GPU host page tables")
++    if torch.cuda.get_allocator_backend() != "native":
++        raise RuntimeError("managed model weights require PyTorch's native CUDA allocator")
++
++    native = load()
++    allocator = torch.cuda.memory.CUDAPluggableAllocator(
++        native.__file__, "b12x_managed_alloc", "b12x_managed_free"
++    )
++    native.keep_managed_allocator(allocator)
++    settings = torch.cuda.memory._snapshot()["allocator_settings"]
++    expandable = settings["expandable_segments"]
++    if expandable:
++        torch.cuda.memory._set_allocator_settings("expandable_segments:False")
++    pool = torch.cuda.MemPool(allocator.allocator())
++
++    @contextmanager
++    def allocate():
++        if pool is None:
++            raise RuntimeError("managed model weight pool is closed")
++        with torch.cuda.device(device), torch.cuda.use_mem_pool(pool, device=device):
++            yield
++
++    try:
++        yield allocate
++    finally:
++        pool = None
++        torch.cuda.empty_cache()
++        if expandable:
++            torch.cuda.memory._set_allocator_settings("expandable_segments:True")
+diff --git a/b12x/loader/_storage.c b/b12x/loader/_storage.c
+index f5b9703..566bfe9 100644
+--- a/b12x/loader/_storage.c
++++ b/b12x/loader/_storage.c
+@@ -72,6 +72,7 @@ static PyObject *py_capabilities(PyObject *self, PyObject *args) {
+ #include "_direct.c"
+ #include "_batch.c"
+ #include "_ple_reader.c"
++#include "_managed_pool.c"
+ 
+ static PyMethodDef methods[] = {
+     {"ple_reader", py_ple_reader, METH_VARARGS, NULL},
+@@ -86,6 +87,7 @@ static PyMethodDef methods[] = {
+     {"direct_bytes", py_direct_bytes, METH_VARARGS, NULL},
+     {"direct_stats", py_direct_stats, METH_O, NULL},
+     {"capabilities", py_capabilities, METH_VARARGS, NULL},
++    {"keep_managed_allocator", py_keep_managed_allocator, METH_O, NULL},
+     {NULL, NULL, 0, NULL},
+ };
+ static PyModuleDef module = {
+diff --git a/tests/loader/test_managed_pool.py b/tests/loader/test_managed_pool.py
+new file mode 100644
+index 0000000..b0f28bb
+--- /dev/null
++++ b/tests/loader/test_managed_pool.py
+@@ -0,0 +1,30 @@
++"""Small end-to-end copy into final coherent model weight storage."""
++
++import pytest
++import torch
++from safetensors.torch import save_file
++
++pytest.importorskip("vllm")
++
++from b12x.loader._checkpoint import DirectWeightSession
++from b12x.loader._managed_pool import managed_weight_pool
++from vllm.model_executor.weight_transfer import allocate_weights, weight_transfer
++
++
++def test_bounce_copy_into_managed_weight_survives_pool_scope(tmp_path):
++    if not torch.cuda.is_available():
++        pytest.skip("requires CUDA")
++    source = torch.arange(1 << 18, dtype=torch.float32)
++    path = tmp_path / "weights.safetensors"
++    save_file({"weight": source}, path)
++
++    with managed_weight_pool(0) as allocate, DirectWeightSession(read_mode="bounce") as session:
++        with weight_transfer(session, allocator=allocate):
++            weight = allocate_weights(
++                torch.empty, source.shape, dtype=source.dtype, device="cuda"
++            )
++            checkpoint_view = dict(session.weights([path]))["weight"]
++            assert session(weight, checkpoint_view)
++            session.finish()
++
++    torch.testing.assert_close(weight.cpu(), source, rtol=0, atol=0)
+-- 
+2.54.0 (Apple Git-157)
+
