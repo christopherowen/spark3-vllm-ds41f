@@ -19,5 +19,5 @@
   "omitted_local_behavior": [
     "B12X managed-weight pool adaptation: current upstream uses ordinary CUDA weights; this may increase GB10 memory pressure and remains under investigation"
   ],
-  "status": "new loader-lifecycle source patch pending rebuild; prior image reached guarded startup memory floor and was rolled back; known working patch0029 service restored"
+  "status": "loader-lifecycle image sha256:c068aebe built and bounded smoke passed; prior image reached guarded startup memory floor; new guarded TP3 load pending"
 }

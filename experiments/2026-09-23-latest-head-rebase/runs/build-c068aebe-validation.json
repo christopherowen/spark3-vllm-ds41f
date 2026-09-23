@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "result": "image_built_and_bounded_smoke_passed",
+  "image_tag": "vllm-ds41f-latest:1b6675db79b8-7c77e74dbadd-dd6f35d034115",
+  "image_id": "sha256:c068aebee34047f8c2334ace19d5dc5f6a5b8847c6b157bfe20668b72de9a814",
+  "deployment_commit": "d6f35d034115446a2c4c76297f25be946ef13128",
+  "vllm_patch_head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
+  "vllm_tree": "eddf87778c8d3617eb5b40b57d05cae8b95ec0c2",
+  "b12x_patch_head": "7c77e74dbaddadcaa9b92650d97da269f7d7f34e",
+  "b12x_tree": "b5eaa87c207a221fc9b550c3a8c210582714cebf",
+  "source_replay": "exact pinned heads and trees on local host and dgx1",
+  "build": "recompiled both vLLM CUDA stable extensions with two jobs on idle dgx1; GitHub credential supplied as a temporary BuildKit secret for upstream CMake fetches",
+  "unit_test": "B12X loader lifecycle ordering: 1 passed in a 3 GiB CPU-only container from the final image",
+  "gpu_smoke": "8 GiB container on dgx1: CUDA initialized on NVIDIA GB10; vLLM stable extensions, B12X native ABI, capabilities, and loader adapter imported",
+  "host_memory": "dgx1 remained above 100 GiB MemAvailable during build and bounded smoke",
+  "remaining": "distribute exact image ID to dgx2/dgx3, then guarded TP3 startup, semantic output, long-context, and performance qualification"
+}

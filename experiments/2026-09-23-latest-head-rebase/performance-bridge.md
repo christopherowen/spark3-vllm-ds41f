@@ -3,9 +3,9 @@
 ## Scope and identity
 
 This is a measured comparison of the successful 2026-09-20 promoted service
-with the **currently running patch-0029 service**. It is not a performance
+with the **known working patch-0029 service**. It is not a performance
 measurement of the consolidated latest-head series in this experiment: that
-series has not been built or launched. The two operating configurations differ
+series has not reached serving readiness. The two operating configurations differ
 substantially, so the numbers measure the complete setups, not the causal
 effect of patch consolidation.
 

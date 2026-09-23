@@ -54,6 +54,17 @@ head already contains Spark decode routing and indexer scheduling
 They need target-hardware qualification, but no missing cherry-pick is required
 to get these changes.
 
+B12X also replaced its managed weight pool with ordinary CUDA allocations in
+[1ec67ef](https://github.com/local-inference-lab/b12x/commit/1ec67ef61104b33c309166dc39254fb5279882a6).
+That commit reports a V4.1 target/draft smoke on **four** Sparks. It does not
+establish the memory fit of our larger per-rank TP3 shard. Our first
+current-head target-only load reached the dgx3 5 GiB startup floor just after
+weight loading, with driver allocation failures. This makes weight allocation
+and the obsolete B12X completion hook concrete startup suspects. The grouped
+loader-lifecycle patch tests transfer completion and cache release first;
+restore a managed allocator only if the guarded run still needs it. This is a
+memory compatibility risk, not an explanation of steady decode TPS.
+
 Two prominent upstream vLLM speedups cannot run on this topology:
 
 | Path in pinned source | Why this Spark TP3 setup cannot select it |

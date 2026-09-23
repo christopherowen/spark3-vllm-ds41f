@@ -62,7 +62,8 @@ Patch 0004 now groups current-vLLM loader lifecycle compatibility: removed
 private progress imports, explicit transfer completion at `load_weights`, and
 CUDA cache release before post-load weight preparation. The superseded
 `_log_loading_time` callback is removed because current vLLM does not call it.
-This patch requires exact replay, a new image, and a guarded runtime check.
+This patch replays exactly and image `sha256:c068aebe` passed bounded loader and
+GPU smoke; a guarded three-rank runtime check remains.
 The ordinary CUDA weight allocation introduced by upstream B12X remains a
 separate possible memory contributor; the deleted managed pool has not been
 restored without evidence that the smaller lifecycle fix is insufficient.
