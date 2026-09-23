@@ -1,0 +1,7 @@
+{
+  "container": "dsv41-kkref-r1",
+  "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+  "outcome": "dgx1 worker refused startup: free device memory 110.22/121.69 GiB below --gpu-memory-utilization 0.91 (110.74 GiB); launcher rolled back, no memguard event",
+  "note": "LIL's vLLM enforces the utilization check that R37 did not; LIL's launcher default is 0.82. With explicit --kv-cache-memory-bytes vLLM skips memory profiling, so the value only gates this startup check.",
+  "next": "r2 uses 0.82"
+}

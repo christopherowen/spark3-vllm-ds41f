@@ -2,7 +2,7 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-kkref-r1",
+    "name": "dsv41-kkref-r2",
     "image": "vllm-ds41f-kkref:01f1b874c774-r1",
     "expected_labels": {
       "local.spark3.vllm.tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
@@ -144,7 +144,7 @@
     "--max-parallel-prefills",
     "1",
     "--gpu-memory-utilization",
-    "0.91",
+    "0.82",
     "--max-num-batched-tokens",
     "8192",
     "--kv-cache-memory-bytes",
