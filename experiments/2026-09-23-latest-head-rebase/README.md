@@ -17,6 +17,10 @@ Fetched at 2026-09-23 07:30 UTC:
 Run `prepare-sources` to fetch the pinned bases, replay the patches, and verify
 the exact trees in `series.json`. The source candidate is isolated in `.work/`.
 The old series and running image remain untouched.
+`build-candidate check` verifies clean source and deployment commit identities;
+`build-candidate build` uses the pinned ARM64 dependency image and rebuilds the
+two vLLM CUDA stable extensions from this head. The build command refuses a
+host with a running DS4.1 container.
 `bin/spark3 status` checks the promoted container name from `config/cluster.json`
 and does not list this unpromoted experiment. Direct read-only Docker and
 systemd checks on all three nodes found the current patch-0029 containers and
