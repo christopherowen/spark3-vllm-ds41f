@@ -139,7 +139,7 @@ RUN set -eux; \
 
 ENV PYTHONPATH=/opt/spark3/candidate/vllm:/opt/spark3/candidate/b12x
 
-RUN python3 - <<'PY'
+RUN LIBRARY_PATH=/usr/local/cuda/lib64/stubs python3 - <<'PY'
 import importlib.metadata as metadata
 import subprocess
 
@@ -149,11 +149,11 @@ import b12x.attention.compressed_sparse_mla  # noqa: F401
 import b12x.comm.roce  # noqa: F401
 import b12x.integration.vllm.loader  # noqa: F401
 import b12x.sequence.engram  # noqa: F401
-from b12x.loader._native import load
+from b12x.loader._native import _build
 import vllm.models.deepseek_v41.nvidia.b12x_attention  # noqa: F401
 import vllm.models.deepseek_v41.nvidia.engram  # noqa: F401
-native = load()
-linked = subprocess.check_output(["ldd", native.__file__], text=True)
+native_path = _build()
+linked = subprocess.check_output(["ldd", native_path], text=True)
 assert "liburing.so" in linked, "B12X was built without io_uring row staging"
 stable = "/opt/spark3/candidate/vllm/vllm/_C_stable_libtorch.abi3.so"
 moe_stable = "/opt/spark3/candidate/vllm/vllm/_moe_C_stable_libtorch.abi3.so"
