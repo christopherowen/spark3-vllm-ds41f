@@ -63,3 +63,8 @@ interim measurement; the consolidated latest-head image remains unbuilt and
 unmeasured.
 `performance-recovery.md` records the source/configuration attribution audit
 and the controlled qualification sequence for recovering decode speed.
+
+`cluster-eager.json` is the first runtime qualification arm for the consolidated
+image. It keeps the working patch-0029 target-only serving flags and guarded
+memory limits, changes the image and source identities, and gives the new build
+its own JIT cache. It is an experiment configuration, not a promotion.
