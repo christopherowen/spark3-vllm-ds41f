@@ -1,0 +1,8 @@
+{
+  "container": "dsv41-kkref-r2",
+  "outcome": "dgx1 startup memguard kill at 5,238,712 KiB MemAvailable during B12X weights preparation; launcher rolled back all ranks; hosts back to 115 GiB",
+  "timeline_dgx1": "model loaded 97.48 GiB in 44.7 s; B12X weights preparation with 8 compiler workers, 1072 plan units, cold cache autotuning: 2925 compilations and 18629 measurements by 1:12",
+  "cause": "B12X PreparationSession._race_budget defaults to half of torch.cuda.mem_get_info free memory. On GB10 unified memory that is host RAM, so candidate racing plus 8 compile worker processes consume the post-weight host headroom.",
+  "next": "r3: B12X_AUTOTUNE=0 (default kernel configurations, no racing) and 4/2/2 compile workers",
+  "upstream_candidate": "b12x: bound or configure the autotune race budget on unified-memory devices"
+}

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-kkref-r2",
+    "name": "dsv41-kkref-r3",
     "image": "vllm-ds41f-kkref:01f1b874c774-r1",
     "expected_labels": {
       "local.spark3.vllm.tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
@@ -110,12 +110,13 @@
     "SAFETENSORS_FAST_GPU": "1",
     "VLLM_ALLOW_LONG_MAX_MODEL_LEN": "1",
     "B12X_DENSE_SPLITK_TURBO": "1",
-    "B12X_WEIGHTS_COMPILE_WORKERS": "8",
-    "B12X_STATE_COMPILE_WORKERS": "4",
+    "B12X_WEIGHTS_COMPILE_WORKERS": "4",
+    "B12X_STATE_COMPILE_WORKERS": "2",
     "B12X_BIND_COMPILE_WORKERS": "2",
     "B12X_ROCE_CACHE_DIR": "/cache/kkref/jit/b12x/roce",
     "FLASHINFER_WORKSPACE_BASE": "/cache/kkref/flashinfer",
-    "MAX_JOBS": "2"
+    "MAX_JOBS": "2",
+    "B12X_AUTOTUNE": "0"
   },
   "serve_args": [
     "/models",
