@@ -10,5 +10,6 @@
   "native_build": "not run",
   "target_hardware_tests": "not run",
   "quality_comparison": "not run",
-  "performance_comparison": "not run"
+  "performance_comparison": "not run: consolidated latest-head image has not been built or launched",
+  "interim_live_comparison": "performance-bridge.md: weekend promoted service versus running patch-0029; all eight matched cases slower on patch-0029"
 }

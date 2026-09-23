@@ -52,3 +52,8 @@ extensions against this vLLM source, run focused tests on the target hardware,
 then repeat the guarded three-rank cold start, semantic and long-context
 smokes, quality comparison, and performance matrix from `docs/methodology.md`.
 The service must not be stopped or replaced without explicit authorization.
+
+`performance-bridge.md` records a same-client serving comparison between the
+successful weekend baseline and the running patch-0029 service. This is an
+interim measurement; the consolidated latest-head image remains unbuilt and
+unmeasured.
