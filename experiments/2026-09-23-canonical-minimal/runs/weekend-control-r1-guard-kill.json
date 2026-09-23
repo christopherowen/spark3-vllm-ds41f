@@ -1,0 +1,13 @@
+{
+  "config": "cluster-weekend-control.json",
+  "container": "dsv41-weekend-control-r1",
+  "outcome": "startup memguard kill on all three ranks at end of CUDA graph capture; launcher rolled back; hosts healthy",
+  "model_load": "97.4 GiB per rank in 82 s (dgx2 log)",
+  "kv_reserved_gib": 3.0,
+  "graph_capture": "48 s, 2.72 GiB (dgx2 log)",
+  "memguard_kill_mem_available_kib": {"dgx1": 5170240, "dgx2": 5024596, "dgx3": 5230808},
+  "memguard_threshold_kib": 5242880,
+  "host_mem_available_after_rollback_kib": {"dgx1": 121436332, "dgx2": 121305392, "dgx3": 121103712},
+  "failed_start_logs": "runs/failed-starts/20260923T144337Z-dsv41-weekend-control-r1/ (gitignored *.log, retained on dgx1)",
+  "interpretation": "The 2026-09-20 service started without a startup guard and armed 4 GiB only after readiness, so its startup floor near 5 GiB was never enforced. Retry with a 2 GiB KV reservation (matching the consolidated arms) instead of lowering the guard."
+}
