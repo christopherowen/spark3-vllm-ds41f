@@ -68,3 +68,6 @@ and the controlled qualification sequence for recovering decode speed.
 image. It keeps the working patch-0029 target-only serving flags and guarded
 memory limits, changes the image and source identities, and gives the new build
 its own JIT cache. It is an experiment configuration, not a promotion.
+`cluster-rollback.json` pins the previously working patch-0029 image on the
+same deployment branch, so a failed candidate can be stopped and the prior
+three-rank service relaunched with the coordinated cluster commands.
