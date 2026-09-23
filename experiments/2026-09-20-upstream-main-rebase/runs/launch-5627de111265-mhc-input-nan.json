@@ -47,12 +47,12 @@
     "elapsed_seconds": 0.443857
   },
   "first_non_finite_boundary": {
-    "stage": "layer-0 mhc_pre_delayed_tilelang input",
+    "stage": "first Engram layer output consumed by mhc_pre_delayed_tilelang",
     "shape": [5, 4, 5120],
     "dtype": "torch.bfloat16",
     "nan_count": 102400,
     "inf_count": 0,
-    "interpretation": "the complete first tensor entering MHC pre-normalization is NaN before layer-0 B12X attention executes; the cache-record mismatch was real but is not the sole source of garbled output"
+    "interpretation": "the layer wrapper saw finite input, layer-0 attention reached a finite live-cache reference, and the wrapped previous-layer MHC post did not fail; the next unwrapped operation is self.engram in the checkpoint's first Engram branch (layer 1), whose result is the all-NaN tensor passed to MHC pre-normalization. The cache-record mismatch was real but is not the sole source of garbled output"
   },
   "shutdown": {
     "all_containers_exited": true,
@@ -61,5 +61,5 @@
     "all_memguards_inactive": true,
     "nodes_reachable": true
   },
-  "remaining_gate": "isolate whether layer-0 hidden state is corrupted by input preparation, MHC state initialization, or the MHC pre-normalization kernel before authorizing another start"
+  "remaining_gate": "isolate the first Engram branch into disk-staged embedding rows, wkv projection, q/k gate projections, and the final gated residual before authorizing another coordinated start"
 }

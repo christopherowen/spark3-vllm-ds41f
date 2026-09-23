@@ -126,16 +126,16 @@
   "failed_image_digest": "sha256:b9c4e1264f2f7fa1d0de93b3db0e452e732e754608595b654f38e65f6e4df2a7",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "the corrected patch 0028 image completes guarded fresh-cache startup without memory failure, but its first target-only request exposes all-NaN input at the layer-0 MHC pre-normalization boundary before B12X attention; launch is locked while that earlier corruption source is isolated",
+  "deployment_status": "the corrected patch 0028 image completes guarded fresh-cache startup without memory failure, but its first target-only request exposes an all-NaN result from the first Engram injection before the following MHC pre-normalization; launch is locked while the Engram disk lookup and projection boundary is isolated",
   "integration_status": {
-    "status": "patch 0028 fixes the proven B12X cache-record ABI and passes source and rebuilt-image regressions, but the expanded live probe now finds an earlier all-NaN layer-0 MHC input; cache publication is no longer the first observed corruption boundary",
+    "status": "patch 0028 fixes the proven B12X cache-record ABI and passes source and rebuilt-image regressions, but the expanded live probe now isolates an all-NaN result from the first Engram injection; cache publication is no longer the first observed corruption boundary",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0028-runtime-regressions-and-cold-start-pass-live-semantic-probe-fails-before-attention",
+    "status": "patch-0028-runtime-regressions-and-cold-start-pass-live-semantic-probe-fails-at-first-engram-injection",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"
