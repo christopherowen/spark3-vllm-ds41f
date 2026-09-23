@@ -135,3 +135,26 @@ token-hash routing. `cluster-kkref-g-nccl.json` keeps full decode graphs and
 changes only `VLLM_ENABLE_ROCE_ALLREDUCE=0`: B12X RoCE collectives, including
 our switchless routing, are captured in the graphs and rely on
 device-resident sequence state across replays.
+
+## Graph-safe activation trace: the first divergence is layer 0's MoE
+
+`gtrace_model.py` and `gtrace_model_state.py` copy per-layer activations into
+persistent buffers from inside the captured forward, so CUDA-graph replays are
+traced too. Traced runs: three eager (all pass) and three graph (1 pass, 2
+fail). Run-to-run noise exists in every mode: layer 0's MoE output varies by
+about 1e-4, and FP8 quantization amplifies that downstream. The comparison
+therefore sets graph-vs-eager against the eager-vs-eager noise floor
+(`gtrace_vs_noise.py`).
+
+At the first decode step, graph and eager are bit-identical through layer 0's
+attention and FFN input. Layer 0's MoE output then differs by 2.06% under
+graph replay, 11.5 times the 0.18% eager-vs-eager noise, and stays 8-9 times
+above noise at steps 2 and 3. With identical input, the DS4.1 MoE computes a
+different result when replayed from a CUDA graph.
+
+The DS4 top-k router (`fused_moe/router/dsv4_topk.py`) launches with
+Programmatic Dependent Launch (`current_platform.is_arch_support_pdl()`, true
+for SM >= 9 including GB10). It calls `gdc_launch_dependents()` before storing
+its outputs. `cluster-kkref-g-nopdl.json` mounts `nopdl_cuda.py`, whose
+`is_arch_support_pdl()` returns False under `SPARK3_DISABLE_PDL=1`, and
+otherwise repeats the failing full-graph configuration.
