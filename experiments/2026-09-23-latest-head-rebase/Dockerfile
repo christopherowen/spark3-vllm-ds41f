@@ -40,7 +40,7 @@ RUN --mount=type=secret,id=github_token,required=false \
       -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
       -DNVCC_THREADS=1; \
     cmake --build /tmp/vllm-native -j=2 \
-      --target=_C_stable_libtorch _moe_C_stable_libtorch; \
+      --target _C_stable_libtorch _moe_C_stable_libtorch; \
     cmake --install /tmp/vllm-native \
       --prefix /opt/vllm-native \
       --component _C_stable_libtorch; \
