@@ -74,6 +74,6 @@ three-rank service relaunched with the coordinated cluster commands.
 
 The first guarded launch of image `sha256:d25a2e05` exposed a B12X progress
 stream import removed in the pinned vLLM head. All three new containers rolled
-back without OOM. Patch 0004 passes the current stderr stream directly to the
-checkpoint display; it changes progress rendering only. The corrected source
+back without OOM. Patch 0004 keeps checkpoint progress on stderr and removes the obsolete
+private output interceptor; it changes progress rendering only. The corrected source
 requires a new image and guarded load.

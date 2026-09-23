@@ -11,8 +11,8 @@
     },
     "b12x": {
       "upstream_commit": "0332cc5089137753d3af43d1c643516b4350359f",
-      "patch_head": "ad98f319b2b03326f080ab67e982ded366b02a4e",
-      "source_tree": "0f1684e3adb47ab82812183302dd9a90d66b3971",
+      "patch_head": "a4b6b18b5ccdf9b8d40508ce17298da8281f94bf",
+      "source_tree": "670645de7d1f6214260cffe56dada9c47794efdd",
       "concept_patches": 4
     }
   },

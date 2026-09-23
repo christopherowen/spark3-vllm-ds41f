@@ -13,5 +13,5 @@
   "performance_comparison": "not run: consolidated latest-head image has not been built or launched",
   "interim_live_comparison": "performance-bridge.md: weekend promoted service versus running patch-0029; all eight matched cases slower on patch-0029",
   "patch_author_replay": "pass: 13 local commits reauthored to GitHub noreply identity; exact vLLM and B12X source trees unchanged; runs/source-replay-identity.json",
-  "b12x_progress_fix": "pass: patch 0004 exact replay at ad98f319b2b03326f080ab67e982ded366b02a4e; rebuild and guarded TP3 load pending"
+  "b12x_progress_fix": "pass: patch 0004 exact replay at a4b6b18b5ccdf9b8d40508ce17298da8281f94bf; d4c5337e bounded GPU smoke found second private progress API and prompted same-concept simplification; new image and guarded load pending"
 }

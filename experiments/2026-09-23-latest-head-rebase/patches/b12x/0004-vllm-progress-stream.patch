@@ -1,42 +1,62 @@
-From ad98f319b2b03326f080ab67e982ded366b02a4e Mon Sep 17 00:00:00 2001
+From a4b6b18b5ccdf9b8d40508ce17298da8281f94bf Mon Sep 17 00:00:00 2001
 From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 11:00:29 +0200
-Subject: [PATCH] fix(loader): use current vLLM progress stream
+Subject: [PATCH] fix(loader): use public progress stream on current vLLM
 
 Upstream base: 0332cc5089137753d3af43d1c643516b4350359f
 
-Rationale: Current vLLM removed undecorated_log_stream; importing it at weight load prevents every rank from starting.
+Rationale: Current vLLM removed undecorated_log_stream and the private _b12x_output module; importing either prevents checkpoint loading.
 
-Quality and speed: Progress rendering only; checkpoint data, model arithmetic, and hot paths are unchanged.
+Quality and speed: Keep checkpoint progress on stderr; weight data, arithmetic, and hot paths are unchanged.
 
 Tests: syntax parse and source replay; guarded TP3 load pending.
 
 Upstream status: local candidate, not submitted.
 ---
- b12x/integration/vllm/loader.py | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ b12x/integration/vllm/loader.py | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
 diff --git a/b12x/integration/vllm/loader.py b/b12x/integration/vllm/loader.py
-index bb1584c..80a39c3 100644
+index bb1584c..5a57eff 100644
 --- a/b12x/integration/vllm/loader.py
 +++ b/b12x/integration/vllm/loader.py
-@@ -103,7 +103,6 @@ class B12xModelLoader(DefaultModelLoader):
+@@ -3,7 +3,6 @@
+ from __future__ import annotations
+ 
+ import dataclasses
+-from contextlib import ExitStack
+ import heapq
+ import json
+ import math
+@@ -103,9 +102,6 @@ class B12xModelLoader(DefaultModelLoader):
          return model
  
      def load_weights(self, model, model_config):
 -        from vllm.utils.system_utils import undecorated_log_stream
-         from vllm.v1.executor._b12x_output import PreparationOutput
- 
+-        from vllm.v1.executor._b12x_output import PreparationOutput
+-
          session = self._session
-@@ -114,7 +113,7 @@ class B12xModelLoader(DefaultModelLoader):
+         group = session.shared_read_group if session is not None else None
+         if group is not None:
+@@ -114,16 +110,9 @@ class B12xModelLoader(DefaultModelLoader):
              group._gather(None)
          progress = CheckpointDisplay(
              enabled=enable_tqdm(self.load_config.use_tqdm_on_load),
 -            stream=undecorated_log_stream(sys.stderr),
 +            stream=sys.stderr,
          )
-         with ExitStack() as stack:
-             output = stack.enter_context(PreparationOutput(
+-        with ExitStack() as stack:
+-            output = stack.enter_context(PreparationOutput(
+-                progress.write_output, enabled=progress._enabled and progress._stream.isatty(),
+-            ))
+-            if output.stream is not None:
+-                progress._stream = output.stream
+-            stack.enter_context(progress)
+-            stack.callback(output.stop)
++        with progress:
+             self._progress = progress
+             if session is not None:
+                 session.progress = progress.phase
 -- 
 2.54.0 (Apple Git-157)
 

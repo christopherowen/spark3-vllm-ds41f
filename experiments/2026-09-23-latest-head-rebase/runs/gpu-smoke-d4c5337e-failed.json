@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-23T09:06:07.914254+00:00",
+  "result": "failed_bounded_gpu_loader_api_smoke_before_distribution",
+  "image_id": "sha256:d4c5337e557a8fc939cbc498451111108d75a41a1bf7b5e4f1002dc91bef2564",
+  "b12x_patch_head": "ad98f319b2b03326f080ab67e982ded366b02a4e",
+  "container_memory_limit_gib": 8,
+  "gpu": "NVIDIA GB10 on dgx1",
+  "first_exception": "ModuleNotFoundError: No module named vllm.v1.executor._b12x_output",
+  "cause": "upstream B12X checkpoint display still imports a private downstream output interceptor absent from pinned vLLM",
+  "correction": "amend concept patch 0004 to use CheckpointDisplay directly with stderr and no private output interceptor",
+  "cluster_state": "all three inference ranks remained stopped; this image was not distributed or launched"
+}
