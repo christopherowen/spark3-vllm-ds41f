@@ -114,3 +114,16 @@ BF16 compute with 16-head blocks (one full block plus an 8-head remainder).
 Single-pass extend keeps the upstream FP8 default.
 `cluster-consolidated-bf16-decode.json` is the failing consolidated NCCL
 configuration plus that one read-only mount.
+
+Result: `runs/consolidated-bf16dec/lru.json` still fails 5/5 (`valueerk`,
+syntax errors) with split-KV decode forced to BF16/H16. The decode plan is
+built with `mode="decode"` and no persisted selection cache exists, so the
+override was in effect. B12X's FP8-internal / 8-head-block decode is not the
+cause.
+
+## FlashInfer attention at 256-token blocks
+
+`cluster-consolidated-fi-attn-b256.json` repeats the FlashInfer-attention
+bisect with `--block-size 256`, which gives FlashInfer's required 64-entry
+compressed page. It isolates the B12X attention/cache path from the other
+shared components: TP3 virtual heads, disk Engram, and B12X MoE/linear.
