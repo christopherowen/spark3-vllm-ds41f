@@ -186,3 +186,40 @@ main stream before the router gate. During replay they can occupy SMs while
 the routed MoE kernel launches; in eager mode the CPU enqueues the routed
 kernels first. `cluster-kkref-gtrace-noaux.json` repeats the traced full-graph
 arm with `VLLM_DISABLE_SHARED_EXPERTS_STREAM=1`.
+
+The shared-experts stream is not the cause. With it disabled
+(`cluster-kkref-gtrace-noaux.json`), the one-off shared-expert difference
+disappears, but the routed output still differs by exactly the same amounts
+(2.43%, 3.49%, 2.60% at steps 1-3), and two of three runs fail.
+
+## Root cause: B12X W4A8-MX tiny decode ignores `swiglu_limit`
+
+B12X plans an exact MoE variant for every token count in
+`capture_sizes ∪ compile_sizes ∪ planned` (vLLM
+`model_executor/warmup/b12x_prepare.py`); any other count runs the
+prefill-capacity variant. For W4A8-MX with 1-4 tokens the exact variant is
+`tiny_decode` (`b12x/moe/_shared/kernels/tiny_decode.py`, default on,
+`B12X_W4A8_TINY_DECODE=0` is its kill switch). Its FC2 computes
+`silu(gate) * up` with no SwiGLU clamp. The dynamic and micro paths pass
+`swiglu_limit` to their kernels, and DeepSeek V4.1 sets `swiglu_limit: 10.0`
+(reference: `gate <= 10`, `-10 <= up <= 10`). Tiny decode also keeps
+activations in BF16/FP16 where the other paths quantize to MXFP8.
+
+So "graph vs eager" was really "tiny decode vs the clamped kernel": the eager
+configuration captures nothing, plans no exact decode counts, and runs the
+clamped kernel. Every graph mode (full, piecewise, breakable) plans
+1, 2, 3, 4 and uses tiny decode for decode and small DSpark verification
+batches. The weekend B12X (`f1c4e9dd`) and LIL's beta (`0f846212`) both ship
+this kernel, which is why all three stacks fail the same gate.
+
+Confirmation (`cluster-kkref-gtrace-notiny.json`, full graphs,
+`B12X_W4A8_TINY_DECODE=0`): layer-0 routed output graph vs eager falls from
+2.4-3.5% to 0.40-0.45% (graph-vs-graph noise 0.3-0.4%). Three traced runs
+pass, and the LRU gate passes 8/8 (`runs/kktrace/g-full-notiny-lru.json`).
+
+The fix, `patches/b12x/0002-tiny-decode-swiglu-limit.patch`, carries
+`swiglu_limit` into both tiny-decode compile identities and clamps gate and
+up before SiLU, keeping the tiny-decode kernel's speed. Unclamped models
+compile the same kernel as before. `cluster-kkref-tinyclamp.json` mounts the
+patched files (`overlay-b12x/`) into the r4 configuration (full graphs,
+DSpark 3).
