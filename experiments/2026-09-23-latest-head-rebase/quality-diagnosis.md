@@ -30,10 +30,16 @@ The B12X attention adapter, its cache writers, vLLM's decode metadata and
 Engram lookback/disk preparation all cross this boundary. Source inspection
 confirms that the compressed-cache block table fix remains in the consolidated
 adapter. It does not establish that the runtime tables or writes are correct.
-The current B12X compressed-MLA test helper was written for an older plan API:
-a 2.5 GiB capped attempt to run it with 24 local heads stopped before any
-kernel execution because it omits `invocation_from_descriptors`. That failure
-is only test-harness evidence; it says nothing about native 24-head results.
+The legacy B12X compressed-MLA test helper was written for an older plan API.
+The current prepared-API test passed a synthetic V4.1 packed-cache FP8 decode
+comparison with 24 local heads under a 4 GiB cap on dgx3. It uses 64-token
+pages, not this service's production 128-token SWA pages, and cannot validate
+the live metadata, writers, disk Engram, or full model. A synthetic V2 Engram
+hash comparison also matched whole-sequence and incremental chunks. The
+separate model-state test fixture predates this branch's disk-Engram extension
+and lacks `disk_engram_models`; it failed before exercising the gather. These
+bounded results and inconclusive setup failures are recorded in
+`runs/capped-component-controls.json`.
 
 No image or service restart was needed for these checks. The candidate remains
 unpromoted and guarded. Before changing throughput settings, the next causal

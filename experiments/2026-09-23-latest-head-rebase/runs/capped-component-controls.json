@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "image_id": "sha256:a3152e8cf0cde66a2997bdf6fa0ce7001dc2cf62a9b8bf1d8a95cbd5a1ad354a",
+  "date_utc": "2026-09-23",
+  "controls": [
+    {
+      "host": "dgx1",
+      "memory_cap": "2500m",
+      "test": "legacy tests/attention/test_attention_mla_compressed.py with 24 heads",
+      "result": "test helper failed before kernel execution: old plan call omits invocation_from_descriptors"
+    },
+    {
+      "host": "dgx1",
+      "memory_cap": "2500m",
+      "test": "tests/attention/test_compressed_sparse_mla_v41.py::test_v41_heterogeneous_attention_replay_and_live_rows[24-decode-False-True]",
+      "result": "first CUDA allocation failed under the capped process; no kernel result"
+    },
+    {
+      "host": "dgx3",
+      "memory_cap": "4g",
+      "test": "tests/attention/test_compressed_sparse_mla_v41.py::test_v41_heterogeneous_attention_replay_and_live_rows[24-decode-False-True]",
+      "result": "passed in 4.90 s; synthetic packed V4.1 cache, 24 local heads, FP8 decode, page size 64; not a full-model or production page-size test"
+    },
+    {
+      "host": "dgx3",
+      "memory_cap": "4g",
+      "test": "tests/kernels/test_engram.py::test_lookback_window_reproduces_single_instance, V2 window only, no capture",
+      "result": "passed by direct function call; full sequence and incremental 1-2-token chunks hashed identically on synthetic token histories"
+    },
+    {
+      "host": "dgx3",
+      "memory_cap": "4g",
+      "test": "tests/kernels/test_engram.py::test_v2_model_state_gathers_lookback_window",
+      "result": "fixture failed after local model-state extension: its __new__ mock lacks disk_engram_models; not a runtime gather result"
+    }
+  ],
+  "safety": "test containers were removed; all three serving containers remained running with OOMKilled=false and active guards"
+}
