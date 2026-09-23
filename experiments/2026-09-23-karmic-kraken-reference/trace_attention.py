@@ -1340,6 +1340,7 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase):
             self._cache_context_kv(kv, positions)
             if swa is original_swa:
                 self._prepare_global_kv(positions, hidden_states)
+            _spark3_record(self, "mid", None, positions)
             index_query = None
             if self.indexer is not None:
                 h = self.indexer.heads
@@ -1744,57 +1745,71 @@ class DeepseekV4Attention(nn.Module, AttentionLayerBase):
             local = get_tp_group().all_reduce(local)
         return local
 
-# spark3 diagnostic (not a product patch). When the flag file named by
-# SPARK3_LAYER_TRACE exists, TP rank 0 saves per-layer tensors of each forward
-# pass to <flag contents>/<counter>.pt: hidden input, SWA latent, compressor
-# latent/slots (KV-source layers) and attention output (first 8 heads).
+# spark3 diagnostic (not a product patch). SPARK3_LAYER_TRACE names a JSON
+# flag file read once per forward pass on every TP rank:
+#   {"sync": ["hin", "kv", "lat", "mid", "attn"] | "all", "device": false,
+#    "dir": "/cache/..." | null}
+# Every TP rank synchronizes the current CUDA stream (or the device) at the
+# "sync" points; rank 0 additionally saves each layer's tensors under "dir".
+import json as _spark3_json
 import os as _spark3_os
 
 _SPARK3_FLAG = _spark3_os.environ.get("SPARK3_LAYER_TRACE")
 _SPARK3_BUFFER: dict = {}
-_SPARK3_STATE = {"count": 0, "dir": None, "last_layer": None}
+_SPARK3_STATE = {"count": 0, "cfg": None}
 
 
-def _spark3_active():
-    if not _SPARK3_FLAG or not _spark3_os.path.exists(_SPARK3_FLAG):
+def _spark3_read_flag():
+    try:
+        with open(_SPARK3_FLAG) as handle:
+            return _spark3_json.loads(handle.read() or "{}")
+    except (OSError, ValueError):
         return None
-    from vllm.distributed import get_tensor_model_parallel_rank
-
-    if get_tensor_model_parallel_rank() != 0:
-        return None
-    with open(_SPARK3_FLAG) as handle:
-        return handle.read().strip() or None
 
 
 def _spark3_record(layer, name, tensor, positions):
     if not _SPARK3_FLAG or torch.cuda.is_current_stream_capturing():
         return
-    directory = _spark3_active()
-    if directory is None:
-        return
     if getattr(layer, "is_draft", False):
         return
     layer_id = int(layer.layer_id)
-    if name == "hin" and layer_id == 0 and _SPARK3_BUFFER:
-        _spark3_flush()
-    _SPARK3_STATE["dir"] = directory
-    _SPARK3_BUFFER[(layer_id, name)] = (
-        tensor.detach().to("cpu", copy=True).float().half()
-        if tensor.is_floating_point() else tensor.detach().to("cpu", copy=True),
-        positions.detach().to("cpu", copy=True),
-    )
-    _SPARK3_STATE["last_layer"] = max(layer_id, _SPARK3_STATE["last_layer"] or 0)
-    if name == "attn" and layer_id == int(layer.config.model_config.hf_config.num_hidden_layers) - 1:
+    if name == "hin" and layer_id == 0:
+        if _SPARK3_BUFFER:
+            _spark3_flush()
+        from vllm.distributed import get_tensor_model_parallel_rank
+
+        _SPARK3_STATE["cfg"] = _spark3_read_flag()
+        _SPARK3_STATE["rank0"] = get_tensor_model_parallel_rank() == 0
+    cfg = _SPARK3_STATE["cfg"]
+    if not cfg:
+        return
+    sync = cfg.get("sync") or []
+    if sync == "all" or name in sync:
+        if cfg.get("device"):
+            torch.cuda.synchronize()
+        else:
+            torch.cuda.current_stream().synchronize()
+    directory = cfg.get("dir") if _SPARK3_STATE.get("rank0") else None
+    if directory and tensor is not None:
+        _SPARK3_BUFFER[(layer_id, name)] = (
+            tensor.detach().to("cpu", copy=True).float().half()
+            if tensor.is_floating_point() else tensor.detach().to("cpu", copy=True),
+            positions.detach().to("cpu", copy=True),
+        )
+    if (
+        directory
+        and name == "attn"
+        and layer_id == int(layer.config.model_config.hf_config.num_hidden_layers) - 1
+    ):
         _spark3_flush()
 
 
 def _spark3_flush():
-    directory = _SPARK3_STATE["dir"]
-    if directory is None or not _SPARK3_BUFFER:
-        _SPARK3_BUFFER.clear()
-        return
-    _spark3_os.makedirs(directory, exist_ok=True)
-    path = _spark3_os.path.join(directory, f"{_SPARK3_STATE['count']:06d}.pt")
-    torch.save(dict(_SPARK3_BUFFER), path)
-    _SPARK3_STATE["count"] += 1
+    cfg = _SPARK3_STATE["cfg"] or {}
+    directory = cfg.get("dir") if _SPARK3_STATE.get("rank0") else None
+    if directory and _SPARK3_BUFFER:
+        _spark3_os.makedirs(directory, exist_ok=True)
+        path = _spark3_os.path.join(directory, f"{_SPARK3_STATE['count']:06d}.pt")
+        torch.save(dict(_SPARK3_BUFFER), path)
+        _SPARK3_STATE["count"] += 1
     _SPARK3_BUFFER.clear()
