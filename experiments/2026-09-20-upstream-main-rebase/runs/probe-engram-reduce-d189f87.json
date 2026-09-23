@@ -1,0 +1,227 @@
+{
+  "container_name": "engram-reduce-probe-d189f87",
+  "image_id": "sha256:5627de1112656aaab227d26cb3bc0edfa46e5f54934000e4ec6f83f9a70e545a",
+  "master_port": 29631,
+  "memory_limit_gib": 8,
+  "nodes": {
+    "dgx1": {
+      "container_id": "afbd0304e92e17e56895405170f23c61b601c1b79f9ab2731526d70591df6c0b",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "local_shape": [
+          5,
+          24,
+          256
+        ],
+        "rank": 0,
+        "reduced_equal_nccl": true,
+        "reduced_finite": 30720,
+        "reduced_sha256": "fbf7fe8351c268c47a5e3b7373a82ff3a3def1fc2e9a1c6701cd1362d306f3dd",
+        "reduced_shape": [
+          5,
+          24,
+          256
+        ],
+        "reduced_values": 30720,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f0",
+            "roceP2p1s0f0",
+            "rocep1s0f1",
+            "roceP2p1s0f1"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "1": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ],
+            "2": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ]
+          },
+          "rank": 0,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        }
+      }
+    },
+    "dgx2": {
+      "container_id": "cd94f500e140ffdbae1c60aebed7f8c4ae037dd006149213d68bb53612e329e2",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "local_shape": [
+          5,
+          24,
+          256
+        ],
+        "rank": 1,
+        "reduced_equal_nccl": true,
+        "reduced_finite": 30720,
+        "reduced_sha256": "fbf7fe8351c268c47a5e3b7373a82ff3a3def1fc2e9a1c6701cd1362d306f3dd",
+        "reduced_shape": [
+          5,
+          24,
+          256
+        ],
+        "reduced_values": 30720,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f1",
+            "roceP2p1s0f1",
+            "rocep1s0f0",
+            "roceP2p1s0f0"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "0": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ],
+            "2": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ]
+          },
+          "rank": 1,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        }
+      }
+    },
+    "dgx3": {
+      "container_id": "5e7483888223a66d1da0be863058e62c7ed2f51aeda738ad13a0d5e7a502a384",
+      "exit_code": 0,
+      "oom_killed": false,
+      "report": {
+        "local_shape": [
+          5,
+          24,
+          256
+        ],
+        "rank": 2,
+        "reduced_equal_nccl": true,
+        "reduced_finite": 30720,
+        "reduced_sha256": "fbf7fe8351c268c47a5e3b7373a82ff3a3def1fc2e9a1c6701cd1362d306f3dd",
+        "reduced_shape": [
+          5,
+          24,
+          256
+        ],
+        "reduced_values": 30720,
+        "runtime_stats": {
+          "bytes_posted_per_hca": [
+            30784,
+            30720,
+            30784,
+            30720
+          ],
+          "ctrl_seq": 5,
+          "epoch": 5,
+          "error_hca": 0,
+          "error_peer": 0,
+          "error_seq": 0,
+          "hcas": [
+            "rocep1s0f0",
+            "roceP2p1s0f0",
+            "rocep1s0f1",
+            "roceP2p1s0f1"
+          ],
+          "last_seq": 5,
+          "max_gather_bytes": 4194304,
+          "max_size": 2097152,
+          "ops_posted": 5,
+          "peer_hca_routes": {
+            "0": [
+              "rocep1s0f0",
+              "roceP2p1s0f0"
+            ],
+            "1": [
+              "rocep1s0f1",
+              "roceP2p1s0f1"
+            ]
+          },
+          "rank": 2,
+          "slot_bytes": 4194304,
+          "spin_limit": 5000000,
+          "stripe_count": 2,
+          "stripe_hcas": [
+            0,
+            1
+          ],
+          "world_size": 3,
+          "writes_completed": 20,
+          "writes_completed_per_hca": [
+            5,
+            5,
+            5,
+            5
+          ]
+        }
+      }
+    }
+  },
+  "probe": "probe_engram_collective.py",
+  "recorded_at": "2026-09-23T00:37:10.188457+00:00",
+  "repository_commit": "d189f876534fa88315c8844ef0dcb8f425fe5fda",
+  "result": "pass",
+  "schema_version": 1,
+  "timeout_seconds": 180
+}

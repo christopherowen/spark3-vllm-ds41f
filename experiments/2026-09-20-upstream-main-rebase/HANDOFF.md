@@ -10,8 +10,9 @@ exercise this candidate's disk-Engram path. `cluster.json` selects
 parallelism in that mode and its `embed()` calls
 `tensor_model_parallel_all_reduce` on `[5, 24, 256]` BF16 staged rows. The
 dim-0 gather and `_engram_select_rows` belong to a different Engram mode. The
-local `probe_engram_collective.py` now tests the actual all-reduce shape against
-NCCL, but it has not been copied to nodes or run. The earlier two setup failures
+`probe_engram_collective.py` now tests the actual all-reduce shape against NCCL.
+The corrected probe passed on all three nodes under an 8 GiB container cap;
+see `runs/probe-engram-reduce-d189f87.json`. The earlier two setup failures
 were for the irrelevant gather probe and are not evidence about this failure.
 
 The WKV replay below used synthetic finite activations, not the all-reduced
@@ -173,36 +174,31 @@ candidate launch logged RoCEnante ready with all four HCAs and later logged its
 all-gather and all-reduce paths live.  Do not conclude that production
 RoCEnante is broken from the two probe setup failures.
 
-The local probe also mirrors the production group split: Gloo for B12X endpoint
-exchange and a separate NCCL group for the numerical oracle. This corrected
-all-reduce version has **not** been copied to the nodes or run.
+The corrected probe mirrors the production group split: Gloo for B12X endpoint
+exchange and a separate NCCL group for the numerical oracle. It returned the
+same 30,720 finite values and SHA-256 hash on all three ranks, exactly matching
+NCCL, with no reported RoCEnante transport errors or OOM kills. This clears
+the synthetic collective geometry; it does not yet validate the real rows after
+reduction.
 
 ## Suggested next steps
 
-1. Run `py_compile`, Ruff when available, and `git diff --check` over all three
-   probe scripts. Record the corrected probe in a clean repository commit and
-   use the coordinated cluster sync procedure before running it on nodes; do
-   not copy an uncommitted working tree.
-2. Before any node run, prove all three nodes have no running containers, ample
-   memory, active RDMA links, and no stale probe container. Use a new rendezvous
-   port and the exact candidate network environment from `cluster.json`.
-3. Run the corrected three-node all-reduce probe with the 8 GiB per-process cap.
-   Stop only the exact disposable probe containers if any rank fails or stalls.
-   Do not reboot.
-4. If the reduction differs from NCCL, isolate RoCEnante's exact reduction
-   geometry and use NCCL for that geometry until a minimal B12X fix passes.
-   Add the TP3 `[5, 24, 256]` regression to the appropriate upstream suite.
-5. If it passes, build one bounded three-rank Engram pipeline probe: exact disk
-   rows for the prompt -> production all-reduce -> real WKV -> q/k gate with
-   deterministic finite hidden states. This loads only the roughly 150 MiB WKV
-   per rank, not the full model.
-6. Only after the complete isolated Engram pipeline is finite should another
+1. Run the bounded `probe_engram_pipeline.py` on all three ranks. It reads the
+   real prompt rows, compares their RoCEnante reduction with NCCL, then runs
+   the checkpoint WKV and fused gate with finite test hidden states. Use a new
+   rendezvous port, the candidate network environment, and an 8 GiB container
+   cap. Stop only the exact probe containers if any rank fails or stalls.
+2. If the real reduction differs from NCCL, isolate the transport boundary and
+   use NCCL for this geometry until a minimal B12X fix passes. If WKV or the
+   gate first becomes non-finite, inspect that input and its loaded weights.
+   Add a focused regression for the proven cause.
+3. Only after the complete isolated Engram pipeline is finite should another
    full launch be considered. Keep it target-only with CUDA graphs `NONE`,
    2 GiB KV, the 5/3 GiB memory guards, the completed compilation cache, and a
    single tiny deterministic request. Add compact probes before/after all-reduce,
    WKV, and final gate; record only shapes, finite counts, ranges,
    and hashes.  Stop the candidate immediately after the request.
-7. Once a minimal source fix passes both the isolated pipeline and guarded live
+4. Once a minimal source fix passes both the isolated pipeline and guarded live
    request, add focused regressions, refresh the candidate/run receipts, and
    decide whether the change belongs upstream in B12X or vLLM before promotion.
 
@@ -212,7 +208,8 @@ all-reduce version has **not** been copied to the nodes or run.
 - Failure receipt: `runs/launch-5627de111265-mhc-input-nan.json`
 - Exact disk lookup probe: `probe_engram_checkpoint.py`
 - Exact managed WKV probe: `probe_engram_wkv.py`
-- Pending TP3 collective probe: `probe_engram_collective.py`
+- Completed synthetic TP3 collective probe: `probe_engram_collective.py`
+- Real-row TP3 pipeline probe: `probe_engram_pipeline.py`
 - Common Engram implementation:
   `/tmp/spark3-prepare-ded2f/vllm/vllm/models/deepseek_v41/common/engram.py`
 - B12X disk Engram implementation:
@@ -228,17 +225,12 @@ all-reduce version has **not** been copied to the nodes or run.
 - RoCEnante runtime:
   `/tmp/spark3-prepare-ded2f/b12x/b12x/comm/roce/roce_oneshot.py`
 
-## Uncommitted repository state
+## Repository state
 
-At handoff, the following work is intentionally uncommitted pending root-cause
-isolation and a tested fix:
-
-- corrected `candidate.json` and the live failure receipt so they identify the
-  first Engram output rather than layer-0 MHC input;
-- `probe_engram_checkpoint.py`;
-- `probe_engram_wkv.py`;
-- `probe_engram_collective.py`;
-- this handoff.
+Commit `d189f876534fa88315c8844ef0dcb8f425fe5fda` records the corrected
+failure boundary, the first three probes, and this handoff. All three nodes
+were synchronized to that commit before the passing collective probe. The
+real-row pipeline probe and its result remain separate work in progress.
 
 Do not discard unrelated user changes.  Do not promote or push a candidate
 until correctness is demonstrated by a deterministic live request.
