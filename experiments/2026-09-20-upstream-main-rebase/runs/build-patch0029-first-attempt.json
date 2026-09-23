@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-23T04:26:28.781544+02:00",
+  "result": "failed_before_native_compile",
+  "builder": "dgx1",
+  "deployment_commit": "4243ad067ab89ebb9fdcda8b847b2cd88ad42701",
+  "source_head": "d9ddab37ab97df1b699b785ad3b22f3b3c862668",
+  "failure": "CMake FetchContent could not clone https://github.com/vllm-project/MSA.git without authenticated GitHub access; no image produced.",
+  "resolution": "Retry with an ephemeral BuildKit GitHub token streamed from authenticated local gh CLI; no secret stored in source or image."
+}

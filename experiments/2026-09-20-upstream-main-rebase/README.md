@@ -640,8 +640,13 @@ All q13 containers stopped cleanly without OOM; the receipt is
 
 Patch 0029 puts that table lookup in the B12X adapter for indexed decode and
 prefill, including layers that read another layer's compressed cache. A fresh
-28-plus-1 patch replay, source identity check, syntax check, and diff check
-pass. Its image and unpatched TP3 runtime still need validation.
+patch replay, source identity check, syntax check, and diff check pass. Image
+`470bd39a` built successfully and has the same ID on all three nodes. The new
+mapping regression and both cache-writer regressions pass in that image. The
+first unauthenticated build attempt failed fetching the MSA dependency; its
+receipt is `runs/build-patch0029-first-attempt.json`. The authenticated build
+receipt is `runs/build-470bd39a205c-validation.json`. A clean TP3 runtime
+without the diagnostic probe remains to be tested.
 
 - Keep the stopped promoted containers intact until the candidate passes its
   gates, so rollback remains a coordinated start of known state.

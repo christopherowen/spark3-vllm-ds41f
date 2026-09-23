@@ -124,20 +124,20 @@
     "index_digest": "sha256:f29125bcc6d276ed38a67c9dfd4e51ccbaba09ad92847a0913c0df38d9c05c71",
     "arm64_manifest_digest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
   },
-  "image_digest": null,
+  "image_digest": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
   "failed_image_digest": "sha256:b9c4e1264f2f7fa1d0de93b3db0e452e732e754608595b654f38e65f6e4df2a7",
   "last_qualified_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
   "superseded_image_digest": "sha256:f3de2589ce252cbec60c5ef18ecc44b9d5a869324655ed1dc2486360ad3c4fd1",
-  "deployment_status": "patch 0029 source candidate prepared; guarded q13 monkeypatch proved compressed-cache block mapping restores coherent target-only output; new immutable image build and unpatched TP3 smoke pending",
+  "deployment_status": "patch 0029 immutable image built and distributed identically to all three ranks; clean guarded V2 target-only semantic smoke pending",
   "integration_status": {
-    "status": "patch 0029 corrects the B12X indexed block-table owner based on q13 TP3 A/B; new image qualification pending",
+    "status": "patch 0029 source and rebuilt-image regressions pass; unpatched clean TP3 semantic smoke pending",
     "upstream_native_path": "DS4.1 keeps the upstream model, CED/indexer, allocator, and projections; B12X owns sparse MLA kernels, direct ordinary-weight loading, and bounded disk Engram row staging",
     "missing_vllm_consumers": [],
     "b12x_source_commits_reachable_from_vllm": true,
     "details": "donor-analysis.md"
   },
   "compatibility_gate": {
-    "status": "patch-0029-source-replay-pending-build-and-unpatched-runtime",
+    "status": "patch-0029-build-and-three-node-image-identity-pass-clean-runtime-pending",
     "vllm_cutlass_dsl": "4.7.1",
     "b12x_cutlass_dsl": "4.7.1",
     "details": "compatibility.md"

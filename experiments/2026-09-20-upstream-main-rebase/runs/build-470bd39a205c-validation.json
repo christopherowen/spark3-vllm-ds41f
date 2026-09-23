@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-23T04:26:28.781544+02:00",
+  "result": "pass_build_and_distribution",
+  "builder": "dgx1",
+  "deployment_commit": "4243ad067ab89ebb9fdcda8b847b2cd88ad42701",
+  "source_root": "/home/swank/projects/spark3-vllm-ds41f/.work/experiments/2026-09-23-blocktable",
+  "image": {
+    "tag": "vllm-ds41f-upstream-main:d9ddab37ab97-b69feee3022c-d4243ad067ab8",
+    "id": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
+    "base_manifest": "sha256:54c653f0a663ac04a92c25aba60f264c6eb203635b1ad1f627eb932ae453609b"
+  },
+  "sources": {
+    "vllm_head": "d9ddab37ab97df1b699b785ad3b22f3b3c862668",
+    "vllm_tree": "92aa9f7d15c88b69bc6117963e2dcb52b81a55e5",
+    "b12x_head": "b69feee3022c05fa840833a80dd4010156cf7fe1",
+    "b12x_tree": "a251f563557bcbff88b17dedd6fd6bccd859929a"
+  },
+  "gates": {
+    "fresh_patch_replay": "pass",
+    "prepared_source_identity": "pass",
+    "native_extension_build": "pass",
+    "candidate_imports": "pass",
+    "shared_compressed_block_mapping_regression": "pass",
+    "existing_swa_and_compressed_cache_writer_regressions": "pass",
+    "three_node_image_identity": "pass"
+  },
+  "distribution": {
+    "method": "parallel uncompressed docker save/load over dgx1 internal peer links",
+    "dgx1_to_dgx2": "192.168.0.2",
+    "dgx1_to_dgx3": "192.168.2.2",
+    "node_image_ids": {
+      "dgx1": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
+      "dgx2": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
+      "dgx3": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff"
+    }
+  },
+  "github_dependency_auth": "ephemeral BuildKit secret; no token in build args, image layers, repository, or receipt",
+  "remaining_gate": "guarded clean three-rank V2 target-only semantic smoke"
+}
