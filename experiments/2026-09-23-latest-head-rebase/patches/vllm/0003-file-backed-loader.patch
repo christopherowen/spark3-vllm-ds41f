@@ -1,5 +1,5 @@
-From ce7f002ae028fdea43feafde90c1bcbc1a78509d Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From 302bd0a0854b8f1a8dddb3311f9b13fa66c5a1f7 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:55 +0200
 Subject: [PATCH] feat(loader): own and route file backed checkpoint weights
 

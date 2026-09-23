@@ -17,6 +17,10 @@ Fetched at 2026-09-23 07:30 UTC:
 Run `prepare-sources` to fetch the pinned bases, replay the patches, and verify
 the exact trees in `series.json`. The source candidate is isolated in `.work/`.
 The old series and running image remain untouched.
+On September 23 the 13 local patch commits were reauthored to Christopher
+Owen's GitHub noreply identity. A fresh canonical replay produced the same
+vLLM and B12X source trees; `runs/source-replay-identity.json` records both
+sets of commit IDs. This changes attribution only, not the candidate code.
 `build-candidate check` verifies clean source and deployment commit identities;
 `build-candidate build` uses the pinned ARM64 dependency image and rebuilds the
 two vLLM CUDA stable extensions from this head. The build command refuses a

@@ -1,5 +1,5 @@
-From efc58696a860f5a0fa120cbc24c8619c34258f40 Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From fa366598208baa0b31e513308685f07a27490810 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:56 +0200
 Subject: [PATCH] perf(mhc): retain qualified 3072 token geometry
 

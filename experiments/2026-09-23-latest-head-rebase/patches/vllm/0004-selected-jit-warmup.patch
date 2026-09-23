@@ -1,5 +1,5 @@
-From fb06c8054dfa2c68fdd4bd14c63f6d4dd522be03 Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From 460133fa38a5432fd7d6b2fe4ce19e3eb468c320 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:55 +0200
 Subject: [PATCH] perf(warmup): register selected kernels before weight
 

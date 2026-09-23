@@ -11,5 +11,6 @@
   "target_hardware_tests": "not run",
   "quality_comparison": "not run",
   "performance_comparison": "not run: consolidated latest-head image has not been built or launched",
-  "interim_live_comparison": "performance-bridge.md: weekend promoted service versus running patch-0029; all eight matched cases slower on patch-0029"
+  "interim_live_comparison": "performance-bridge.md: weekend promoted service versus running patch-0029; all eight matched cases slower on patch-0029",
+  "patch_author_replay": "pass: 13 local commits reauthored to GitHub noreply identity; exact vLLM and B12X source trees unchanged; runs/source-replay-identity.json"
 }

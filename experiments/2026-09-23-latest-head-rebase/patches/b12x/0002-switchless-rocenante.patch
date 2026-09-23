@@ -1,5 +1,5 @@
-From ac4d793501f688774e158f10148e09f6cac87ba1 Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From f99cd41222a1a5d2be730bf89de5b9fecb6f9b8f Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:56 +0200
 Subject: [PATCH] feat(rocenante): route switchless peers by HCA stripe
 

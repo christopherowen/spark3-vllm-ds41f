@@ -59,7 +59,7 @@ def main():
                 git(
                     temporary,
                     "-c", "user.name=Christopher Owen",
-                    "-c", "user.email=root@your.mom",
+                    "-c", "user.email=3221756+christopherowen@users.noreply.github.com",
                     "am", "--quiet", "--committer-date-is-author-date",
                     str(EXPERIMENT / item["patch"]),
                 )

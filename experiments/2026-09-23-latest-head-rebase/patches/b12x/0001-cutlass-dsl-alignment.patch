@@ -1,5 +1,5 @@
-From 33024b434b51956b6065248e826930da217c77b9 Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From c9f607da571119f392228ba71b98e4f9a2cfc5b1 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:56 +0200
 Subject: [PATCH] build: align CUTLASS DSL with vLLM image
 

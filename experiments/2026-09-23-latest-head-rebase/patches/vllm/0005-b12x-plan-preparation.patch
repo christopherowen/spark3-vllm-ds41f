@@ -1,5 +1,5 @@
-From 354b90d1cdafea75251e149242e55f221be9d1f9 Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From 443a73d362eae015720f7bbbc906496e8eae7fbe Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:55 +0200
 Subject: [PATCH] feat(b12x): prepare MoE and MXFP8 plans before KV admission
 

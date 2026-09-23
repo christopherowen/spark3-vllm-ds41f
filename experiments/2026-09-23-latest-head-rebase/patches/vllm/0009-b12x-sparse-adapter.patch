@@ -1,5 +1,5 @@
-From d602a63649ed6de98280c747c62771c9c89ca14f Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From 15b245879c219d0172cf0a7c46cb356ef01eb5e6 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:55 +0200
 Subject: [PATCH] feat(deepseek-v41): connect B12X sparse attention and caches
 

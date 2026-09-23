@@ -1,5 +1,5 @@
-From efa5e032c9254a80941ec25ee9ddeaf02d582972 Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From 1b6675db79b8b73674ab1e738c36d6c62fcc31bd Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:55 +0200
 Subject: [PATCH] fix(deepseek-v41): dispatch fused TP3 Q heads
 

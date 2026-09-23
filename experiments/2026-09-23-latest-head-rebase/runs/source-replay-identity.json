@@ -1,0 +1,23 @@
+{
+  "time_utc": "2026-09-23T08:17:31Z",
+  "purpose": "Replace placeholder authorship on consolidated local patch commits",
+  "author_and_committer": "Christopher Owen <3221756+christopherowen@users.noreply.github.com>",
+  "changes": {
+    "vllm": {
+      "old_patch_head": "efa5e032c9254a80941ec25ee9ddeaf02d582972",
+      "new_patch_head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
+      "unchanged_source_tree": "eddf87778c8d3617eb5b40b57d05cae8b95ec0c2"
+    },
+    "b12x": {
+      "old_patch_head": "efc58696a860f5a0fa120cbc24c8619c34258f40",
+      "new_patch_head": "fa366598208baa0b31e513308685f07a27490810",
+      "unchanged_source_tree": "de6142a42059d7075623d348fe71f52724926a94"
+    }
+  },
+  "validation": {
+    "fresh_canonical_replay": "python3 experiments/2026-09-23-latest-head-rebase/prepare-sources .work/experiments/2026-09-23-latest-head-rebase-reauth-verify: passed",
+    "local_patch_commits": "10 vLLM and 3 B12X commits use the GitHub noreply identity",
+    "source_delta": "none: source-tree hashes match before and after reattribution",
+    "service_action": "none"
+  }
+}

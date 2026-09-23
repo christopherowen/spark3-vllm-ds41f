@@ -1,5 +1,5 @@
-From 079eb25a85ea8fea931472a620277ab797230651 Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From 70059d9b0bb305d0552b1b2f6ea15af27cb48d3d Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:55 +0200
 Subject: [PATCH] feat(deepseek-v41): compose virtual heads for TP3
 

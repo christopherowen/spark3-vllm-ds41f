@@ -1,5 +1,5 @@
-From 9176becb70c24e16dc88cf99f59f804ef40cf406 Mon Sep 17 00:00:00 2001
-From: Christopher Owen <root@your.mom>
+From 0bd1369e8f4c933c94df56aa8df4b0480317ff27 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Wed, 23 Sep 2026 09:31:55 +0200
 Subject: [PATCH] feat(deepseek-v41): stage requested Engram rows from disk
 
