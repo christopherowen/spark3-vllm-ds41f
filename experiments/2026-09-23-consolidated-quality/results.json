@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "roce_current": {
+    "receipt": "runs/roce-current.json",
+    "lru_syntax_passes": 0,
+    "lru_requests": 5,
+    "observation": "all five responses had malformed def put signatures; value splash or value recon"
+  },
+  "b12x_page_128_control": {
+    "result": "pass",
+    "scope": "24-head FP8 decode, two 128-token pages, capped 3500 MiB disposable container on dgx3",
+    "elapsed_seconds": 4.74,
+    "limitation": "isolated kernel/reference test; no live vLLM metadata, cache writer, Engram, or collectives"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "repository_commit": "9b68ae0c9564434e1595fd6dca25565be3139f19",
+  "promoted_baseline": "2026-09-20-live",
+  "candidate_image_id": "sha256:a3152e8cf0cde66a2997bdf6fa0ce7001dc2cf62a9b8bf1d8a95cbd5a1ad354a",
+  "vllm_patch_head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
+  "b12x_patch_head": "355611878e2ee316a74fd22d913d4db8d23c9306",
+  "reference_config": "experiments/2026-09-23-latest-head-rebase/cluster-eager.json",
+  "quality_control": "experiments/2026-09-23-latest-head-rebase/quality-diagnosis.md"
+}

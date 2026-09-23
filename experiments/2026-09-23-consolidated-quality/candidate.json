@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "intended_variable": "VLLM_ENABLE_ROCE_ALLREDUCE",
+  "roce_config": "cluster-roce.json",
+  "nccl_config": "cluster-nccl.json",
+  "roce_value": "1",
+  "nccl_value": "0",
+  "image_change": false,
+  "model_change": false,
+  "memory_guard_change": false,
+  "readiness_gate": "same immutable image on all three guarded ranks",
+  "quality_gate": "repeat the exact temperature-zero LRU request and retain every completion"
+}
