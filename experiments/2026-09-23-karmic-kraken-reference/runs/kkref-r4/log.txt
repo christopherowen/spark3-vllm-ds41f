@@ -1,0 +1,16 @@
+start 2026-09-23T17:45:47Z mem=6GiB
+prose c1 rc=0 mem=6GiB
+prose c2 rc=0 mem=6GiB
+prose c4 rc=0 mem=6GiB
+prose c8 rc=0 mem=6GiB
+code c1 rc=0 mem=6GiB
+code c2 rc=0 mem=6GiB
+code c4 rc=0 mem=6GiB
+code c8 rc=0 mem=6GiB
+1/5: put signature uses ['self', 'key', 'valueerk']
+2/5: put signature uses ['self', 'key', 'valueerk']
+3/5: put signature uses ['self', 'key', 'valueerk']
+4/5: Python syntax error: invalid syntax at line 14
+5/5: put signature uses ['self', 'key', 'valueerk']
+saved /tmp/claude-runs/kkref-r4/lru.json
+end 2026-09-23T17:47:28Z mem=6GiB

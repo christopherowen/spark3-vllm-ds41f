@@ -65,3 +65,24 @@ under `/cache/kkref`.
 Same as `../2026-09-23-canonical-minimal/`: five-repeat LRU probe, the
 prose/code c1-c8 serving matrix from dgx1 against localhost, and the
 startup/steady memory guards.
+
+## Results so far (r4: autotune off, weekend memory envelope, DSpark 3)
+
+Serving matrix (`runs/kkref-r4/`, same client as the weekend control):
+prose c1 40.9 tok/s (weekend today 34.6), code c1 53.5 (44.0), prose c8 133.0
+(83.1), code c8 161.3 (71.9); TTFT 0.26 s vs 0.32 s. LIL's line meets the
+speed target with B12X autotuning disabled.
+
+Quality: the LRU gate fails 0/5 twice (`valueerk`, `valueazon`, syntax errors).
+The defect is shared by weekend R37, LIL beta, and the canonical-main
+candidate. Token-by-token generation where every step is a fresh full prefill
+(`stepwise-salt.json`) produces correct code. Chunked generation (fresh
+prefill, then K ordinary decode steps) passes at K=4 and K=16 and fails at
+K=48 and K=256 (`stepwise-chunk*.json`). The error accumulates across
+consecutive decode steps and a prefill clears it: decode-written state
+differs from what prefill writes for the same tokens.
+
+`cluster-kkref-trace.json` removes DSpark and mounts `trace_model_state.py`,
+a diagnostic copy of LIL's `DeepseekV41ModelState` that logs the Engram
+lookback window and input ids per step on TP rank 0. It tests whether decode
+feeds Engram the wrong n-grams.
