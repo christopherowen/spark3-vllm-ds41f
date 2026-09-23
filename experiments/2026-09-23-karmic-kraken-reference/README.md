@@ -107,3 +107,14 @@ writes for the same tokens. At most 16 consecutive decode steps stay correct;
 48 or more do not. The defect is shared by weekend R37, LIL beta and the
 canonical-main candidate. Every stack also shares TP3 head padding, B12X
 cache writers and kernels, and disk Engram.
+
+## Result: the drift requires CUDA-graph replay
+
+On LIL's image in eager mode (`cudagraph_mode: NONE`, no DSpark), the LRU gate
+passed 30/30 across all synchronization arms, including no synchronization
+(`runs/kktrace/sync-ab-eager.json`). With FULL_AND_PIECEWISE graphs it passed
+about 1 time in 24, with or without DSpark and with or without a per-step
+device synchronize. Kernel numerics, Engram, collectives and host races are
+not the cause. The next arms separate PIECEWISE graphs (attention eager
+between pieces) from FULL_AND_PIECEWISE with breakable CUDA graphs enabled,
+which runs the `eager_break_during_capture` regions eagerly.
