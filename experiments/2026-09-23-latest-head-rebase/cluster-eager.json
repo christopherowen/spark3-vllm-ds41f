@@ -2,16 +2,16 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-20-live",
   "container": {
-    "name": "dsv41-latest-1b6675-7c77e7-eager-r2",
-    "image": "vllm-ds41f-latest:1b6675db79b8-7c77e74dbadd-dd6f35d034115",
+    "name": "dsv41-latest-1b6675-355611-eager-r3",
+    "image": "vllm-ds41f-latest:1b6675db79b8-355611878e2e-d164a221daefe",
     "expected_labels": {
-      "org.opencontainers.image.revision": "d6f35d034115446a2c4c76297f25be946ef13128",
+      "org.opencontainers.image.revision": "164a221daefecf9f1a3b40e96406106ac21d52a9",
       "local.spark3.vllm.base": "0f2a15c9277f34c9afe141cf578d1f02b3bebdfe",
       "local.spark3.vllm.patch-head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
       "local.spark3.vllm.tree": "eddf87778c8d3617eb5b40b57d05cae8b95ec0c2",
       "local.spark3.b12x.base": "0332cc5089137753d3af43d1c643516b4350359f",
-      "local.spark3.b12x.patch-head": "7c77e74dbaddadcaa9b92650d97da269f7d7f34e",
-      "local.spark3.b12x.tree": "b5eaa87c207a221fc9b550c3a8c210582714cebf"
+      "local.spark3.b12x.patch-head": "355611878e2ee316a74fd22d913d4db8d23c9306",
+      "local.spark3.b12x.tree": "10d92859133e063e82a57d57d02eafe3ba212290"
     },
     "docker_run_args": [
       "--network=host",

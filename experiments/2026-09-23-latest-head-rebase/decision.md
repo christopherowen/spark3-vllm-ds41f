@@ -9,6 +9,7 @@ or treat this image as qualified.
 The smaller B12X lifecycle fix did not recover memory headroom. The latest
 guarded load repeated the post-weight failure at 5,164,244 KiB available on
 dgx3. Patch 0005 now restores managed storage for final model weights on GB10
-as one distinct concept, retaining upstream's bounded reader. Test a small
-native checkpoint copy in an 8 GiB container before the next full launch.
+as one distinct concept, retaining upstream's bounded reader. A 1 MiB native
+checkpoint copy passed with exact values in an 8 GiB container. The next gate
+is one guarded TP3 start using the same 5 GiB startup floor.
 Output quality, long-context capacity, and serving speed remain open gates.

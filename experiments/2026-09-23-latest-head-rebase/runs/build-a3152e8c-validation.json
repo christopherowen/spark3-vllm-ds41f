@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "result": "image_built_and_bounded_managed_copy_passed",
+  "image_tag": "vllm-ds41f-latest:1b6675db79b8-355611878e2e-d164a221daefe",
+  "image_id": "sha256:a3152e8cf0cde66a2997bdf6fa0ce7001dc2cf62a9b8bf1d8a95cbd5a1ad354a",
+  "deployment_commit": "164a221daefecf9f1a3b40e96406106ac21d52a9",
+  "vllm_patch_head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
+  "vllm_tree": "eddf87778c8d3617eb5b40b57d05cae8b95ec0c2",
+  "b12x_patch_head": "355611878e2ee316a74fd22d913d4db8d23c9306",
+  "b12x_tree": "10d92859133e063e82a57d57d02eafe3ba212290",
+  "source_replay": "exact pinned heads and trees on local host and dgx1",
+  "build": "reused unchanged native vLLM extension build layers; compiled B12X C99 loader with scoped managed allocator on idle dgx1",
+  "bounded_gpu_test": "8 GiB container on dgx1: exact 1 MiB float32 safetensors checkpoint copied through B12X bounce reader into managed PyTorch weight pool; exact tensor values survived pool scope; 1 passed in 2.10s",
+  "test_setup_error": "first capped container omitted production io_uring security flags and failed io_uring initialization with EPERM; rerun with IPC_LOCK and seccomp=unconfined passed",
+  "host_memory": "dgx1 remained above 120 GiB MemAvailable after build and capped test",
+  "remaining": "distribute exact image ID to dgx2/dgx3, then one guarded TP3 startup, semantic output, long-context, and performance qualification"
+}

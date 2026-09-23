@@ -65,8 +65,9 @@ Image `sha256:c068aebe` passed bounded loader and GPU smoke, but its guarded
 three-rank load also reached dgx3's 5 GiB startup floor immediately after
 weight loading. See `runs/launch-eager-c068aebe-failed.json`. This rules out
 the loader-lifecycle fix alone as sufficient. Patch 0005 restores scoped
-managed final weights as the next single causal change; bounded copy and
-three-rank qualification remain.
+managed final weights as the next single causal change. Image `sha256:a3152e8c`
+passed a capped 1 MiB native checkpoint copy into managed weight storage with
+exact values after pool scope exit. Three-rank qualification remains.
 
 `performance-bridge.md` records a same-script serving comparison between the
 successful weekend baseline and patch0029. It is an interim measurement;
@@ -74,10 +75,10 @@ the consolidated latest-head image has no successful serving measurement.
 `performance-recovery.md` records the source/configuration attribution audit
 and the controlled qualification sequence for recovering decode speed.
 
-`cluster-eager.json` is the first runtime qualification arm for the consolidated
-image. It keeps the working patch-0029 target-only serving flags and guarded
-memory limits, changes the image and source identities, and gives the new build
-its own JIT cache. It is an experiment configuration, not a promotion.
+`cluster-eager.json` keeps the working patch-0029 target-only serving flags and
+guarded memory limits. Its latest revision pins the managed-weight image and
+reuses the JIT cache from the preceding loader-only attempt because no kernel
+source changed. It is an experiment configuration, not a promotion.
 `cluster-rollback.json` pins the previously working patch-0029 image on the
 same deployment branch, so a failed candidate can be stopped and the prior
 three-rank service relaunched with the coordinated cluster commands.
