@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "result": "api_ok_incorrect_text",
+  "request": {
+    "prompt": "1 + 1 =",
+    "max_tokens": 4,
+    "temperature": 0,
+    "http_status": 200,
+    "text": "sob\u54a7 Tuc"
+  },
+  "configuration": "cluster-v2-numeric.json",
+  "repository_commit": "bb4c29c15c03da2c677b86a6730adc628aa6b831",
+  "findings": {
+    "layer0_b12x_native_vs_reference_max_abs": 0.0625,
+    "layer2_residual_range": [
+      -788.0,
+      760.0
+    ],
+    "previous_layer_residual_range": [
+      -0.8984375,
+      0.84765625
+    ]
+  },
+  "nodes": {
+    "dgx1": {
+      "container_id": "fcdafbe8697a53fd70b63451a285ef8ef5758e919822ff61d08c3dc25b2cbcf1",
+      "exit_code": 0,
+      "oom_killed": false,
+      "model_state_initialized": true,
+      "non_finite_activation_errors": 0
+    },
+    "dgx2": {
+      "container_id": "c80dd8e17ce004035d6f371a59231d7f17735f144b113a64bcc3ec26aaa49b42",
+      "exit_code": 0,
+      "oom_killed": false,
+      "model_state_initialized": true,
+      "non_finite_activation_errors": 0
+    },
+    "dgx3": {
+      "container_id": "fcf13701e9b4acb5c8d431c2ba984cac37ac58df893d565399b610847e028ad4",
+      "exit_code": 0,
+      "oom_killed": false,
+      "model_state_initialized": true,
+      "non_finite_activation_errors": 0
+    }
+  }
+}

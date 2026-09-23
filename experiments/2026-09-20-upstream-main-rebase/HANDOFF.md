@@ -21,6 +21,13 @@ correctness is unresolved. See `runs/launch-v2-live-trace-q6.json`. The next
 diagnostic compares live layer-0 B12X attention output against its compressed
 reference and records attention/MoE/decoder activation ranges by layer.
 
+That comparison passed closely on layer 0 (maximum absolute error 0.0625 on
+native/reference values of magnitude at most 3). The layer-2 decoder residual
+then jumped from about ±1 to about ±800, while its MoE output remained small.
+The next live trace compares `mhc_shifted_post_pre`'s residual update against
+the direct tensor formula and records the carried MHC mix ranges. See
+`runs/launch-v2-numeric-q7.json`.
+
 ## Review correction: disk Engram collective
 
 Source review found that the proposed dim-0 all-gather probe does **not**

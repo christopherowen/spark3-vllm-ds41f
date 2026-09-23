@@ -229,7 +229,7 @@ def _wrap_method(
             _trace(f"{prefix}.{label}.output", output)
         if label in ("attention", "moe", "decoder", "logits"):
             for index, tensor in enumerate(_tensors(output)):
-                if index >= (2 if label == "decoder" else 1):
+                if index >= (4 if label == "decoder" else 1):
                     break
                 if tensor.is_floating_point():
                     _trace(f"{prefix}.{label}.output[{index}]", tensor)
@@ -240,12 +240,41 @@ def _wrap_method(
 
 def _wrap_function(module: Any, function_name: str) -> None:
     original = getattr(module, function_name)
+    calls = 0
 
     @functools.wraps(original)
     def checked(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        selected = (
+            function_name == "mhc_shifted_post_pre"
+            and os.path.exists(_ARM_FILE)
+            and calls < 8
+        )
+        reference = None
+        if selected:
+            calls += 1
+            x, residual, post_mix, res_mix = args[:4]
+            reference = (
+                torch.einsum("tij,tih->tjh", res_mix.float(), residual.float())
+                + post_mix.float() * x.float().unsqueeze(-2)
+            ).to(residual.dtype)
         _check(f"{function_name}.input", (args, kwargs))
         output = original(*args, **kwargs)
         _check(f"{function_name}.output", output)
+        if selected:
+            actual = output[0]
+            error = (actual.float() - reference.float()).abs()
+            print(
+                "spark3 NaN probe: mhc_shifted_post_pre "
+                f"call={calls} x_max={float(x.float().abs().max().item())} "
+                f"residual_max={float(residual.float().abs().max().item())} "
+                f"post_mix_max={float(post_mix.float().abs().max().item())} "
+                f"res_mix_max={float(res_mix.float().abs().max().item())} "
+                f"actual_max={float(actual.float().abs().max().item())} "
+                f"reference_max={float(reference.float().abs().max().item())} "
+                f"max_abs_error={float(error.max().item())}",
+                flush=True,
+            )
         return output
 
     setattr(module, function_name, checked)
