@@ -1,0 +1,22 @@
+#!/bin/sh
+# Import the DS4.1 serving modules on a GPU in a memory-capped container.
+# usage: smoke-imports IMAGE
+set -eu
+image=${1:?usage: smoke-imports IMAGE}
+exec docker run --rm --gpus all --memory=16g --memory-swap=16g \
+  --entrypoint /usr/bin/python3 "$image" - <<'PY'
+import torch
+
+assert torch.cuda.is_available()
+print("device", torch.cuda.get_device_name(0), torch.cuda.get_device_capability(0))
+import vllm.distributed.device_communicators.b12x_roce_all_reduce  # noqa: F401
+import vllm.models.deepseek_v4_1.nvidia.dspark  # noqa: F401
+import vllm.models.deepseek_v4_1.nvidia.model  # noqa: F401
+import vllm.models.deepseek_v4_1.nvidia.vl_model  # noqa: F401
+import vllm.v1.attention.backends.mla.b12x_mla_sparse  # noqa: F401
+from vllm.models.deepseek_v41 import DeepseekV41ForCausalLM
+
+print("DS4.1 SM12x class:", DeepseekV41ForCausalLM.__module__)
+assert DeepseekV41ForCausalLM.__module__.startswith("vllm.models.deepseek_v4_1")
+print("karmic-kraken reference GPU import smoke passed")
+PY

@@ -7,6 +7,7 @@ import json
 import os
 import signal
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -148,6 +149,15 @@ def main():
 
     deployment_commit = git(REPO, "rev-parse", "HEAD")
     vllm, b12x = sources["vllm"], sources["b12x"]
+    deletions = Path(tempfile.mkdtemp(prefix="spark3-vllm-deletions."))
+    deleted = git(
+        source_root / "vllm", "diff", "--name-only", "--diff-filter=D",
+        sources["runtime_base_revision"], "HEAD", "--", "vllm",
+    ).splitlines()
+    (deletions / "deleted.txt").write_text(
+        "".join(path.removeprefix("vllm/") + "\n" for path in deleted)
+    )
+    print(f"candidate deletes {len(deleted)} vllm files relative to the base image")
     tag = os.environ.get(
         "CANDIDATE_TAG",
         "vllm-ds41f-kkref:"
@@ -160,6 +170,7 @@ def main():
         "--build-context", f"b12x-source={source_root / 'b12x'}",
         "--build-context", f"cutlass-dsl-wheels={WHEELS}",
         "--build-context", f"cutlass-source={CUTLASS}",
+        "--build-context", f"vllm-deletions={deletions}",
         "--build-arg", f"VLLM_REVISION={vllm['revision']}",
         "--build-arg", f"VLLM_TREE={vllm['expected_tree']}",
         "--build-arg", f"B12X_REVISION={b12x['revision']}",

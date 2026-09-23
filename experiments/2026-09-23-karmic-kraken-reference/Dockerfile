@@ -108,40 +108,21 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Keep install-only generated modules and matching native extensions from the
-# base install without overwriting any candidate source file. Python modules
-# that exist in the base install but were deleted from the candidate tree stay
-# deleted; only generated or build-only files and directories are copied.
-RUN python3 - <<'PY'
-import shutil
-from pathlib import Path
-
-import vllm
-
-installed = Path(vllm.__file__).parent
-source = Path("/opt/spark3/candidate/vllm/vllm")
-generated = {"_version.py", "third_party/flashmla/flash_mla_interface.py"}
-copied, skipped = 0, []
-for path in installed.rglob("*"):
-    if path.is_dir() or "__pycache__" in path.parts:
-        continue
-    relative = path.relative_to(installed)
-    target = source / relative
-    if target.exists():
-        continue
-    if (
-        path.suffix == ".py"
-        and target.parent.is_dir()
-        and relative.as_posix() not in generated
-    ):
-        skipped.append(relative.as_posix())
-        continue
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(path, target)
-    copied += 1
-print(f"copied {copied} generated/native files; kept {len(skipped)} deletions")
-for relative in sorted(skipped):
-    print("  not restored:", relative)
-PY
+# base install without overwriting any candidate source file, then remove the
+# files the candidate deliberately deletes relative to the base image's
+# canonical commit (listed by build-candidate from git).
+COPY --from=vllm-deletions deleted.txt /tmp/vllm-deleted.txt
+RUN set -eux; \
+    installed=$(python3 -c \
+      'from pathlib import Path; import vllm; print(Path(vllm.__file__).parent)'); \
+    cp -a --no-clobber "$installed"/. /opt/spark3/candidate/vllm/vllm/; \
+    while read -r relative; do \
+      [ -n "$relative" ] || continue; \
+      rm -f "/opt/spark3/candidate/vllm/vllm/$relative"; \
+      echo "kept deletion: $relative"; \
+    done < /tmp/vllm-deleted.txt; \
+    rm -f /tmp/vllm-deleted.txt; \
+    test -f /opt/spark3/candidate/vllm/vllm/third_party/flashmla/flash_mla_interface.py
 
 # B12X declares CuTe DSL 4.6.2 exactly, as did the weekend image. Install the
 # hash-locked wheel set over the nightly's 4.7.1, then B12X without dependencies.
@@ -178,10 +159,6 @@ import b12x.integration.vllm.loader  # noqa: F401
 import b12x.sequence.engram  # noqa: F401
 from b12x.comm.roce._proxy import load
 from b12x.loader._native import _build
-import vllm.distributed.device_communicators.b12x_roce_all_reduce  # noqa: F401
-import vllm.models.deepseek_v4_1.nvidia.dspark  # noqa: F401
-import vllm.models.deepseek_v4_1.nvidia.model  # noqa: F401
-import vllm.models.deepseek_v4_1.nvidia.vl_model  # noqa: F401
 print("RoCE proxy ABI", load().roce_abi_version())
 native_path = _build()
 linked = subprocess.check_output(["ldd", native_path], text=True)
@@ -189,5 +166,5 @@ assert "liburing.so" in linked, "B12X was built without io_uring row staging"
 for name in ("_C_stable_libtorch", "_moe_C_stable_libtorch"):
     with open(f"/opt/spark3/candidate/vllm/vllm/{name}.abi3.so", "rb") as handle:
         assert handle.read(4) == b"\x7fELF"
-print("karmic-kraken reference imports passed")
+print("karmic-kraken reference B12X build checks passed")
 PY
