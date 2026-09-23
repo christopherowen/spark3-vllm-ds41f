@@ -83,3 +83,34 @@ baked FlashInfer modules. `cluster-weekend-control-kv2-fi.json` sets
 `FLASHINFER_WORKSPACE_BASE=/cache/flashinfer-r37`. The guard thresholds are
 unchanged. Any image that uses `VLLM_USE_FLASHINFER_SAMPLER=1` needs the same
 pre-weight build.
+
+## Control result: the weekend setup fails the same LRU gate
+
+`runs/weekend-control-kv2/` holds the unchanged weekend image with 2 GiB KV
+and a prebuilt FlashInfer sampler. It reproduces the 2026-09-20 serving matrix
+within single-run noise: prose c1 34.6 tok/s (Sep 20: 31.4), code c1 44.0
+(44.3), code c4 96.0 (94.4). It fails the LRU gate 4/5 with the same malformed
+tokens as the consolidated candidate (`valueerk`, ` value splash`). The
+defect is therefore shared by both stacks and predates the canonical-main
+rebase.
+
+## FlashInfer-attention bisect: not runnable at 128-token blocks
+
+`cluster-consolidated-fi-attn.json` failed cleanly in warmup:
+FlashInfer 0.6.18 SM120 sparse-MLA decode supports only a compressed page size
+of 64, and 128-token blocks give 32 for ratio-4 layers. It would need 256-token
+blocks, which the B12X path cannot use. No memory event occurred (minimum
+about 9.8 GiB available).
+
+## Shared-component hypothesis: B12X split-KV V4.1 decode
+
+Both stacks call B12X `run_unified_decode` for decode. For the V4.1 cache,
+decode is never single-pass: it runs split-KV with FP8-internal compute. With
+24 heads per rank (TP3), the default selects 8-head blocks. Prefill
+("extend") is single-pass. That matches "correct as one prefill, wrong during
+incremental decode", and 24 heads per rank arises only at TP3.
+`b12x_tuning_bf16_decode.py` changes only the split-KV decode selection to
+BF16 compute with 16-head blocks (one full block plus an 8-head remainder).
+Single-pass extend keeps the upstream FP8 default.
+`cluster-consolidated-bf16-decode.json` is the failing consolidated NCCL
+configuration plus that one read-only mount.
