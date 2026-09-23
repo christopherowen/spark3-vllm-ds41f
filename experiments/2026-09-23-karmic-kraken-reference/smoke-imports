@@ -3,7 +3,7 @@
 # usage: smoke-imports IMAGE
 set -eu
 image=${1:?usage: smoke-imports IMAGE}
-exec docker run --rm --gpus all --memory=16g --memory-swap=16g \
+exec docker run --rm -i --gpus all --memory=16g --memory-swap=16g \
   --entrypoint /usr/bin/python3 "$image" - <<'PY'
 import torch
 
