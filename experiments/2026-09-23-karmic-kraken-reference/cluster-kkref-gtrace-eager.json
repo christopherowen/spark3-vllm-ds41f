@@ -47,6 +47,11 @@
         "{home}/projects/spark3-vllm-ds41f/experiments/2026-09-23-karmic-kraken-reference/gtrace_model_state.py",
         "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/model_state.py",
         "ro"
+      ],
+      [
+        "{home}/projects/spark3-vllm-ds41f/experiments/2026-09-23-karmic-kraken-reference/gtrace_dsv4_topk.py",
+        "/opt/spark3/candidate/vllm/vllm/model_executor/layers/fused_moe/router/dsv4_topk.py",
+        "ro"
       ]
     ]
   },
