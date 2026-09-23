@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-23T04:35:11.721420+02:00",
+  "result": "pass_target_only_semantic_smoke",
+  "configuration": "cluster-v2-patch0029.json",
+  "repository_commit": "ff61256e25fbf6e02d17c1c469d5f3aa00eb6059",
+  "image_id": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
+  "probe_mounted": false,
+  "startup": "API and JIT ready; 5 GiB startup guards switched to 3 GiB steady guards on all nodes",
+  "requests": [
+    {
+      "endpoint": "/v1/completions",
+      "prompt": "1 + 1 =",
+      "status": 200,
+      "text": " 2? No",
+      "note": "first completion answer is 2; four-token raw continuation is not a stand-alone chat answer"
+    },
+    {
+      "endpoint": "/v1/completions",
+      "prompt": "2 + 2 =",
+      "status": 200,
+      "text": " 4\n2"
+    },
+    {
+      "endpoint": "/v1/completions",
+      "prompt": "The capital of France is",
+      "status": 200,
+      "text": " Paris."
+    },
+    {
+      "endpoint": "/v1/chat/completions",
+      "prompt": "What is 7 times 8? Answer with just the number.",
+      "status": 200,
+      "text": "56"
+    },
+    {
+      "endpoint": "/v1/chat/completions",
+      "concurrency": 4,
+      "status": 200,
+      "answers": {
+        "3 times 3": "9",
+        "5 plus 7": "12",
+        "6 times 4": "24",
+        "10 minus 3": "7"
+      }
+    },
+    {
+      "endpoint": "/v1/chat/completions",
+      "prompt_tokens": 4827,
+      "prompt": "passphrase retrieval with repeated filler",
+      "status": 200,
+      "text": "ORION"
+    }
+  ],
+  "nodes": {
+    "dgx1": {
+      "container_id": "e2b790db626855663130c60b636dd8a76910240b93cffd1901628786cc08d8e6",
+      "running": true,
+      "oom_killed": false,
+      "image_id": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
+      "mem_available_gib_after_smoke": 8.91,
+      "memguard": "active 3 GiB steady threshold"
+    },
+    "dgx2": {
+      "container_id": "f5a2a88d6213f3ea15756793890d692afc4f358d390d737f07267161b87461c4",
+      "running": true,
+      "oom_killed": false,
+      "image_id": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
+      "mem_available_gib_after_smoke": 10.36,
+      "memguard": "active 3 GiB steady threshold"
+    },
+    "dgx3": {
+      "container_id": "7ea4ca5354c5be53fc34f9a1481eeb62b8efccff4da4277f2c8f9a9b48d6b73b",
+      "running": true,
+      "oom_killed": false,
+      "image_id": "sha256:470bd39a205cb4c75bd403ea0976735d56506e4096c165cfcf5207771c968bff",
+      "mem_available_gib_after_smoke": 9.76,
+      "memguard": "active 3 GiB steady threshold"
+    }
+  },
+  "remaining_qualification": [
+    "full 4x128K context and eight-way Strix workload",
+    "CUDA graph mode after eager correctness",
+    "latency and throughput versus promoted baseline",
+    "failure/recovery and minimum-memory gates",
+    "current upstream HEAD rebase and new native ABI image if that separate update is required"
+  ],
+  "status": "candidate remains running; promoted config/cluster.json unchanged"
+}

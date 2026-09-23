@@ -645,8 +645,26 @@ patch replay, source identity check, syntax check, and diff check pass. Image
 mapping regression and both cache-writer regressions pass in that image. The
 first unauthenticated build attempt failed fetching the MSA dependency; its
 receipt is `runs/build-patch0029-first-attempt.json`. The authenticated build
-receipt is `runs/build-470bd39a205c-validation.json`. A clean TP3 runtime
-without the diagnostic probe remains to be tested.
+receipt is `runs/build-470bd39a205c-validation.json`.
+
+The clean patch-0029 image is now running on all three DGX nodes with V2 model
+runner and active 3 GiB steady memory guards. The ordinary completion and chat
+APIs returned coherent arithmetic and factual answers; four concurrent short
+chat requests all returned the expected numbers, and a 4,827-token retrieval
+request returned its passphrase. No diagnostic probe was mounted. All containers
+remained running without OOM and with 8.8–10.0 GiB available host memory after
+the smoke. Details are in `runs/launch-v2-patch0029-r1.json`. This is a working
+target-only candidate, not a promoted baseline; the long-context, CUDA graph,
+performance, and failure gates below remain open.
+
+On 2026-09-23, upstream `vllm/main` was at `e581e14002a0` (146 commits after
+this candidate's `d05da62e9ccd` base), and `b12x/master` was at `4f3028b19c1d`
+(18 commits after `0f3a8cbfd1c`). A dry patch replay against those heads
+conflicted in vLLM patch 0001 at `deepseek_v41/attention.py` and B12X patch 0002
+in RoCEnante source. Moving this working candidate to those newer heads needs a
+separate patch-by-patch rebase, removal of changes now provided upstream, a
+matching ARM64 base/native ABI build, and the same guarded runtime gates. The
+current running image retains the September 20 source pins.
 
 - Keep the stopped promoted containers intact until the candidate passes its
   gates, so rollback remains a coordinated start of known state.
