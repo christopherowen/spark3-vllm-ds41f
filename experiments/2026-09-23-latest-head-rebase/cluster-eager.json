@@ -3,9 +3,9 @@
   "promoted_baseline": "2026-09-20-live",
   "container": {
     "name": "dsv41-latest-1b6675-fa3665-eager-r1",
-    "image": "vllm-ds41f-latest:1b6675db79b8-fa366598208b-d5dea7189dcf7",
+    "image": "vllm-ds41f-latest:1b6675db79b8-fa366598208b-d2a926a1511dd",
     "expected_labels": {
-      "org.opencontainers.image.revision": "5dea7189dcf7ae3550960aed898a560db441258f",
+      "org.opencontainers.image.revision": "2a926a1511dd313d4aff45be353f745f70aea27a",
       "local.spark3.vllm.base": "0f2a15c9277f34c9afe141cf578d1f02b3bebdfe",
       "local.spark3.vllm.patch-head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
       "local.spark3.vllm.tree": "eddf87778c8d3617eb5b40b57d05cae8b95ec0c2",
