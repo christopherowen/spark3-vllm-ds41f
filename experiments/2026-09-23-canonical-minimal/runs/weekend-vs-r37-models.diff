@@ -1,0 +1,332 @@
+Only in weekend/ds41-r37/vllm/vllm/models: __pycache__
+Only in weekend/ds41-r37/vllm/vllm/models/common: __pycache__
+Only in weekend/ds41-r37/vllm/vllm/models/common/ops: __pycache__
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4: __pycache__
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4/common: __pycache__
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4/common/ops: __pycache__
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4/nvidia: __pycache__
+diff -ru r37-vllm/vllm/models/deepseek_v4/nvidia/model.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4/nvidia/model.py
+--- r37-vllm/vllm/models/deepseek_v4/nvidia/model.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4/nvidia/model.py	2026-09-16 20:57:13
+@@ -873,7 +873,9 @@
+             # instead of e_score_correction_bias / the hash table. Created on
+             # every MoE layer, hash layers included.
+             self.gate.bias_vl = nn.Parameter(
+-                torch.empty(config.n_routed_experts, dtype=torch.float32),
++                allocate_weights(
++                    torch.empty, config.n_routed_experts, dtype=torch.float32
++                ),
+                 requires_grad=False,
+             )
+ 
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4/nvidia/ops: __pycache__
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1: __pycache__
+diff -ru r37-vllm/vllm/models/deepseek_v4_1/attention.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/attention.py
+--- r37-vllm/vllm/models/deepseek_v4_1/attention.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/attention.py	2026-09-16 20:42:11
+@@ -27,6 +27,7 @@
+     RowParallelLinear,
+     UnquantizedLinearMethod,
+ )
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.models.deepseek_v4_1.b12x_layers import (
+     B12xFP8LinearMethod,
+     B12xLinearMethod,
+@@ -331,7 +332,13 @@
+         self._context[prefix] = self
+         self.kv_cache = torch.tensor([])
+         self.attn_sink = nn.Parameter(
+-            torch.empty(self.n_local_heads, dtype=torch.float32), requires_grad=False
++            allocate_weights(
++                torch.full,
++                (self.n_local_heads,),
++                -float("inf"),
++                dtype=torch.float32,
++            ),
++            requires_grad=False,
+         )
+         self.fused_wqa_wkv = MergedColumnParallelLinear(
+             hf.hidden_size,
+@@ -374,6 +381,13 @@
+         self._wo_projection_weights = None
+         for linear in (self.fused_wqa_wkv, self.wq_b):
+             _native_linear(linear)
++        # The native checkpoint has 64 heads / 8 output groups. A TP=3
++        # serving config exposes 72 / 9 and pads checkpoint tensors before the
++        # standard parallel loaders slice them. The virtual WO columns are
++        # zero, so this preserves the native model's output exactly.
++        from vllm.models.deepseek_v4_1.virtual_heads import wrap_attention
++
++        wrap_attention(self, tp, hf)
+         self.rotary_emb = build_deepseek_v4_rope(
+             hf,
+             head_dim=512,
+diff -ru r37-vllm/vllm/models/deepseek_v4_1/b12x_layers.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/b12x_layers.py
+--- r37-vllm/vllm/models/deepseek_v4_1/b12x_layers.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/b12x_layers.py	2026-09-16 20:48:05
+@@ -24,6 +24,7 @@
+     UnquantizedEmbeddingMethod,
+ )
+ from vllm.model_executor.parameter import BlockQuantScaleParameter
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.v1.worker.workspace import (
+     current_preallocated_workspace,
+     current_workspace_manager,
+@@ -281,7 +282,8 @@
+     def __init__(self, hidden_size: int, eps: float = 1e-6):
+         super().__init__()
+         self.weight = nn.Parameter(
+-            torch.ones(hidden_size, dtype=torch.bfloat16), requires_grad=False
++            allocate_weights(torch.ones, hidden_size, dtype=torch.bfloat16),
++            requires_grad=False,
+         )
+         self.variance_epsilon = eps
+         self.capacity = _capacity()
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/common: __pycache__
+diff -ru r37-vllm/vllm/models/deepseek_v4_1/common/engram.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/common/engram.py
+--- r37-vllm/vllm/models/deepseek_v4_1/common/engram.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/common/engram.py	2026-09-16 20:48:05
+@@ -20,7 +20,10 @@
+ from vllm.logger import init_logger
+ from vllm.model_executor.layers.linear import ReplicatedLinear
+ from vllm.model_executor.utils import set_weight_attrs
+-from vllm.model_executor.weight_transfer import get_file_tensor_source
++from vllm.model_executor.weight_transfer import (
++    allocate_weights,
++    get_file_tensor_source,
++)
+ from vllm.triton_utils import tl, triton
+ from vllm.v1.worker.workspace import retain_cuda_graph_capture_resource
+ 
+@@ -376,7 +379,8 @@
+             )
+         elif self.disk_table is None:
+             self.weight = nn.Parameter(
+-                torch.empty(
++                allocate_weights(
++                    torch.empty,
+                     plan.weight_shape,
+                     dtype=torch.float8_e4m3fn,
+                     device=plan.caps.device,
+@@ -384,7 +388,8 @@
+                 requires_grad=False,
+             )
+             self.weight_scale_inv = nn.Parameter(
+-                torch.empty(
++                allocate_weights(
++                    torch.empty,
+                     plan.scale_shape, dtype=torch.uint8, device=plan.caps.device
+                 ),
+                 requires_grad=False,
+@@ -523,11 +528,13 @@
+             prefix=f"{prefix}.wkv",
+         )
+         self.q_weight = nn.Parameter(
+-            torch.empty(self.hc_mult, self.dim, dtype=torch.bfloat16),
++            allocate_weights(
++                torch.empty, self.hc_mult, self.dim, dtype=torch.bfloat16
++            ),
+             requires_grad=False,
+         )
+         self.k_weight = nn.Parameter(
+-            torch.empty_like(self.q_weight), requires_grad=False
++            allocate_weights(torch.empty_like, self.q_weight), requires_grad=False
+         )
+         self.register_buffer(
+             "norm_weights",
+diff -ru r37-vllm/vllm/models/deepseek_v4_1/compressor.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/compressor.py
+--- r37-vllm/vllm/models/deepseek_v4_1/compressor.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/compressor.py	2026-09-16 20:47:30
+@@ -9,6 +9,7 @@
+ 
+ from vllm.model_executor.layers.attention_layer_base import AttentionLayerBase
+ from vllm.model_executor.layers.linear import MergedColumnParallelLinear
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.models.deepseek_v4_1.b12x_layers import B12xLinearMethod, B12xRMSNorm
+ from vllm.models.deepseek_v4_1.sparse_mla import DeepseekV41B12xBackend
+ from vllm.triton_utils import tl, triton
+@@ -146,7 +147,8 @@
+         )
+         self.norm = B12xRMSNorm(512, vllm_config.model_config.hf_config.rms_norm_eps)
+         self.norm.weight = nn.Parameter(
+-            torch.ones(512, dtype=torch.float32), requires_grad=False
++            allocate_weights(torch.ones, 512, dtype=torch.float32),
++            requires_grad=False,
+         )
+         self.state_cache = (
+             CompressorStateCache(vllm_config, f"{prefix}.state_cache")
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia: __pycache__
+diff -ru r37-vllm/vllm/models/deepseek_v4_1/nvidia/b12x_vision.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia/b12x_vision.py
+--- r37-vllm/vllm/models/deepseek_v4_1/nvidia/b12x_vision.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia/b12x_vision.py	2026-09-16 20:47:30
+@@ -19,7 +19,9 @@
+ from b12x.norm.vision import run_gelu, run_rope_qkv, run_spatial_merge
+ from torch import nn
+ 
++from vllm.model_executor.weight_transfer import allocate_weights
+ 
++
+ def _capacity(config):
+     capacity = getattr(config, "vision_max_tokens", None)
+     if capacity is None:
+@@ -35,12 +37,17 @@
+     def __init__(self, in_features, out_features, bias=True):
+         super().__init__()
+         self.weight = nn.Parameter(
+-            torch.empty(out_features, in_features, dtype=torch.bfloat16),
++            allocate_weights(
++                torch.empty, out_features, in_features, dtype=torch.bfloat16
++            ),
+             requires_grad=False,
+         )
+         self.bias = (
+             nn.Parameter(
+-                torch.empty(out_features, dtype=torch.bfloat16), requires_grad=False
++                allocate_weights(
++                    torch.empty, out_features, dtype=torch.bfloat16
++                ),
++                requires_grad=False,
+             )
+             if bias
+             else None
+@@ -64,7 +71,8 @@
+     def __init__(self, dim):
+         super().__init__()
+         self.weight = nn.Parameter(
+-            torch.ones(dim, dtype=torch.bfloat16), requires_grad=False
++            allocate_weights(torch.ones, dim, dtype=torch.bfloat16),
++            requires_grad=False,
+         )
+ 
+     def forward(self, x, *, out, plan):
+diff -ru r37-vllm/vllm/models/deepseek_v4_1/nvidia/dspark.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia/dspark.py
+--- r37-vllm/vllm/models/deepseek_v4_1/nvidia/dspark.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia/dspark.py	2026-09-16 20:42:11
+@@ -34,6 +34,7 @@
+ from vllm.model_executor.layers.linear import ReplicatedLinear
+ from vllm.model_executor.layers.logits_processor import LogitsProcessor
+ from vllm.model_executor.model_loader.weight_utils import default_weight_loader
++from vllm.model_executor.weight_transfer import copy_weight
+ from vllm.model_executor.models.qwen3_dspark import (
+     DSparkConfidenceHead,
+     DSparkMarkovHead,
+@@ -623,7 +624,7 @@
+             else:
+                 if "attn_sink" in name:
+                     narrow = loaded_weight[head_start:head_end]
+-                    params_dict[name][: narrow.shape[0]].copy_(narrow)
++                    copy_weight(params_dict[name][: narrow.shape[0]], narrow)
+                     loaded_params.add(name)
+                     continue
+                 if name.endswith(".ffn.gate.bias"):
+diff -ru r37-vllm/vllm/models/deepseek_v4_1/nvidia/model.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia/model.py
+--- r37-vllm/vllm/models/deepseek_v4_1/nvidia/model.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia/model.py	2026-09-16 20:48:05
+@@ -44,6 +44,7 @@
+     make_layers,
+     maybe_prefix,
+ )
++from vllm.model_executor.weight_transfer import allocate_weights, copy_weight
+ from vllm.models.common.ops.sequence_parallel import (
+     sp_all_gather,
+     sp_padding_mask,
+@@ -161,7 +162,8 @@
+         mix_hc = (2 + self.hc_mult) * self.hc_mult
+         hc_dim = self.hc_mult * self.hidden_size
+         self.hc_attn_fn = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 (mix_hc, hc_dim),
+                 dtype=torch.float32,
+             ),
+@@ -169,35 +171,40 @@
+         )
+         self.hc_attn_fn_broadcast: torch.Tensor | None = None
+         self.hc_ffn_fn = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 (mix_hc, hc_dim),
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_attn_base = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 mix_hc,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_ffn_base = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 mix_hc,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_attn_scale = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 3,
+                 dtype=torch.float32,
+             ),
+             requires_grad=False,
+         )
+         self.hc_ffn_scale = nn.Parameter(
+-            torch.empty(
++            allocate_weights(
++                torch.empty,
+                 3,
+                 dtype=torch.float32,
+             ),
+@@ -752,7 +759,7 @@
+                         continue
+                     narrow_weight = loaded_weight[head_rank_start:head_rank_end]
+                     n = narrow_weight.shape[0]
+-                    params_dict[name][:n].copy_(narrow_weight)
++                    copy_weight(params_dict[name][:n], narrow_weight)
+                     loaded_params.add(name)
+                     continue
+                 else:
+diff -ru r37-vllm/vllm/models/deepseek_v4_1/nvidia/vl_model.py weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia/vl_model.py
+--- r37-vllm/vllm/models/deepseek_v4_1/nvidia/vl_model.py	2026-09-23 14:03:28
++++ weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1/nvidia/vl_model.py	2026-09-16 20:47:30
+@@ -34,6 +34,7 @@
+     WeightsMapper,
+     maybe_prefix,
+ )
++from vllm.model_executor.weight_transfer import allocate_weights
+ from vllm.multimodal import MULTIMODAL_REGISTRY
+ from vllm.utils.tensor_schema import TensorSchema, TensorShape
+ 
+@@ -150,13 +151,19 @@
+             self.vision = DeepseekV4ViT(config)
+             self.aligner = DeepseekV4Aligner(config)
+             self.image_start = nn.Parameter(
+-                torch.empty(config.hidden_size, dtype=torch.float32)
++                allocate_weights(
++                    torch.empty, config.hidden_size, dtype=torch.float32
++                )
+             )
+             self.image_end = nn.Parameter(
+-                torch.empty(config.hidden_size, dtype=torch.float32)
++                allocate_weights(
++                    torch.empty, config.hidden_size, dtype=torch.float32
++                )
+             )
+             self.image_newline = nn.Parameter(
+-                torch.empty(config.hidden_size, dtype=torch.float32)
++                allocate_weights(
++                    torch.empty, config.hidden_size, dtype=torch.float32
++                )
+             )
+ 
+         with self._mark_language_model(vllm_config):
+Only in weekend/ds41-r37/vllm/vllm/models/deepseek_v4_1: virtual_heads.py

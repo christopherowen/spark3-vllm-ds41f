@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "repository_commit": "4a1270e1d4861a092c5ff7dff22413ab57b0c512",
+  "promoted_baseline": "2026-09-20-live",
+  "weekend_image": "vllm-dsv41:r37-b12x-e4m3fix1-arm64-sm121",
+  "weekend_sources": {
+    "vllm": "https://github.com/local-inference-lab/vllm/tree/c687594b8a8082e18af9fe2f64eb5f9ee442e251",
+    "b12x": "https://github.com/local-inference-lab/b12x/tree/f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+    "branch": "release/ds41-optimized-r37 (both repositories)"
+  },
+  "consolidated_candidate": {
+    "image_id": "sha256:a3152e8cf0cde66a2997bdf6fa0ce7001dc2cf62a9b8bf1d8a95cbd5a1ad354a",
+    "vllm_base": "0f2a15c9277f34c9afe141cf578d1f02b3bebdfe",
+    "vllm_patch_head": "1b6675db79b8b73674ab1e738c36d6c62fcc31bd",
+    "vllm_tree": "eddf87778c8d3617eb5b40b57d05cae8b95ec0c2",
+    "b12x_base": "0332cc5089137753d3af43d1c643516b4350359f",
+    "b12x_patch_head": "355611878e2ee316a74fd22d913d4db8d23c9306"
+  },
+  "canonical_main_observed": {
+    "vllm": "157bcb7c489689dd34cf28d9c9970a465d326a03",
+    "b12x_master": "8a99d639410e39d5f39cb4037675331beceea1d4",
+    "observed_at": "2026-09-23"
+  }
+}
