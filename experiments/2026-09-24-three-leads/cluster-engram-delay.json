@@ -129,7 +129,8 @@
     "B12X_AUTOTUNE": "0",
     "B12X_W4A8_TINY_DECODE": "0",
     "SPARK3_ENGRAM_ASYNC": "1",
-    "SPARK3_ENGRAM_ASYNC_DELAY_MS": "20"
+    "SPARK3_ENGRAM_ASYNC_DELAY_MS": "20",
+    "SPARK3_ENGRAM_ASYNC_TRACE": "1"
   },
   "serve_args": [
     "/models",

@@ -56,4 +56,20 @@ summaries are recorded below.
 
 ## Results
 
-Pending.
+### Engram overlay, first attempt (hung)
+
+The first version launched the B12X decode kernel from the reader thread and
+waited on CUDA events there. The delay arm captured its graphs (the in-graph
+flag wait captures fine) and then hung in the first adaptive-verification
+profiling step, with every rank's main thread asleep. It was stopped by hand
+after 30 minutes; nothing was measured. A healthy arm also runs one extra
+thread at 100% CPU, so the busy thread seen during the hang was not the
+fault. The likely cause is a kernel launch through CuTe's Python runtime from
+a second thread. The overlay now keeps every kernel launch and stream
+operation on the main thread: the decode is queued at stage time behind a
+host-released gate (`cuStreamWaitValue32` on a mapped host word), and the
+reader thread only polls for the row IDs, reads the rows, and releases the
+gate, also on failure. The reader's wait and the main thread's join have
+deadlines, so a repeat fails the start instead of hanging.
+
+Other arms: pending summary.

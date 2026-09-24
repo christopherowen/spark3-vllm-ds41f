@@ -426,28 +426,22 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
         return self._engram_executor
 
     def _read_engram_rows(self, jobs):
-        import gc
-
-        # A collection here could unload a CuTe module, which waits for queued
-        # device work, which waits for the flags this thread has yet to write.
-        collecting = gc.isenabled()
-        gc.disable()
-        try:
-            for engram, job in jobs:
-                engram.finish_disk(job, self._engram_side_stream)
-        except BaseException:
-            for engram, _ in jobs:
-                engram.release_rows()
-            raise
-        finally:
-            if collecting:
-                gc.enable()
+        """Reader thread: host work only (no kernel launches, no CUDA waits)."""
+        failure = None
+        for engram, job in jobs:
+            try:
+                engram.finish_disk(job)
+            except BaseException as error:  # every gate is released regardless
+                failure = failure or error
+        if failure is not None:
+            raise failure
 
     def join_engram_reader(self):
         future = getattr(self, "_engram_reader_future", None)
         self._engram_reader_future = None
         if future is not None:
-            future.result()
+            # The reader itself times out on its row IDs; this bounds the rest.
+            future.result(timeout=60)
 
     def prepare_disk_engram(self, input_ids, query_start_loc, lookback_token_ids):
         if torch.compiler.is_compiling() or torch.cuda.is_current_stream_capturing():
@@ -474,12 +468,14 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
                 hashes,
             )
             if engrams and all(engram.async_rows for engram in engrams):
+                self._engram_reader()
                 jobs = [
                     (
                         engram,
                         engram.stage_disk(
                             hashes[:, engram.layer_hash_index],
                             self.engram_hash.num_tokens,
+                            self._engram_side_stream,
                         ),
                     )
                     for engram in engrams
