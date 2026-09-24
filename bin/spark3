@@ -1885,6 +1885,8 @@ THERMAL_FIELDS = (
 )
 # Stop measuring when a GPU comes within this many degrees of its slowdown limit.
 THERMAL_HEADROOM_FLOOR_C = 5.0
+# DGX Spark board zones trip a critical shutdown at 104 C; stop well before it.
+BOARD_CEILING_C = 98.0
 
 
 def parse_thermal(text: str) -> dict:
@@ -1990,6 +1992,12 @@ class MemoryWatch:
                 if sample[key] is not None:
                     state.setdefault(f"{key}_start", sample[key])
                     state[f"{key}_last"] = sample[key]
+        board = sample["system_c"]
+        if board is not None and board >= BOARD_CEILING_C:
+            self.halt(
+                f"{name}: board thermal zone at {board:g} C reached the {BOARD_CEILING_C:g} C "
+                "bench ceiling (critical trip 104 C)"
+            )
         headroom = sample["headroom_c"]
         if headroom is not None and headroom <= THERMAL_HEADROOM_FLOOR_C:
             self.halt(
