@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_from_baseline": "2026-09-24-karmic-kraken-nofiat",
+  "generated_from_baseline": "2026-09-24-karmic-kraken-r2",
   "sources": {
     "vllm": {
       "kind": "git",
@@ -168,5 +168,5 @@
       "role": "safe lab lane for experiments beside a serving cluster, checksum-verified release-image patching, serving A/B and agent-session benchmark methodology; GLM TP4, NVFP4, and uncensored-checkpoint specifics are not deployment inputs"
     }
   },
-  "source_manifest": "manifests/sources/2026-09-24-karmic-kraken-source.json"
+  "source_manifest": "manifests/sources/2026-09-24-karmic-kraken-r2-source.json"
 }

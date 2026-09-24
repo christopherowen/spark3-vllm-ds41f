@@ -11,17 +11,17 @@ state, or an experiment.
 ## Current baseline
 
 The active baseline was promoted on 2026-09-24
-([manifests/baselines/2026-09-24-karmic-kraken-nofiat.json](manifests/baselines/2026-09-24-karmic-kraken-nofiat.json);
+([manifests/baselines/2026-09-24-karmic-kraken-r2.json](manifests/baselines/2026-09-24-karmic-kraken-r2.json);
 [speed tuning](experiments/2026-09-24-kk-speed-tuning/decision.md)):
 
 - three DGX Spark nodes using tensor parallelism 3;
 - direct dual ConnectX-7 paths between every pair of nodes;
-- Local Inference Lab's `integration/karmic-kraken-beta` vLLM (unchanged) and
-  B12X (plus the switchless RoCEnante patch), with B12X attention, linear, MoE,
-  and mHC kernels;
+- Local Inference Lab's `integration/karmic-kraken-beta` vLLM (plus an Engram
+  projection sharding patch) and B12X (plus the switchless RoCEnante patch),
+  with B12X attention, linear, MoE, and mHC kernels;
 - DeepSeek V4.1 Flash native FP8/FP4 weights, unchanged;
-- DSpark speculative decoding with three draft tokens, full CUDA graphs for
-  decode batches up to 32 tokens;
+- DSpark speculative decoding with three draft tokens and block rejection,
+  full CUDA graphs for decode batches up to 32 tokens;
 - B12X W4A8 tiny decode disabled (`B12X_W4A8_TINY_DECODE=0`): it omits the
   model's SwiGLU clamp and caused the incoherence seen in earlier images;
 - 160,000-token per-request limit, eight admitted sequences, and 933,168 KV

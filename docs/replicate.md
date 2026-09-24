@@ -1,6 +1,6 @@
 # Replicating the promoted baseline
 
-This reproduces `manifests/baselines/2026-09-24-karmic-kraken-nofiat.json`:
+This reproduces `manifests/baselines/2026-09-24-karmic-kraken-r2.json`:
 DeepSeek V4.1 Flash on three DGX Spark (GB10) nodes, tensor parallelism 3,
 direct-cabled dual ConnectX-7 ring, Local Inference Lab's
 `integration/karmic-kraken-beta` vLLM and B12X.
@@ -46,20 +46,20 @@ experiments/2026-09-23-karmic-kraken-reference/prepare-sources
 scripts/fetch-cutlass-dsl-wheels
 scripts/fetch-cutlass
 experiments/2026-09-23-karmic-kraken-reference/build-candidate check
-CANDIDATE_TAG=vllm-ds41f-kkref:01f1b874c774-r1 \
+CANDIDATE_TAG=vllm-ds41f-kkref:01f1b874c774-r2 \
   experiments/2026-09-23-karmic-kraken-reference/build-candidate build
 ```
 
-`prepare-sources` fetches the pinned vLLM and B12X revisions, applies
-`patches/b12x/0001-switchless-rocenante.patch`, and verifies both source trees
-against `sources.json`. `build-candidate` refuses to run next to a live
+`prepare-sources` fetches the pinned vLLM and B12X revisions, applies the
+vLLM Engram projection patch and the B12X switchless RoCEnante patch, and
+verifies both source trees against `sources.json`. `build-candidate` refuses to run next to a live
 service, sizes compile jobs to available memory, and cancels the build if
 MemAvailable falls below 24 GiB. The image records its source trees as labels
 (`local.spark3.vllm.tree`, `local.spark3.b12x.tree`), which the launcher checks
 against `config/cluster.json`. Your digest will differ from ours because the
 image also records the deployment commit; the tree labels must match.
 
-`experiments/2026-09-23-karmic-kraken-reference/smoke-imports vllm-ds41f-kkref:01f1b874c774-r1`
+`experiments/2026-09-23-karmic-kraken-reference/smoke-imports vllm-ds41f-kkref:01f1b874c774-r2`
 runs a GPU import check of the built image in a memory-capped container.
 
 ## Distribute one digest
@@ -68,10 +68,10 @@ Copy the image to the other two nodes and confirm all three report the same ID:
 
 ```sh
 for host in dgx2 dgx3; do
-  docker save vllm-ds41f-kkref:01f1b874c774-r1 | ssh "$host" docker load
+  docker save vllm-ds41f-kkref:01f1b874c774-r2 | ssh "$host" docker load
 done
 for host in dgx1 dgx2 dgx3; do
-  ssh "$host" docker image inspect vllm-ds41f-kkref:01f1b874c774-r1 --format '{{.Id}}'
+  ssh "$host" docker image inspect vllm-ds41f-kkref:01f1b874c774-r2 --format '{{.Id}}'
 done
 ```
 
@@ -83,7 +83,7 @@ of the memory-guarded startup, prebuild it on each node first:
 
 ```sh
 experiments/2026-09-23-canonical-minimal/prebuild_flashinfer.sh \
-  vllm-ds41f-kkref:01f1b874c774-r1 kkref/flashinfer
+  vllm-ds41f-kkref:01f1b874c774-r2 kkref/flashinfer
 ```
 
 Then, from the head node with a clean checkout of the published `main` commit:

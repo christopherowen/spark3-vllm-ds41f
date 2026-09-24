@@ -1,2 +1,2 @@
-# No local vLLM patches: local-inference-lab/vllm integration/karmic-kraken-beta
-# at the pinned revision is used unchanged.
+# Applied after the pinned local-inference-lab/vllm integration/karmic-kraken-beta revision.
+0001-engram-projection-tp-padding.patch

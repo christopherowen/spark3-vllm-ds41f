@@ -1,0 +1,91 @@
+From 7ea79d934133572ae3140e0e24fba72670ef51f5 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Thu, 24 Sep 2026 12:59:55 +0200
+Subject: [PATCH] fix(deepseek-v4.1): shard the Engram projection at any TP
+ size
+
+Upstream base: 01f1b874c774b4fade087d5f311970ee53745e01
+
+Rationale: engram_config.projection_tp shards the Engram WKV projection
+(output 25600 = hidden 5120 x (hc_mult 4 + 1)) with a ColumnParallelLinear,
+which requires the output to divide by the TP size and, for block-FP8
+checkpoints, whole 32-row scale blocks per rank. At TP3 neither holds, so the
+option failed and every rank read the full 157 MB FP8 projection twice per
+forward. Pad the output to a multiple of tp_size x 32 rows, load the last
+rank's missing rows through the existing allow_tp_padding zero-fill (a
+narrowed copy the B12X checkpoint loader supports), and slice the gathered
+output back to the logical width.
+
+Quality and speed: padded rows have zero weights, so outputs are unchanged.
+On three DGX Sparks the projection falls from ~690 to ~235 us per call and
+frees ~210 MB per rank; LRU coherence gate 5/5 twice.
+
+Tests: TP3 serving on DeepSeek V4.1 Flash with projection_tp=true (profile,
+serving matrix, LRU gate); unpadded TP sizes take the unchanged path.
+
+Upstream status: local candidate for local-inference-lab/vllm, not submitted.
+---
+ vllm/models/deepseek_v4_1/common/engram.py | 40 +++++++++++++++++++++-
+ 1 file changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/vllm/models/deepseek_v4_1/common/engram.py b/vllm/models/deepseek_v4_1/common/engram.py
+index 0cd652bf1..b1373cbbe 100644
+--- a/vllm/models/deepseek_v4_1/common/engram.py
++++ b/vllm/models/deepseek_v4_1/common/engram.py
+@@ -30,6 +30,42 @@ from vllm.utils.b12x import (
+ )
+ from vllm.v1.worker.workspace import retain_cuda_graph_capture_resource
+ 
++
++_FP8_BLOCK_ROWS = 32
++
++
++class _PaddedColumnParallelLinear(ColumnParallelLinear):
++    """Column-parallel linear whose output need not divide by the TP size.
++
++    The output is padded to a multiple of tp_size x 32 rows so every rank owns
++    whole block-FP8 scale blocks. The last rank's missing checkpoint rows are
++    zero-filled through the loader's existing ``allow_tp_padding`` path (a
++    narrowed copy the B12X checkpoint loader supports), so the padded rows
++    compute exactly zero, and the gathered output is sliced back to the
++    logical width.
++    """
++
++    def __init__(self, input_size, output_size, **kwargs):
++        from vllm.distributed import get_tensor_model_parallel_world_size
++
++        tp_size = get_tensor_model_parallel_world_size()
++        quantum = tp_size * _FP8_BLOCK_ROWS
++        padded = -(-output_size // quantum) * quantum
++        self.logical_output_size = output_size
++        self.padded_output_size = padded
++        super().__init__(input_size, padded, **kwargs)
++        if padded != output_size:
++            for name in ("weight", "weight_scale_inv", "weight_scale"):
++                param = getattr(self, name, None)
++                if param is not None:
++                    param.allow_tp_padding = True
++
++    def forward(self, input_):
++        output = super().forward(input_)
++        if self.padded_output_size == self.logical_output_size:
++            return output
++        return output[..., : self.logical_output_size].contiguous()
++
+ logger = init_logger(__name__)
+ DEAD_ID = -1
+ 
+@@ -642,7 +678,9 @@ class Engram(nn.Module):
+         self._disk_prepared = False
+         self._disk_prepared_tokens = 0
+         projection_tp = getattr(layout, "projection_tp", False)
+-        projection_cls = ColumnParallelLinear if projection_tp else ReplicatedLinear
++        projection_cls = (
++            _PaddedColumnParallelLinear if projection_tp else ReplicatedLinear
++        )
+         self.wkv = projection_cls(
+             6144,
+             self.dim * (self.hc_mult + 1),
+-- 
+2.54.0 (Apple Git-157)
+

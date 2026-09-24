@@ -1,0 +1,45 @@
+{
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "max_tokens": 256
+  },
+  "results": [
+    {
+      "case": "prose",
+      "concurrency": 1,
+      "requests": 16,
+      "completion_tokens": 4096,
+      "aggregate_tps": 35.3,
+      "accepted_per_draft": 0.905,
+      "acceptance_rate": 0.325
+    },
+    {
+      "case": "prose",
+      "concurrency": 4,
+      "requests": 16,
+      "completion_tokens": 4096,
+      "aggregate_tps": 89.1,
+      "accepted_per_draft": 0.844,
+      "acceptance_rate": 0.48
+    },
+    {
+      "case": "code",
+      "concurrency": 1,
+      "requests": 16,
+      "completion_tokens": 4096,
+      "aggregate_tps": 57.9,
+      "accepted_per_draft": 2.303,
+      "acceptance_rate": 0.768
+    },
+    {
+      "case": "code",
+      "concurrency": 4,
+      "requests": 16,
+      "completion_tokens": 4096,
+      "aggregate_tps": 128.5,
+      "accepted_per_draft": 2.242,
+      "acceptance_rate": 0.76
+    }
+  ]
+}

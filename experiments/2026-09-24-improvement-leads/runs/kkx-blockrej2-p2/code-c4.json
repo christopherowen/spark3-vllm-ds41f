@@ -1,0 +1,61 @@
+{
+  "aggregate_e2e_tps": 114.83204294303775,
+  "case": "code",
+  "concurrency": 4,
+  "failed": 0,
+  "mean_decode_tps_approx": 32.19140227227217,
+  "mean_ttft_s": 0.5590703882480739,
+  "requested_output_tokens": 256,
+  "requests": [
+    {
+      "completion_tokens": 256,
+      "decode_tps_approx": 31.88394329067412,
+      "elapsed_s": 8.637798351002857,
+      "error": null,
+      "ok": true,
+      "output_sha256": "e711f76fb17a6ee8ab542f064fcd6fe683f664e455bb8ae4fae3cf8aaa32574f",
+      "prompt_tokens": 75,
+      "request": 0,
+      "status": 200,
+      "ttft_s": 0.6400423120066989
+    },
+    {
+      "completion_tokens": 256,
+      "decode_tps_approx": 33.37464708042337,
+      "elapsed_s": 7.958265700988704,
+      "error": null,
+      "ok": true,
+      "output_sha256": "e7c564b345e937e79f84175d8ac3dc5a0a69c36edbc8ba3545877d1901bf42f0",
+      "prompt_tokens": 75,
+      "request": 1,
+      "status": 200,
+      "ttft_s": 0.3177354689978529
+    },
+    {
+      "completion_tokens": 256,
+      "decode_tps_approx": 32.69331025775452,
+      "elapsed_s": 8.438914669008227,
+      "error": null,
+      "ok": true,
+      "output_sha256": "ab0c5033f2f9428e9cbe56611b041efb17d52cc7a57c88a901f640033fdcb66c",
+      "prompt_tokens": 75,
+      "request": 2,
+      "status": 200,
+      "ttft_s": 0.639153861993691
+    },
+    {
+      "completion_tokens": 256,
+      "decode_tps_approx": 30.813708460236658,
+      "elapsed_s": 8.91488741399371,
+      "error": null,
+      "ok": true,
+      "output_sha256": "079469daee1bcf6882f8c6ab99b9d9ad2e7db7b60619773da6ff00e604768de1",
+      "prompt_tokens": 75,
+      "request": 3,
+      "status": 200,
+      "ttft_s": 0.6393499099940527
+    }
+  ],
+  "successful": 4,
+  "wall_elapsed_s": 8.917371612973511
+}

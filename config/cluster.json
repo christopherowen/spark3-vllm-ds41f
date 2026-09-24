@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "promoted_baseline": "2026-09-24-karmic-kraken-nofiat",
+  "promoted_baseline": "2026-09-24-karmic-kraken-r2",
   "container": {
     "name": "dsv41-karmic-kraken",
-    "image": "vllm-ds41f-kkref:01f1b874c774-r1",
+    "image": "vllm-ds41f-kkref:01f1b874c774-r2",
     "expected_labels": {
-      "local.spark3.vllm.tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
+      "local.spark3.vllm.tree": "90fdd043cf678aab95fc23c83056d4376b9c305f",
       "local.spark3.b12x.tree": "d661de3161ff474a92646974584d6f5eb1958f75"
     },
     "docker_run_args": [
@@ -157,7 +157,7 @@
     "vllm",
     "--language-model-only",
     "--engram-config",
-    "{\"table_memory\":\"disk\",\"disk_resident_scales\":false}",
+    "{\"table_memory\":\"disk\",\"disk_resident_scales\":false,\"projection_tp\":true}",
     "--attention-backend",
     "B12X",
     "--linear-backend",
@@ -165,7 +165,7 @@
     "--moe-backend",
     "b12x",
     "--speculative-config",
-    "{\"method\":\"dspark\",\"num_speculative_tokens\":3,\"draft_tensor_parallel_size\":3,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":2.0}",
+    "{\"method\":\"dspark\",\"num_speculative_tokens\":3,\"draft_tensor_parallel_size\":3,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"block\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":2.0}",
     "--jit-monitor-mode",
     "warn",
     "--compilation-config",

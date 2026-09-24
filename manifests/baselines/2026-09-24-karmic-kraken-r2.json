@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "status": "promoted-baseline",
+  "captured_at": "2026-09-24T11:16:22Z",
+  "evidence_container": "dsv41-kkx-r2 (experiments/2026-09-24-improvement-leads/cluster-r2.json, identical launch apart from name and port)",
+  "container_name": "dsv41-karmic-kraken",
+  "image_tag": "vllm-ds41f-kkref:01f1b874c774-r2",
+  "image_id": "sha256:a95eb867261b713185c1591c1a13be229e93e8df64b500d9df5aff194c629475",
+  "nodes": {
+    "dgx1": {
+      "image_id": "sha256:a95eb867261b713185c1591c1a13be229e93e8df64b500d9df5aff194c629475",
+      "initial_free_gib": 112.7,
+      "role": "api-head-rank-0"
+    },
+    "dgx2": {
+      "image_id": "sha256:a95eb867261b713185c1591c1a13be229e93e8df64b500d9df5aff194c629475",
+      "initial_free_gib": 113.26,
+      "role": "headless-rank-1"
+    },
+    "dgx3": {
+      "image_id": "sha256:a95eb867261b713185c1591c1a13be229e93e8df64b500d9df5aff194c629475",
+      "initial_free_gib": 113.23,
+      "role": "headless-rank-2"
+    }
+  },
+  "source_identity": {
+    "vllm_repository": "https://github.com/local-inference-lab/vllm",
+    "vllm_ref": "integration/karmic-kraken-beta",
+    "vllm_revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+    "vllm_tree": "90fdd043cf678aab95fc23c83056d4376b9c305f",
+    "b12x_repository": "https://github.com/local-inference-lab/b12x",
+    "b12x_ref": "integration/karmic-kraken-beta",
+    "b12x_revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+    "b12x_patch_head": "3d2439944021c3dc41aa7a597aefc67232e9f563",
+    "b12x_tree": "d661de3161ff474a92646974584d6f5eb1958f75",
+    "runtime_base_image": "docker.io/vllm/vllm-openai@sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "image_build_deployment_commit": "64974bca830020c4dd6f59014bae3afe18cc4777",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+    "vllm_patch_head": "7ea79d934133572ae3140e0e24fba72670ef51f5"
+  },
+  "runtime_choices": {
+    "B12X_W4A8_TINY_DECODE": "0 (tiny decode omits swiglu_limit; see experiment README)",
+    "B12X_AUTOTUNE": "0 (autotune race budget is free memory // 2 on unified memory)",
+    "speculative": "DSpark, 3 tokens, draft TP 3, adaptive verification cost scale 2, block rejection",
+    "cudagraph": "FULL_AND_PIECEWISE, capture sizes 1-32 (adds 28 and 32)",
+    "max_num_batched_tokens": 4096,
+    "memguards_gib": {
+      "startup": 5,
+      "steady": 3
+    },
+    "flashinfer_autotune": "disabled (--no-enable-flashinfer-autotune): it saved 0 configs, and only the sampler uses FlashInfer",
+    "engram_projection": "sharded across ranks (projection_tp, padded to 25632 rows by vLLM patch 0001)"
+  },
+  "capacity": {
+    "kv_cache_bytes_per_rank": 2147483648,
+    "kv_cache_tokens": 933168,
+    "kv_bytes_per_token_per_rank": 2301,
+    "max_model_len": 160000,
+    "max_num_seqs": 8,
+    "reported_full_context_concurrency": 5.83,
+    "graph_capture_gib": 1.47
+  },
+  "benchmarks": {
+    "prose-c1": {
+      "mean_tps": 40.4,
+      "min": 36.2,
+      "max": 43.2,
+      "n": 8
+    },
+    "prose-c2": {
+      "mean_tps": 61.2,
+      "min": 56.9,
+      "max": 63.4,
+      "n": 4
+    },
+    "prose-c4": {
+      "mean_tps": 98.4,
+      "min": 95.4,
+      "max": 102.3,
+      "n": 4
+    },
+    "prose-c8": {
+      "mean_tps": 137.6,
+      "min": 132.3,
+      "max": 139.8,
+      "n": 4
+    },
+    "code-c1": {
+      "mean_tps": 52.1,
+      "min": 50.2,
+      "max": 56.0,
+      "n": 8
+    },
+    "code-c2": {
+      "mean_tps": 76.7,
+      "min": 73.6,
+      "max": 79.6,
+      "n": 4
+    },
+    "code-c4": {
+      "mean_tps": 118.2,
+      "min": 115.1,
+      "max": 122.5,
+      "n": 4
+    },
+    "code-c8": {
+      "mean_tps": 160.0,
+      "min": 157.6,
+      "max": 162.2,
+      "n": 4
+    }
+  },
+  "quality": {
+    "lru_gate": "5/5 in each of four passes (kkx-r2, kkx-r2b)"
+  },
+  "experiment": "experiments/2026-09-24-improvement-leads/",
+  "receipts": "experiments/2026-09-24-improvement-leads/runs/kkx-r2-*, kkx-r2b-*, kkx-r2-c2reps, kkx-r2-sampled.json",
+  "previous_baseline": "manifests/baselines/2026-09-24-karmic-kraken-nofiat.json",
+  "limitations": [
+    "The image is built by the 2026-09-23 karmic-kraken experiment's prepare-sources/build-candidate recipe; bin/spark3 build render still describes the previous reconstruction.",
+    "Quality is gated on the LRU coding probe and activation traces; no broad evaluation yet.",
+    "A shared-expert race was observed only with tiny decode on; its mechanism is not identified.",
+    "B12X autotune is off: a full in-engine tune does not fit GB10 memory, and targeted tuning and offline plan sweeps found no gain."
+  ],
+  "min_mem_available_gib": {
+    "dgx1_min_gib": 6.97,
+    "dgx2_min_gib": 7.91,
+    "dgx3_min_gib": 7.9
+  },
+  "benchmarks_c2_repetitions": {
+    "prose": {
+      "mean_tps": 66.2,
+      "sd": 1.6,
+      "n": 5
+    },
+    "code": {
+      "mean_tps": 83.7,
+      "sd": 3.3,
+      "n": 5
+    }
+  },
+  "sampled_traffic": {
+    "sampling": {
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "max_tokens": 256
+    },
+    "results": [
+      {
+        "case": "prose",
+        "concurrency": 1,
+        "requests": 16,
+        "completion_tokens": 4096,
+        "aggregate_tps": 35.3,
+        "accepted_per_draft": 0.905,
+        "acceptance_rate": 0.325
+      },
+      {
+        "case": "prose",
+        "concurrency": 4,
+        "requests": 16,
+        "completion_tokens": 4096,
+        "aggregate_tps": 89.1,
+        "accepted_per_draft": 0.844,
+        "acceptance_rate": 0.48
+      },
+      {
+        "case": "code",
+        "concurrency": 1,
+        "requests": 16,
+        "completion_tokens": 4096,
+        "aggregate_tps": 57.9,
+        "accepted_per_draft": 2.303,
+        "acceptance_rate": 0.768
+      },
+      {
+        "case": "code",
+        "concurrency": 4,
+        "requests": 16,
+        "completion_tokens": 4096,
+        "aggregate_tps": 128.5,
+        "accepted_per_draft": 2.242,
+        "acceptance_rate": 0.76
+      }
+    ]
+  },
+  "engram_projection_profile": "rank-0 decode profile: ~690 -> ~235 us per call (experiments/2026-09-24-improvement-leads/runs/profile-engramtp-c1)"
+}

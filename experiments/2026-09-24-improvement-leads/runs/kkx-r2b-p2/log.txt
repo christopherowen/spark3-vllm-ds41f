@@ -1,0 +1,16 @@
+start 2026-09-24T11:26:45Z mem=7GiB
+prose c1 rc=0 mem=7GiB
+prose c2 rc=0 mem=7GiB
+prose c4 rc=0 mem=7GiB
+prose c8 rc=0 mem=7GiB
+code c1 rc=0 mem=7GiB
+code c2 rc=0 mem=7GiB
+code c4 rc=0 mem=7GiB
+code c8 rc=0 mem=6GiB
+1/5: pass
+2/5: pass
+3/5: pass
+4/5: pass
+5/5: pass
+saved /tmp/claude-runs/kkx-r2b-p2/lru.json
+end 2026-09-24T11:28:27Z mem=7GiB

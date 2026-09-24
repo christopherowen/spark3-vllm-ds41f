@@ -1,13 +1,13 @@
 # Current state
 
 Promoted 2026-09-24 as
-[`2026-09-24-karmic-kraken-nofiat`](../manifests/baselines/2026-09-24-karmic-kraken-nofiat.json)
+[`2026-09-24-karmic-kraken-r2`](../manifests/baselines/2026-09-24-karmic-kraken-r2.json)
 and running on all three nodes from `config/cluster.json`.
 
 | Setting | Active value |
 |---|---:|
-| Sources | Local Inference Lab `integration/karmic-kraken-beta` vLLM `01f1b874` and B12X `0f846212` + switchless RoCEnante patch |
-| Image | `vllm-ds41f-kkref:01f1b874c774-r1`, one digest on all ranks |
+| Sources | Local Inference Lab `integration/karmic-kraken-beta` vLLM `01f1b874` + Engram projection TP patch, B12X `0f846212` + switchless RoCEnante patch |
+| Image | `vllm-ds41f-kkref:01f1b874c774-r2`, one digest on all ranks |
 | Tensor parallel ranks | 3 |
 | Maximum model length | 160,000 tokens |
 | Maximum sequences | 8 |
@@ -15,9 +15,10 @@ and running on all three nodes from `config/cluster.json`.
 | Batched-token budget | 4,096 |
 | Explicit KV memory | 2 GiB per rank |
 | Reported KV capacity | 933,168 tokens (5.83x full 160K windows) |
-| DSpark | 3 draft tokens, draft TP 3, adaptive verification (cost scale 2.0) |
+| DSpark | 3 draft tokens, draft TP 3, adaptive verification (cost scale 2.0), block rejection |
 | CUDA graphs | full, capture sizes 1-32 |
 | B12X W4A8 tiny decode | disabled (`B12X_W4A8_TINY_DECODE=0`) |
+| Engram projection | sharded across ranks (`projection_tp`) |
 | B12X autotune | disabled |
 | FlashInfer autotune | disabled (`--no-enable-flashinfer-autotune`) |
 | Memory guards | 5 GiB startup (0.25 s), 3 GiB steady (2 s) |
