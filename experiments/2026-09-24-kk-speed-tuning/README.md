@@ -53,3 +53,19 @@ repeat runs, four samples). `summarize.py runs kkt-baseline ...` regenerates it.
   MoE streams each verified token's experts from memory
   (`../2026-09-23-karmic-kraken-reference/runs/moe-decode-bench/`), so
   verification cost grows almost linearly with depth. Reject; keep depth 3.
+- `batched8192`: three launches, each stopped by the 5 GiB startup guard on
+  dgx1 (the API-server rank, always the tightest) at 4.98-5.00 GiB, 30-40 s
+  after KV allocation, during the warmup forward at the full 8,192-token batch
+  (`runs/failed-starts/*batched8192*`, `*b8192-nofia*`, `*b8192-kv15*` on dgx1).
+  Removing `--enable-flashinfer-autotune` changes nothing: the pass is on by
+  default, and it saves 0 configs in this stack either way. Freeing 0.5 GiB of
+  KV (1.5 GiB) did not make room, and KV capacity is not linear in bytes:
+  1.5 GiB holds 439,068 tokens against 933,168 at 2 GiB, because part of the
+  reservation is fixed per-sequence cache. Reject; keep 4,096.
+- Autotune r1 (`runs/autotune-r1-guard-kill/`): stopped by the startup guard on
+  dgx1 at 5.0 GiB after 28 of 861 tuning obligations (3,005 compilations,
+  2:43). The race budget bounds only candidate scratch; the four spawned,
+  device-pinned compile workers and resident compiled programs grow with
+  tuning. B12X saves selections only when a stage installs, so a killed run
+  keeps nothing. r2 (`cluster-autotune2.json`) uses one compile worker per
+  stage, a 256-program compile cache, a 1 GiB race budget, and `memlog.sh`.
