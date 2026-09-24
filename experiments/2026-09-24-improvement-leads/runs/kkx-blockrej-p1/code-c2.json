@@ -1,0 +1,37 @@
+{
+  "aggregate_e2e_tps": 86.40545753554946,
+  "case": "code",
+  "concurrency": 2,
+  "failed": 0,
+  "mean_decode_tps_approx": 47.71863270792382,
+  "mean_ttft_s": 0.43407635849143844,
+  "requested_output_tokens": 256,
+  "requests": [
+    {
+      "completion_tokens": 256,
+      "decode_tps_approx": 50.16301655484185,
+      "elapsed_s": 5.660401679982897,
+      "error": null,
+      "ok": true,
+      "output_sha256": "13ba1d30770a724a22a2901b46cec1c591558aa4e87b62030120a61d50065d66",
+      "prompt_tokens": 75,
+      "request": 0,
+      "status": 200,
+      "ttft_s": 0.5769753329805098
+    },
+    {
+      "completion_tokens": 256,
+      "decode_tps_approx": 45.27424886100578,
+      "elapsed_s": 5.923518205003347,
+      "error": null,
+      "ok": true,
+      "output_sha256": "90d17f7fcf158b405dc794aaedebf504b5e24f87b3a642c9fc753f6da66b19be",
+      "prompt_tokens": 75,
+      "request": 1,
+      "status": 200,
+      "ttft_s": 0.29117738400236703
+    }
+  ],
+  "successful": 2,
+  "wall_elapsed_s": 5.925551633001305
+}

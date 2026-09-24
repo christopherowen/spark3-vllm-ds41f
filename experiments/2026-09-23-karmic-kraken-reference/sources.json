@@ -5,8 +5,10 @@
     "ref": "integration/karmic-kraken-beta",
     "revision": "01f1b874c774b4fade087d5f311970ee53745e01",
     "canonical_base": "0f8fa53acf43a9a6a7a1f7e6b196950c78cd6d7a",
-    "expected_tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
-    "patches": []
+    "expected_tree": "90fdd043cf678aab95fc23c83056d4376b9c305f",
+    "patches": [
+      "patches/vllm/0001-engram-projection-tp-padding.patch"
+    ]
   },
   "b12x": {
     "repository": "https://github.com/local-inference-lab/b12x.git",
