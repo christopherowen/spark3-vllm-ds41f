@@ -10,8 +10,6 @@ __pycache__/
 *.pyc
 cache/
 *.log
-# Experiment receipts, failed-start logs included, are evidence and stay tracked.
-!experiments/*/runs/**/*.log
 results/private/
 .DS_Store
 .venv/
