@@ -16,7 +16,12 @@ before changing runtime or build state.
   `bin/spark3 bench` run. It is immutable too; a new promotion adds its own.
 - `experiments/` is the only place for unpromoted tuning.
 - `docs/inspiration.md` is a research watchlist, never a source or deployment
-  authority.
+  authority. It names each source, what to review it for, and the adoption
+  boundary; nothing more.
+- Reviews of inspiration sources are for our eyes only: their results,
+  comparisons with ours, and analyses of their code or methods never go into
+  this repository (docs, experiments, commits, or scripts). An idea taken from
+  a source enters as an ordinary experiment of ours, measured on our stack.
 
 Do not treat a running container, shell history, an uncommitted file on a node, or
 an image tag as configuration authority. Inspect them as evidence and reconcile
