@@ -78,8 +78,16 @@
     "mia_sglang_ds41f_sparks": {
       "kind": "git-watch",
       "url": "https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-DGX-Sparks",
+      "observed_revision": "6b40a5e105ed466463af65fa2e51bbd28c6c017d",
       "added_to_watchlist": "2026-09-20",
       "role": "SGLang comparison for multi-Spark launch, tuning, benchmark methodology, and native-weight performance"
+    },
+    "sfxnz_ds41f_exl3_vllm_2x": {
+      "kind": "git-watch",
+      "url": "https://github.com/sfxnz/DeepSeek-V4.1-Flash-EXL3-vLLM-2x-DGX-Spark",
+      "observed_revision": "45d330336f0adc28012147dc054750df8c580313",
+      "added_to_watchlist": "2026-09-24",
+      "role": "disk-Engram host-path fixes, GB10 memory hygiene, and one-lever-per-boot measurement discipline on vLLM TP2; EXL3 2-bit experts and an MXFP8 LM head change quality and are not deployment inputs"
     },
     "mia_exl3_ds41f_2x": {
       "kind": "git-watch",

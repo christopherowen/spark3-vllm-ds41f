@@ -111,3 +111,79 @@ The Engram patch is carried in the image recipe
 (`../2026-09-23-karmic-kraken-reference/patches/vllm/`), producing image
 `vllm-ds41f-kkref:01f1b874c774-r2` (vLLM tree `90fdd043`); `cluster-r2.json`
 is the candidate on that image with no overlays.
+
+## External review: MiaAI overnight and sfxnz (2026-09-24 evening)
+
+MiaAI-Lab `6b40a5e` reports a TP3 SGLang configuration 17-40% faster at one
+stream and 19% faster at four than its previous one. `mia_workload.py`
+reimplements their `benchmarks/overnight_bench.py` workload without running
+their code: same prompts, thinking off, 512 tokens, decode tok/s from the first
+to the last content delta, and C4 as 2 prose plus 2 code. It ran against our
+promoted r2 service with 8 repetitions
+(`runs/mia-workload-r2.json`; their numbers are 5 repetitions from
+`docs/overnight-results.md`):
+
+| Their workload | MiaAI final | Ours (r2) |
+|---|---|---|
+| C1 prose | 34.2 | 39.6 (+16%) |
+| C1 prose2 | 32.6 | 37.2 (+14%) |
+| C1 code | 62.2 | 61.4 (tie) |
+| C1 sampled chat, T=0.7 | 37.2 | 42.1 (+13%) |
+| C4 aggregate | 75.8 | 93.8 (+24%) |
+| C4 per-stream | 24.3 | 29.4 (+21%) |
+
+Most of their gain is changes our stack already has:
+
+- The checkpoint's FP8 `wo_a`: our V4.1 attention consumes the e4m3 weights
+  and UE8M0 scales directly (`_WOProjectionWeightMethod`).
+- Tensor-parallel MoE, which is their EP1.
+- Block verification.
+- Deterministic kernel tactics: no FlashInfer autotune.
+- One image on every rank, checked by `doctor --live`. Their rank 2 had been
+  running a different build.
+
+Their single-stream code lead comes from DSpark k=5 with a draft-confidence
+cap (4.0 accepted tokens per step on code).
+
+sfxnz `45d3303` (vLLM TP2, EXL3 2-bit experts) is not comparable on quality
+or topology. Its output-neutral findings agree with MiaAI's on one point:
+the disk-Engram host path stalls the GPU.
+
+Our own profile shows the same stall (`runs/profile-engramtp-c1/`, one stream).
+The GPU is busy 78% of the window. In a representative 40.1 ms step, the only
+gaps over 50 us are 0.72 + 0.27 + 0.88 ms around the two Engram `_lookup`
+kernels at step start: hashes copied to the host, host disk reads, then the
+row copy. That is about 1.9 ms (4.7%) of GPU idle per step.
+
+Leads, in order:
+
+1. **Overlap the disk Engram lookup with compute.** MiaAI forks the lookup
+   onto a side stream once the hash ids exist, and joins it at each Engram
+   layer. Layer 14's rows are then ready about 15 ms before they are needed.
+   The change is bit-exact, with a check mode. sfxnz stages Engram tables in
+   parallel and prefetches next-step rows with `fadvise(WILLNEED)` after
+   propose. Expected: about 4% at one stream. This needs a vLLM patch around
+   `prepare_disk_engram`, and possibly B12X's lookup binding.
+2. **Draft-only FP8 LM head.** The DSpark draft reuses the target's bf16
+   `lm_head` for full-vocab draft logits. An e4m3 copy used only by the draft
+   leaves every accepted token unchanged: MiaAI saw 0.1-1.3 ms per step, and
+   acceptance 3.0882 to 3.0875 offline. It costs about 200 MiB per rank; dgx1
+   headroom is 5.8 GiB above the 3 GiB guard.
+3. **Depth 5 with a confidence cap, for code.** Our depth-5 run raised
+   acceptance but not throughput, because verification streams each row's
+   experts. MiaAI's cap maps dead rows to the anchor row's experts, so capped
+   positions cost no MoE bandwidth. vLLM's adaptive verification is our
+   analogue. Retest after 1 and 2, measured on code.
+4. **Memory hygiene from sfxnz:** page-cache drop after load, indexer
+   workspace factor, logits cap. It is worth measuring only as dgx1 headroom
+   for KV or sequences.
+
+Already true for us: capture sizes cover every verify width (k+1=4:
+4, 8, ..., 32), and there is no autotune. Both repos' negative results (k
+sweeps, autotune) match ours.
+
+A safety note from MiaAI: a single prompt of about 200k tokens ran their head
+node out of memory during prefill, with the KV cache only 31% full (per-chunk
+indexer transient). The node hung for 40 minutes with no memory guard. Our
+context limit is 160K; prefill is measured to 128K by `bin/spark3 bench` and
+to 254K in `kkt-len512k`, both under the 3 GiB steady guard.
