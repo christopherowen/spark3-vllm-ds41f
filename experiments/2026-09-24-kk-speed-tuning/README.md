@@ -69,3 +69,11 @@ repeat runs, four samples). `summarize.py runs kkt-baseline ...` regenerates it.
   tuning. B12X saves selections only when a stage installs, so a killed run
   keeps nothing. r2 (`cluster-autotune2.json`) uses one compile worker per
   stage, a 256-program compile cache, a 1 GiB race budget, and `memlog.sh`.
+- Autotune r2 (one compile worker, 256-program cache, 1 GiB race budget;
+  `runs/kkt-autotune2-memlog.final.txt`): MemAvailable fell about 0.95 GiB per
+  minute, tracking compilations (about 1.6 MB per compiled candidate), with 20
+  of 861 obligations done after four minutes; stopped by hand before the guard.
+  Candidate programs stay resident, so a full in-engine tune cannot fit on GB10
+  at this model size. `norm.mhc` produced 2,139 of r1's ~3,000 compilations.
+- Draft TP 1: not run. The DSpark drafter is 7.39 GiB; at TP 1 all of it lands
+  on dgx1, which has 6-7 GiB of steady headroom.
