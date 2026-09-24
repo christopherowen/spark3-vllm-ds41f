@@ -2182,9 +2182,14 @@ def suite_decode(bench: Bench, options: argparse.Namespace, rng: random.Random) 
             result = sample(point)
             requests = result["requests"]
             tokens = sum(request["completion_tokens"] or 0 for request in requests if request["ok"])
+            metrics = result["metrics"]
+            drafts = metrics["spec_decode_num_drafts"]
             samples[point].append({
                 "tps": round(tokens / result["wall_s"], 3),
-                "accepted_per_draft": acceptance(result["metrics"]),
+                "accepted_per_draft": acceptance(metrics),
+                # Adaptive verification trims draft rows per step; step time
+                # follows the rows it keeps, so record them with each sample.
+                "verified_per_draft": round(metrics["spec_decode_num_draft_tokens"] / drafts, 4) if drafts else None,
                 "requests": compact(requests),
             })
         remaining = []
@@ -2211,6 +2216,7 @@ def suite_decode(bench: Bench, options: argparse.Namespace, rng: random.Random) 
             "ttft_s": describe([request["ttft_s"] for request in ok]),
             "accepted_per_draft": describe([entry["accepted_per_draft"] for entry in entries if entry["accepted_per_draft"] is not None]),
             "step_ms": describe(step_times_ms(entries)),
+            "verified_per_draft": describe([entry["verified_per_draft"] for entry in entries if entry.get("verified_per_draft") is not None]),
             "failed_requests": len(requests) - len(ok),
             "distinct_outputs": len({request["output_sha256"] for request in ok}),
         }
