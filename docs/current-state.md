@@ -1,55 +1,33 @@
-# Captured current state
+# Current state
 
-Captured 2026-09-20 from the three running containers.
+Promoted 2026-09-24 as
+[`2026-09-24-karmic-kraken-nofiat`](../manifests/baselines/2026-09-24-karmic-kraken-nofiat.json)
+and running on all three nodes from `config/cluster.json`.
 
 | Setting | Active value |
 |---|---:|
+| Sources | Local Inference Lab `integration/karmic-kraken-beta` vLLM `01f1b874` and B12X `0f846212` + switchless RoCEnante patch |
+| Image | `vllm-ds41f-kkref:01f1b874c774-r1`, one digest on all ranks |
 | Tensor parallel ranks | 3 |
 | Maximum model length | 160,000 tokens |
 | Maximum sequences | 8 |
 | Maximum parallel prefills | 1 |
-| Batched-token budget | 8,192 |
-| Long-prefill threshold | 4,096 |
-| Explicit KV memory | 3 GiB per rank |
-| Reported KV capacity | 498,145 tokens |
-| Full 160K concurrency | 3.11x |
-| DSpark depth | 3 |
-| Container memory limit | 112 GiB |
-| Host memguard threshold | 3 GiB, armed after JIT/API readiness |
-| Async scheduling | disabled |
-| Reasoning | enabled |
+| Batched-token budget | 4,096 |
+| Explicit KV memory | 2 GiB per rank |
+| Reported KV capacity | 933,168 tokens (5.83x full 160K windows) |
+| DSpark | 3 draft tokens, draft TP 3, adaptive verification (cost scale 2.0) |
+| CUDA graphs | full, capture sizes 1-32 |
+| B12X W4A8 tiny decode | disabled (`B12X_W4A8_TINY_DECODE=0`) |
+| B12X autotune | disabled |
+| FlashInfer autotune | disabled (`--no-enable-flashinfer-autotune`) |
+| Memory guards | 5 GiB startup (0.25 s), 3 GiB steady (2 s) |
+| Async scheduling | enabled |
+| Reasoning | enabled by default |
 
-The eight-sequence limit controls admission count; it does not imply eight complete
-160K KV windows. The aggregate live cache is approximately 498K tokens.
+Measured on this configuration: LRU coherence gate 5/5; code at eight streams
+172 tok/s and single-stream prose/code about 41/52 tok/s; cold prefill about
+4,100 tok/s; dgx1 minimum MemAvailable about 7 GiB. The previous state
+(2026-09-20, 498,145 KV tokens in 3 GiB, incoherent code output) is retained in
+[`2026-09-20-live`](../manifests/baselines/2026-09-20-live.json).
 
-The three images carry matching critical vLLM and B12X source. dgx2 and dgx3 are
-byte-identical. dgx1 has a different image ID because its image omits the unused
-`vllm/benchmarks/` package; serving-critical source hashes match. This is acceptable
-as captured evidence but not as the final deployment method.
-
-## Known transition gaps
-
-- Do not promote the incomplete release-branch image reconstruction; retain it
-  only as forensic evidence until the upstream-main candidate supersedes it.
-- Build once and distribute a single OCI digest to all ranks.
-- Replace the incomplete release-branch reconstruction with the isolated
-  upstream-main candidate in `experiments/2026-09-20-upstream-main-rebase/`.
-- Keep the upstream-native allocator/model qualification separate from the
-  B12X/RoCEnante performance overlay. The current prepared source carries do
-  not yet include vLLM's DS4.1 B12X or RoCEnante consumer adapters.
-- Qualify the tracked model configuration and indexer artifacts under the
-  deterministic `/home/swank/projects/spark3-vllm-ds41f/` node path.
-- Exercise the coordinated deployment rollback path during a scheduled restart.
-- Establish a frozen benchmark baseline for this exact concurrency-tuned runtime.
-
-The B12X patch stack and the mounted vLLM indexer override have been applied to
-fresh pinned checkouts and match their recorded live files. A later full-tree
-comparison found additional live modifications under the DS4.1 model package,
-plus `vllm/models/deepseek_v4/nvidia/model.py`, that are not represented by the
-vLLM patch series. `manifests/sources/2026-09-20-active-source.json` now states
-that narrower verification scope explicitly.
-
-The reconstruction additionally pins the official vLLM image digest, FlashInfer
-`v0.7.0rc1`, CUTLASS `v4.4.2`, and the five CuTe DSL 4.6.2 wheel hashes. Its
-Dockerfile remains a candidate until a build and functional/benchmark
-qualification are attached as an experiment.
+To reproduce it elsewhere, follow [replicate.md](replicate.md).

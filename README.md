@@ -38,6 +38,8 @@ the serving matrix; see
 and its [decision](experiments/2026-09-23-karmic-kraken-reference/decision.md).
 
 The machine-readable desired configuration is [config/cluster.json](config/cluster.json).
+To reproduce the deployment on your own three Sparks, follow
+[docs/replicate.md](docs/replicate.md).
 The previous baseline's live evidence is
 [manifests/baselines/2026-09-20-live.json](manifests/baselines/2026-09-20-live.json).
 

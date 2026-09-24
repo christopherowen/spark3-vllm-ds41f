@@ -1,0 +1,35 @@
+#!/bin/sh
+# Check out the CUTLASS revision pinned in upstreams.lock.json at the path the
+# promoted image build expects (.work/deps/cutlass-<release_tag>).
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+lock="$repo_root/upstreams.lock.json"
+upstream=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sources"]["cutlass"]["upstream"])' "$lock")
+revision=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sources"]["cutlass"]["revision"])' "$lock")
+tag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sources"]["cutlass"]["release_tag"])' "$lock")
+destination="$repo_root/.work/deps/cutlass-$tag"
+parent=$(dirname -- "$destination")
+
+if [ -d "$destination/.git" ] && [ "$(git -C "$destination" rev-parse HEAD)" = "$revision" ]; then
+  echo "CUTLASS $tag ($revision) already present at $destination"
+  exit 0
+fi
+
+mkdir -p "$parent"
+temporary=$(mktemp -d "$parent/.cutlass.XXXXXX")
+cleanup() {
+  rm -rf -- "$temporary"
+}
+trap cleanup EXIT HUP INT TERM
+
+git -C "$temporary" init --quiet
+git -C "$temporary" remote add upstream "$upstream"
+git -C "$temporary" fetch --quiet --depth 1 upstream "$revision"
+git -C "$temporary" checkout --quiet --detach FETCH_HEAD
+test -f "$temporary/include/cutlass/cutlass.h"
+
+rm -rf -- "$destination"
+mv -- "$temporary" "$destination"
+temporary="$parent/.cutlass.consumed.$$"
+echo "CUTLASS $tag ($revision) checked out at $destination"
