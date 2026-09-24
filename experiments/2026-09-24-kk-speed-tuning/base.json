@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "repository_commit": "0bfb0056656c6eb59fa8dd47ef79565c1d1a0571",
+  "baseline": "manifests/baselines/2026-09-24-karmic-kraken.json",
+  "image": "vllm-ds41f-kkref:01f1b874c774-r1",
+  "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+  "baseline_receipts": "experiments/2026-09-23-karmic-kraken-reference/runs/kkref-notiny"
+}
