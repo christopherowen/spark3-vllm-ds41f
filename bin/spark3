@@ -2097,6 +2097,26 @@ def acceptance(metrics: dict) -> float | None:
     return round(metrics["spec_decode_num_accepted_tokens"] / drafts, 4) if drafts else None
 
 
+def step_times_ms(samples: list[dict]) -> list[float]:
+    """Milliseconds per decode step for single-stream samples.
+
+    Each step emits one token plus the accepted drafts, so the step time is
+    (1 + accepted per draft) / decode tok/s. It is independent of how many
+    drafts the text lets the model accept, which makes it far steadier than
+    tok/s for changes to kernels or host overhead.
+    """
+    times = []
+    for sample in samples:
+        accepted = sample.get("accepted_per_draft")
+        requests = sample.get("requests") or []
+        if accepted is None or len(requests) != 1:
+            continue
+        rate = requests[0].get("decode_tps")
+        if requests[0].get("ok") and rate:
+            times.append(1000 * (1 + accepted) / rate)
+    return times
+
+
 def compact(results: list[dict]) -> list[dict]:
     keys = ("ok", "ttft_s", "prompt_tokens", "completion_tokens", "decode_tps", "output_sha256", "error")
     return [{key: result[key] for key in keys} for result in results]
@@ -2190,6 +2210,7 @@ def suite_decode(bench: Bench, options: argparse.Namespace, rng: random.Random) 
             "per_stream_decode_tps": describe([request["decode_tps"] for request in ok if request["decode_tps"]]),
             "ttft_s": describe([request["ttft_s"] for request in ok]),
             "accepted_per_draft": describe([entry["accepted_per_draft"] for entry in entries if entry["accepted_per_draft"] is not None]),
+            "step_ms": describe(step_times_ms(entries)),
             "failed_requests": len(requests) - len(ok),
             "distinct_outputs": len({request["output_sha256"] for request in ok}),
         }
@@ -2390,6 +2411,25 @@ def bench_rows(report: dict, reference: dict | None, tolerance: float) -> tuple[
         for point, summary in suites["decode"]["points"].items():
             if summary["tps"]["n"]:
                 compare(point, summary["tps"], ref_points.get(point, {}).get("tps"), "tok/s")
+        ref_samples = ref_suites.get("decode", {}).get("samples", {})
+        steps = [
+            (point, describe(step_times_ms(entries)))
+            for point, entries in suites["decode"].get("samples", {}).items()
+        ]
+        steps = [(point, summary) for point, summary in steps if summary["n"]]
+        if steps:
+            lines.append("single-stream step time (ms, lower is better; independent of acceptance):")
+        for point, summary in steps:
+            ref = describe(step_times_ms(ref_samples.get(point, [])))
+            text = f"  {point:<18} {summary['mean']:>9.2f} ±{summary['ci95_pct'] or 0:>4.1f}% n={summary['n']:<3}"
+            change = difference(summary, ref) if ref["n"] else None
+            if change:
+                mean, low, high = change
+                verdict = "faster" if high < 0 else "slower" if low > 0 else "same"
+                text += f" ref {ref['mean']:>8.2f}  {mean:+5.1f}% [{low:+.1f}, {high:+.1f}] {verdict}"
+                if verdict == "slower" and mean > tolerance:
+                    regressions.append(f"{point} step time {mean:+.1f}%")
+            lines.append(text)
     if "sampled" in suites:
         lines.append("sampled (accepted drafts per step, temperature 1.0):")
         ref_points = ref_suites.get("sampled", {}).get("points", {})
