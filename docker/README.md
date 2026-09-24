@@ -57,9 +57,11 @@ rebuilds only what is missing or wrong. It writes `inputs.json` last, so an
 interrupted run is never mistaken for a complete one. `check` recomputes each
 context's digest.
 
-**Contexts:** these are exports without Git metadata. The earlier recipe
-copied whole checkouts, which put about 100 MB of `.git` history into the
-image and changed the build cache key on every fresh clone.
+**Contexts:** these are exports without Git metadata. File modes are
+normalized to Git's 644 and 755, so the contexts don't depend on the host
+umask and are identical on every host. The earlier recipe copied whole
+checkouts, which put about 100 MB of `.git` history into the image and
+changed the build cache key on every fresh clone.
 
 **CI:** CI runs `bin/spark3 build prepare --only vllm` and `--only b12x` to
 check that the series still apply and reproduce the recorded trees.

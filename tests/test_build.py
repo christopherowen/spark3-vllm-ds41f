@@ -51,6 +51,23 @@ class BuildDirectoryTest(unittest.TestCase):
             (root / "a.py").write_text("x = 2\n")
             self.assertNotEqual(before, spark3.tree_digest(root))
 
+    def test_normalize_modes_uses_git_modes(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "d").mkdir(mode=0o775)
+            plain = root / "d" / "plain.txt"
+            plain.write_text("x")
+            plain.chmod(0o664)
+            tool = root / "tool.sh"
+            tool.write_text("#!/bin/sh\n")
+            tool.chmod(0o775)
+            spark3.normalize_modes(root)
+            self.assertEqual(plain.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(tool.stat().st_mode & 0o777, 0o755)
+            self.assertEqual((root / "d").stat().st_mode & 0o777, 0o755)
+
 
 if __name__ == "__main__":
     unittest.main()
