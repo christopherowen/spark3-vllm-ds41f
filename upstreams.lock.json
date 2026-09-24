@@ -159,6 +159,13 @@
       "observed_revision": "7918dcde8a706ef09bc4a708186012661abe2077",
       "added_to_watchlist": "2026-09-20",
       "role": "upstream DeepSeek V4.1 serving recipe and current model-feature guidance"
+    },
+    "joesinvestments_glm53_vllm030_spark4_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/joesinvestments/GLM-5.3-Flash-Blackfrost-Uncensored-vLLM-0.30-4x-DGX-Spark",
+      "observed_revision": "9e7090f72b7c27df77021b65eab5bcdfa8d9328f",
+      "added_to_watchlist": "2026-09-24",
+      "role": "safe lab lane for experiments beside a serving cluster, checksum-verified release-image patching, serving A/B and agent-session benchmark methodology; GLM TP4, NVFP4, and uncensored-checkpoint specifics are not deployment inputs"
     }
   },
   "source_manifest": "manifests/sources/2026-09-24-karmic-kraken-source.json"
