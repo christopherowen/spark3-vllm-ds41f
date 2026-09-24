@@ -11,7 +11,7 @@ state, or an experiment.
 ## Current baseline
 
 The active baseline was promoted on 2026-09-24
-([manifests/baselines/2026-09-24-karmic-kraken-capture32.json](manifests/baselines/2026-09-24-karmic-kraken-capture32.json);
+([manifests/baselines/2026-09-24-karmic-kraken-nofiat.json](manifests/baselines/2026-09-24-karmic-kraken-nofiat.json);
 [speed tuning](experiments/2026-09-24-kk-speed-tuning/decision.md)):
 
 - three DGX Spark nodes using tensor parallelism 3;
@@ -27,7 +27,9 @@ The active baseline was promoted on 2026-09-24
 - 160,000-token per-request limit, eight admitted sequences, and 933,168 KV
   tokens in a 2 GiB-per-rank cache;
 - one concurrent prefill, 4,096 batched tokens, and fail-closed 5 GiB startup
-  and 3 GiB steady memory guards.
+  and 3 GiB steady memory guards;
+- FlashInfer autotune disabled (`--no-enable-flashinfer-autotune`): only the
+  sampler uses FlashInfer, and the pass saved no configs.
 
 One content-addressed image runs on all three nodes. It passes the LRU
 coherence gate 5/5 and is faster than the 2026-09-20 image at every point of

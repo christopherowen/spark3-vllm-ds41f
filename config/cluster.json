@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "promoted_baseline": "2026-09-24-karmic-kraken-capture32",
+  "promoted_baseline": "2026-09-24-karmic-kraken-nofiat",
   "container": {
     "name": "dsv41-karmic-kraken",
     "image": "vllm-ds41f-kkref:01f1b874c774-r1",
@@ -187,7 +187,7 @@
     "--nnodes",
     "3",
     "--no-scheduler-reserve-full-isl",
-    "--enable-flashinfer-autotune"
+    "--no-enable-flashinfer-autotune"
   ],
   "distributed": {
     "master_addr": "10.0.1.71",

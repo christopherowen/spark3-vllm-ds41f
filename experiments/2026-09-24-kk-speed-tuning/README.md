@@ -105,3 +105,13 @@ overlay's `SPARK3_B12X_AUTOTUNE_ONLY`.
 FlashInfer: only the top-k/top-p sampler uses it ("Using FlashInfer for top-p
 & top-k sampling"); at temperature 0 the profile contains no FlashInfer kernel.
 The `--enable-flashinfer-autotune` warmup saves 0 configs.
+
+## Promoted follow-up: FlashInfer autotune disabled
+
+`--enable-flashinfer-autotune` was replaced by `--no-enable-flashinfer-autotune`
+(`cluster-nofiat.json`); omitting the flag leaves the pass on. The log now
+reads "Skipping FlashInfer autotune because it is disabled". One serving pass
+is within the capture32 variation (code c8 172.0, prose c8 142.2 tok/s), LRU
+5/5, and dgx1's minimum MemAvailable rose from 6.07 to 6.96 GiB
+(`runs/kk-nofiat-p1`, `runs/kk-nofiat-mem.json`). Promoted as baseline
+`2026-09-24-karmic-kraken-nofiat`.

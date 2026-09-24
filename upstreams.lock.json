@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_from_baseline": "2026-09-24-karmic-kraken-capture32",
+  "generated_from_baseline": "2026-09-24-karmic-kraken-nofiat",
   "sources": {
     "vllm": {
       "kind": "git",

@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "status": "promoted-baseline",
+  "captured_at": "2026-09-24T05:46:05Z",
+  "evidence_container": "dsv41-karmic-kraken (started from experiments/2026-09-24-kk-speed-tuning/cluster-nofiat.json, identical launch)",
+  "container_name": "dsv41-karmic-kraken",
+  "image_tag": "vllm-ds41f-kkref:01f1b874c774-r1",
+  "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+  "nodes": {
+    "dgx1": {
+      "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+      "initial_free_gib": 112.7,
+      "role": "api-head-rank-0"
+    },
+    "dgx2": {
+      "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+      "initial_free_gib": 113.26,
+      "role": "headless-rank-1"
+    },
+    "dgx3": {
+      "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+      "initial_free_gib": 113.23,
+      "role": "headless-rank-2"
+    }
+  },
+  "source_identity": {
+    "vllm_repository": "https://github.com/local-inference-lab/vllm",
+    "vllm_ref": "integration/karmic-kraken-beta",
+    "vllm_revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+    "vllm_tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
+    "b12x_repository": "https://github.com/local-inference-lab/b12x",
+    "b12x_ref": "integration/karmic-kraken-beta",
+    "b12x_revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+    "b12x_patch_head": "3d2439944021c3dc41aa7a597aefc67232e9f563",
+    "b12x_tree": "d661de3161ff474a92646974584d6f5eb1958f75",
+    "runtime_base_image": "docker.io/vllm/vllm-openai@sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "image_build_deployment_commit": "9ffea8f365bbd5df3e865f99fc70326c6e72caf0",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277"
+  },
+  "runtime_choices": {
+    "B12X_W4A8_TINY_DECODE": "0 (tiny decode omits swiglu_limit; see experiment README)",
+    "B12X_AUTOTUNE": "0 (autotune race budget is free memory // 2 on unified memory)",
+    "speculative": "DSpark, 3 tokens, draft TP 3, adaptive verification cost scale 2",
+    "cudagraph": "FULL_AND_PIECEWISE, capture sizes 1-32 (adds 28 and 32)",
+    "max_num_batched_tokens": 4096,
+    "memguards_gib": {
+      "startup": 5,
+      "steady": 3
+    },
+    "flashinfer_autotune": "disabled (--no-enable-flashinfer-autotune): it saved 0 configs, and only the sampler uses FlashInfer"
+  },
+  "capacity": {
+    "kv_cache_bytes_per_rank": 2147483648,
+    "kv_cache_tokens": 933168,
+    "kv_bytes_per_token_per_rank": 2301,
+    "max_model_len": 160000,
+    "max_num_seqs": 8,
+    "reported_full_context_concurrency": 5.83,
+    "graph_capture_gib": 1.47
+  },
+  "benchmarks": {
+    "prose-c1": {
+      "aggregate_tps": 41.7,
+      "mean_ttft_s": 0.254
+    },
+    "prose-c2": {
+      "aggregate_tps": 61.6,
+      "mean_ttft_s": 0.451
+    },
+    "prose-c4": {
+      "aggregate_tps": 96.1,
+      "mean_ttft_s": 0.567
+    },
+    "prose-c8": {
+      "aggregate_tps": 142.2,
+      "mean_ttft_s": 0.713
+    },
+    "code-c1": {
+      "aggregate_tps": 51.7,
+      "mean_ttft_s": 0.262
+    },
+    "code-c2": {
+      "aggregate_tps": 79.6,
+      "mean_ttft_s": 0.488
+    },
+    "code-c4": {
+      "aggregate_tps": 117.9,
+      "mean_ttft_s": 0.582
+    },
+    "code-c8": {
+      "aggregate_tps": 172.0,
+      "mean_ttft_s": 0.763
+    },
+    "prose-c1-repeat": {
+      "aggregate_tps": 39.9,
+      "mean_ttft_s": 0.257
+    },
+    "code-c1-repeat": {
+      "aggregate_tps": 52.4,
+      "mean_ttft_s": 0.274
+    }
+  },
+  "quality": {
+    "lru_gate": "5/5"
+  },
+  "experiment": "experiments/2026-09-24-kk-speed-tuning/",
+  "receipts": "experiments/2026-09-24-kk-speed-tuning/runs/kk-nofiat-p1",
+  "previous_baseline": "manifests/baselines/2026-09-24-karmic-kraken-capture32.json",
+  "limitations": [
+    "B12X autotune is off: a full in-engine tune does not fit GB10 memory, and a targeted tune measured neutral.",
+    "The image is built by the 2026-09-23 karmic-kraken experiment's prepare-sources/build-candidate recipe; bin/spark3 build render still describes the previous reconstruction.",
+    "Quality is gated on the LRU coding probe and activation traces; no broad evaluation yet.",
+    "A shared-expert race was observed only with tiny decode on; its mechanism is not identified."
+  ],
+  "min_mem_available_gib": {
+    "dgx1_min_gib": 6.96,
+    "dgx2_min_gib": 7.68,
+    "dgx3_min_gib": 7.57
+  }
+}
