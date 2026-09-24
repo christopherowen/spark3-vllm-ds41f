@@ -1106,6 +1106,25 @@ class Engram(nn.Module):
     def finish_disk(self, job):
         self.embed_tokens.finish_disk(job)
 
+    def prepare_embeddings(self, hash_ids):
+        self.embed_tokens.lookup(hash_ids, self.staged_rows)
+
+    def invalidate_disk_output(self, *, clear=False):
+        self._disk_prepared = False
+        self._disk_prepared_tokens = 0
+        if clear:
+            self.staged_rows.zero_()
+
+    def prepare_disk(self, hash_ids, num_tokens):
+        self.invalidate_disk_output()
+        try:
+            self.embed_tokens.prepare_disk(hash_ids, self.staged_rows, num_tokens)
+        except BaseException:
+            self.invalidate_disk_output(clear=True)
+            raise
+        self._disk_prepared_tokens = hash_ids.shape[0]
+        self._disk_prepared = True
+
     def prepare_dummy_output(self, num_tokens):
         self.invalidate_disk_output(clear=True)
         self._disk_prepared_tokens = num_tokens
