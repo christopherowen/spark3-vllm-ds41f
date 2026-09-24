@@ -14,14 +14,11 @@ fi
     avail=$(awk '/MemAvailable/{print int($2/1048576)}' /proc/meminfo)
     if [ "$avail" -lt 10 ]; then
       echo "watchdog: MemAvailable ${avail} GiB, killing $NAME"
-      docker kill "$NAME" >/dev/null 2>&1; exit 0
+      docker kill "$NAME" >/dev/null 2>&1
     fi
-    docker ps --format '{{.Names}}' | grep -q "^$NAME\$" || [ -f /tmp/$NAME.started ] || continue
-    docker ps --format '{{.Names}}' | grep -q "^$NAME\$" || exit 0
   done
 ) &
 WATCHDOG=$!
-touch /tmp/$NAME.started
 O=$PWD/$E/overlay-b12x
 docker run --rm --name "$NAME" --gpus=all --ipc=host --memory=24g --memory-swap=24g \
   -v "$PWD/cache:/cache" -v "$PWD/$E:/exp:ro" \
@@ -37,6 +34,5 @@ docker run --rm --name "$NAME" --gpus=all --ipc=host --memory=24g --memory-swap=
   --entrypoint bash "$IMAGE" -c '
     for t in 1 0; do B12X_W4A8_TINY_DECODE=$t python3 /exp/bench_ds41_moe_decode.py "$@"; done' _ "$@"
 rc=$?
-rm -f /tmp/$NAME.started
 kill $WATCHDOG 2>/dev/null
 exit $rc
