@@ -1,0 +1,610 @@
+node: dgx2
+container: dsv41-weekend-control-kv2-r2
+inspect_returncode: 0
+
+[docker inspect]
+[
+    {
+        "Id": "aa6e78bcc5ae1ecb30ecafc212fe2c33e50484c37a1f183a28767ecf16750510",
+        "Created": "2026-09-23T14:58:02.584845557Z",
+        "Path": "/usr/bin/python3",
+        "Args": [
+            "-m",
+            "vllm.entrypoints.cli.main",
+            "serve",
+            "/models",
+            "--served-model-name",
+            "deepseek-v4.1-flash",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+            "--tokenizer-mode",
+            "deepseek_v41",
+            "--dtype",
+            "bfloat16",
+            "--tensor-parallel-size",
+            "3",
+            "--load-format",
+            "b12x",
+            "--safetensors-load-strategy",
+            "lazy",
+            "--model-loader-extra-config",
+            "{\"io_threads\":8}",
+            "--block-size",
+            "256",
+            "--enable-prefix-caching",
+            "--enable-chunked-prefill",
+            "--max-model-len",
+            "160000",
+            "--max-num-seqs",
+            "8",
+            "--max-parallel-prefills",
+            "1",
+            "--gpu-memory-utilization",
+            "0.91",
+            "--max-num-batched-tokens",
+            "8192",
+            "--kv-cache-memory-bytes",
+            "2147483648",
+            "--max-cudagraph-capture-size",
+            "24",
+            "--generation-config",
+            "vllm",
+            "--language-model-only",
+            "--engram-config",
+            "{\"cpu_offload\":false,\"table_memory\":\"disk\"}",
+            "--attention-backend",
+            "B12X",
+            "--linear-backend",
+            "b12x",
+            "--moe-backend",
+            "b12x",
+            "--speculative-config",
+            "{\"method\":\"dspark\",\"num_speculative_tokens\":3,\"draft_tensor_parallel_size\":1,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":true}",
+            "--jit-monitor-mode",
+            "warn",
+            "--compilation-config",
+            "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24]}",
+            "--prefix-cache-retention-interval",
+            "512",
+            "--long-prefill-token-threshold",
+            "4096",
+            "--no-async-scheduling",
+            "--reasoning-parser",
+            "deepseek_v41",
+            "--tool-call-parser",
+            "deepseek_v41",
+            "--enable-auto-tool-choice",
+            "--default-chat-template-kwargs",
+            "{\"thinking\":true}",
+            "--distributed-executor-backend",
+            "mp",
+            "--nnodes",
+            "3",
+            "--node-rank",
+            "1",
+            "--master-addr",
+            "10.0.1.71",
+            "--master-port",
+            "29570",
+            "--headless"
+        ],
+        "State": {
+            "Status": "exited",
+            "Running": false,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 0,
+            "ExitCode": 137,
+            "Error": "",
+            "StartedAt": "2026-09-23T14:58:02.692032575Z",
+            "FinishedAt": "2026-09-23T15:01:55.636881202Z"
+        },
+        "Image": "sha256:f50c54c17297d45cc064a328876e8163fb42a2ea4f07fd7f0e93f7b60707ed9b",
+        "ResolvConfPath": "/var/lib/docker/containers/aa6e78bcc5ae1ecb30ecafc212fe2c33e50484c37a1f183a28767ecf16750510/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/aa6e78bcc5ae1ecb30ecafc212fe2c33e50484c37a1f183a28767ecf16750510/hostname",
+        "HostsPath": "/var/lib/docker/containers/aa6e78bcc5ae1ecb30ecafc212fe2c33e50484c37a1f183a28767ecf16750510/hosts",
+        "LogPath": "/var/lib/docker/containers/aa6e78bcc5ae1ecb30ecafc212fe2c33e50484c37a1f183a28767ecf16750510/aa6e78bcc5ae1ecb30ecafc212fe2c33e50484c37a1f183a28767ecf16750510-json.log",
+        "Name": "/dsv41-weekend-control-kv2-r2",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "docker-default",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277:/models:ro",
+                "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/blobs:/blobs:ro",
+                "/home/swank/projects/spark3-vllm-ds41f/state/config.json:/models/config.json:ro",
+                "/home/swank/projects/spark3-vllm-ds41f/state/indexer.py:/opt/ds41-r37/vllm/vllm/v1/attention/backends/mla/indexer.py:ro",
+                "/home/swank/projects/spark3-vllm-ds41f/cache:/cache:rw"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "host",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": [
+                "CAP_IPC_LOCK"
+            ],
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "host",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": [
+                "seccomp=unconfined",
+                "label=disable"
+            ],
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 17179869184,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 120259084288,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [
+                {
+                    "PathOnHost": "/dev/infiniband",
+                    "PathInContainer": "/dev/infiniband",
+                    "CgroupPermissions": "rwm"
+                }
+            ],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": [
+                {
+                    "Driver": "",
+                    "Count": -1,
+                    "DeviceIDs": null,
+                    "Capabilities": [
+                        [
+                            "gpu"
+                        ]
+                    ],
+                    "Options": {}
+                }
+            ],
+            "MemoryReservation": 0,
+            "MemorySwap": 120259084288,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": [
+                {
+                    "Name": "memlock",
+                    "Hard": -1,
+                    "Soft": -1
+                },
+                {
+                    "Name": "stack",
+                    "Hard": 67108864,
+                    "Soft": 67108864
+                }
+            ],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "aa6e78bcc5ae1ecb30ecafc212fe2c33e50484c37a1f183a28767ecf16750510",
+                "LowerDir": "/var/lib/docker/overlay2/43c6337870916c62183ffafb14a1dea64ccfb35a1b1e8666ddd19fc6a4590de3-init/diff:/var/lib/docker/overlay2/y1ofc2biqxt71mokx6nqq6qfa/diff:/var/lib/docker/overlay2/h5rz4jjz4f24etx8zw2bbva4j/diff:/var/lib/docker/overlay2/xmzhfd1eotqj7ez2ifz1ahhjk/diff:/var/lib/docker/overlay2/x816v8ro4p88hpgz4snw5wjgf/diff:/var/lib/docker/overlay2/ht8f5kdcbibxefg5j0xk5s6xc/diff:/var/lib/docker/overlay2/cplipmgucav9eni7665zruo7o/diff:/var/lib/docker/overlay2/ikxykztqucyfohd6f0m9vdo0w/diff:/var/lib/docker/overlay2/muefo87cbzhwnfg5pmgjvosvp/diff:/var/lib/docker/overlay2/j8ep288wpfi4x1795melmhu8x/diff:/var/lib/docker/overlay2/vcf3h4iytdmxin9qoc3s7xqnl/diff:/var/lib/docker/overlay2/ygnsjusjc711j92bynqjq22yv/diff:/var/lib/docker/overlay2/32wz9h6u41sqxpqp6900avdm2/diff:/var/lib/docker/overlay2/ur9evvxfheh2fonsie1mmujsg/diff:/var/lib/docker/overlay2/1ltie8agd7jmfnw7t0x7fzvdi/diff:/var/lib/docker/overlay2/gawu318o1ii5zw3vbqoo6kqdx/diff:/var/lib/docker/overlay2/xwrv60wbaej41p6xe4ojtn7v6/diff:/var/lib/docker/overlay2/vwlc05cp933ryerayhhlxybe8/diff:/var/lib/docker/overlay2/n912asmja1a18g21wfblmzb32/diff:/var/lib/docker/overlay2/0ikge9bmllgct2qpxhko7gocd/diff:/var/lib/docker/overlay2/d99igfsd286j28uv5aa9xhatc/diff:/var/lib/docker/overlay2/q2b3m3oltv1g4gyvo1chz0sq4/diff:/var/lib/docker/overlay2/u9gr5cmze8chccvnnrbayc1qc/diff:/var/lib/docker/overlay2/xd6phi4q8c3rm9rtlkhaukcaq/diff:/var/lib/docker/overlay2/jslsdy52c83vsk6kzcs3o919m/diff:/var/lib/docker/overlay2/ksdbi0iz6g715cqv24pv2g6d1/diff:/var/lib/docker/overlay2/mdmi936iocqfak68eq68t185j/diff:/var/lib/docker/overlay2/w5urkh61kriqv6bckmtpbvlu0/diff:/var/lib/docker/overlay2/5hqo2t4u92fgmz3ezlaycjaf5/diff:/var/lib/docker/overlay2/927lo30p1ajyohgv08d6hm7vt/diff:/var/lib/docker/overlay2/ul546dkg36yz8q1afwrh1ewzq/diff:/var/lib/docker/overlay2/g789qwyin4en6tjse1w32yo6n/diff:/var/lib/docker/overlay2/j08lxymlfyvzloqfb7bgh36kc/diff:/var/lib/docker/overlay2/oxoazxv8ph7c2z6k8z6ko7sl0/diff:/var/lib/docker/overlay2/nlz3gsyddchy2phfku9r8lzks/diff:/var/lib/docker/overlay2/ooww1gef10c6cb5u3oyg3gh58/diff:/var/lib/docker/overlay2/8os8ppbe205dx99b5htg8k0wc/diff:/var/lib/docker/overlay2/nb5560nerl48suuhe8at3o3dd/diff:/var/lib/docker/overlay2/l9lrg4e9fe3zxd3wbh4qegpkw/diff:/var/lib/docker/overlay2/onx07jb2ato05c1gwxzxaylqp/diff:/var/lib/docker/overlay2/bd984fb1e4a6d8db7d6f0b898fdadd44828fbbcb3117d959ab72c654867b730e/diff:/var/lib/docker/overlay2/3796d8225f82e77a9c0c0496cf13a814e74dc368abd7b8e74b2ac3497fdbe523/diff:/var/lib/docker/overlay2/30937ff9a0804dde23cb90c016ed2672126a676525d839a92ed561b78d4ba082/diff:/var/lib/docker/overlay2/9beee00653224a9cbc342fab4f29de978df1453954605d69273815ffa4044868/diff:/var/lib/docker/overlay2/5c325d05f1ccf6fc9355029396199f8803960e75b82610bc9c3e2bb612529d82/diff:/var/lib/docker/overlay2/bcde0e39716dddf0366c408b768b895fd51ffb1be00e95998d4053cbf1a69449/diff:/var/lib/docker/overlay2/b02f186993daaa0a041f5c676bcb3cf5f56c612dc0bf9cd841a889c1cba73c1e/diff:/var/lib/docker/overlay2/ce5a437464a6a7a968f44ccc15df1e79d070dbe01623131c6ded2f3d2410d052/diff:/var/lib/docker/overlay2/9a094b44399673afb8ed5e4f1b852038a5ae4f628ca9db4f8682db95043956f8/diff:/var/lib/docker/overlay2/cecb2073a5c0e7af773317b25c28a354465661685e4867db103c10f7a947c5cf/diff:/var/lib/docker/overlay2/e027eece42d9ac0a282440e9c94c5991c7900a8c3b1b3d2db537321bb48fe61b/diff:/var/lib/docker/overlay2/90cc7a00e43b7f571b5b9d723f83f6430be2d70eab47142d56554539fd5dc39a/diff:/var/lib/docker/overlay2/814ada47b574e3b96e29a40bf904d2bdac12fa1bcd2ed45f151ee4fe516de465/diff:/var/lib/docker/overlay2/42e864421bee6c3bdf4369d0f7d651e358a07f9c04f53d4dfc488bd47a33d758/diff:/var/lib/docker/overlay2/cf1edb9601c7fa8ac8189b88665850d72d52fac39118bf6a5460977c03869554/diff:/var/lib/docker/overlay2/3b804614105da6880a26e2a71d604a526ee067edf36fbfa20071b2e455ba9a08/diff:/var/lib/docker/overlay2/0654dcbe6c7685ef2c874c168eac7f8c779be8151a7e18e7b89fa76b936510b4/diff:/var/lib/docker/overlay2/67120744fd07f267442197ab1cf2d5977cd1446d66137c81f79d5c440d01031c/diff:/var/lib/docker/overlay2/fe7a5969e16130c3fa95a52c44be904be20cd3e4e274b3b69b23a3ac9399ec98/diff:/var/lib/docker/overlay2/27305457b6ab020561ca9fc156f8cab39c77f0565232b16a93457668c96a8cb8/diff:/var/lib/docker/overlay2/7f3ec13ea9f7c9e0b249e8478940242a5303f78afdc8db7cf24c74c937476530/diff:/var/lib/docker/overlay2/1793386df64d8c79b24c6d585c3fc48f50b0481aab438b60983293d605239abd/diff:/var/lib/docker/overlay2/f6c339458e23147c75bd8e9300a83b1e05e5e0965ad252886e60279991d9f05b/diff:/var/lib/docker/overlay2/3abd86cea53e02eaec6f0fbb327036c23f6db9c80046c5acd0fe5d2c1b0ea9fa/diff:/var/lib/docker/overlay2/638a0524c822c8320a6b9890a2d5ebdafc92632bbe880be4891b93a980403fd0/diff:/var/lib/docker/overlay2/feadab94abefeb8bc411cd99feb5498750c957d4a001734a1b1a46ce591f5662/diff:/var/lib/docker/overlay2/32881a58fae867dca7d074a3c6d489b48aaff1d11d5c5cb77d06d056ee646eae/diff:/var/lib/docker/overlay2/f84fe34b59eee8d36c278749e04305264bdfe333daca61b7f634bdcee416177b/diff:/var/lib/docker/overlay2/34c95377fb8d63fa4de23a5866f99c92a5c9b6d3423161598e895241fc572f6e/diff:/var/lib/docker/overlay2/a197eeb2aed5be02318b203747417f0025248f1842b2dcdb72156e5713884065/diff:/var/lib/docker/overlay2/db2694537c51c8597be036669a5355a375c91e31dfa49d0167f891164b137858/diff:/var/lib/docker/overlay2/d90bb120f1daeafdcfdcde1b96503c69474b565dff4fba2047ad1253f84e5798/diff:/var/lib/docker/overlay2/38988e3521b5e28b4f90f9d41b6b7f796b76863a256bc06b3819b0f75e7f6564/diff:/var/lib/docker/overlay2/419ac8ec11c515a5f08ff94b649f350efba4923a49dc6d6e4636fe06d62bdc25/diff:/var/lib/docker/overlay2/1ed9828bf4308e7c3f2adae7044f7a01eda0fba38d3707bfddb42746f6ee4c96/diff:/var/lib/docker/overlay2/082bbbf8130e226232da65f7596b29e4f62168801c6c7713b5d119def6eb99ba/diff:/var/lib/docker/overlay2/9b0b842499c546a09cbba1e678ffcedbb6d02f4988ae12d9dbe76d4a5a8b6d05/diff:/var/lib/docker/overlay2/ed22854803cf89f76dafd723bf5b84cf3dcfa48930f6c9f9a0bd64444224f9e9/diff:/var/lib/docker/overlay2/eaaa39ac73f4468cfc81647d380c1567e7241356cd93d0bbf55dc0ba8485765e/diff:/var/lib/docker/overlay2/710f38d206907878bbd2781471e9a5c521e82970ff77ff3a10f1c53054f54a76/diff:/var/lib/docker/overlay2/13a88b024ed5bbc5643e383046714cff83a89105d96624649a271493ec5a8ae8/diff:/var/lib/docker/overlay2/4956542dbf4e36392e5e99b1900f2fe75c0b2a8b26315bb15cfce56e6fac449e/diff:/var/lib/docker/overlay2/301a825067ecba8c53209cf67660dbe797da48a8145c55d5dbbc98aec778b5a1/diff:/var/lib/docker/overlay2/30fbe674481b979252424ed291280606485dcbb725f57417a87da866e4f331c2/diff",
+                "MergedDir": "/var/lib/docker/overlay2/43c6337870916c62183ffafb14a1dea64ccfb35a1b1e8666ddd19fc6a4590de3/merged",
+                "UpperDir": "/var/lib/docker/overlay2/43c6337870916c62183ffafb14a1dea64ccfb35a1b1e8666ddd19fc6a4590de3/diff",
+                "WorkDir": "/var/lib/docker/overlay2/43c6337870916c62183ffafb14a1dea64ccfb35a1b1e8666ddd19fc6a4590de3/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+                "Destination": "/models",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/blobs",
+                "Destination": "/blobs",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/swank/projects/spark3-vllm-ds41f/state/config.json",
+                "Destination": "/models/config.json",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/swank/projects/spark3-vllm-ds41f/state/indexer.py",
+                "Destination": "/opt/ds41-r37/vllm/vllm/v1/attention/backends/mla/indexer.py",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/swank/projects/spark3-vllm-ds41f/cache",
+                "Destination": "/cache",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "dgx2",
+            "Domainname": "",
+            "User": "root",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "VLLM_CACHE_ROOT=/cache/jit/vllm",
+                "VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1",
+                "NCCL_IB_MERGE_NICS=1",
+                "B12X_COMPILE_CACHE_DIR=/cache/jit/b12x/compile",
+                "NCCL_NET=IB",
+                "VLLM_USE_AOT_COMPILE=1",
+                "NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f0,rocep1s0f1,roceP2p1s0f1",
+                "B12X_CUTE_COMPILE_CACHE_DIR=/cache/jit/b12x/cute",
+                "B12X_ROCE_SPIN_LIMIT=5000000",
+                "OMP_NUM_THREADS=8",
+                "VLLM_USE_STANDALONE_COMPILE=1",
+                "B12X_ROCE_GID_INDEX=3",
+                "GLOO_SOCKET_IFNAME=enP7s7",
+                "NCCL_CUMEM_ENABLE=0",
+                "NCCL_IB_SUBNET_AWARE_ROUTING=1",
+                "NCCL_LL128_BUFFSIZE=262144",
+                "NCCL_P2P_DISABLE=1",
+                "VLLM_USE_MEGA_AOT_ARTIFACT=1",
+                "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,garbage_collection_threshold:0.6",
+                "CUDA_DEVICE_MAX_CONNECTIONS=32",
+                "NCCL_CROSS_NIC=1",
+                "NCCL_IB_ADDR_FAMILY=AF_INET",
+                "VLLM_ENABLE_ROCE_ALLREDUCE=1",
+                "VLLM_USE_FLASHINFER_SAMPLER=1",
+                "HF_HOME=/cache/huggingface",
+                "NCCL_DEBUG_SUBSYS=INIT",
+                "NCCL_IB_GID_INDEX=3",
+                "NCCL_NVLS_ENABLE=0",
+                "TORCH_NCCL_ASYNC_ERROR_HANDLING=1",
+                "VLLM_ROCE_ALLREDUCE_MAX_SIZE=2MB",
+                "NCCL_IB_ROCE_VERSION_NUM=2",
+                "NCCL_MAX_NCHANNELS=8",
+                "NCCL_PROTO=^LL128",
+                "TORCHINDUCTOR_CACHE_DIR=/cache/jit/torchinductor",
+                "TRITON_CACHE_DIR=/cache/jit/triton",
+                "VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=900",
+                "VLLM_MULTI_STREAM_GEMM_TOKEN_THRESHOLD=1024",
+                "VLLM_USE_BREAKABLE_CUDAGRAPH=0",
+                "VLLM_USE_V2_MODEL_RUNNER=1",
+                "CUTE_DSL_CACHE_DIR=/cache/jit/cute-dsl",
+                "VLLM_ENGINE_READY_TIMEOUT_S=3600",
+                "VLLM_HOST_IP=10.0.1.70",
+                "NCCL_IGNORE_CPU_AFFINITY=1",
+                "TP_SOCKET_IFNAME=enP7s7",
+                "VLLM_CACHE_DIR=/cache/jit/vllm",
+                "NCCL_DEBUG=WARN",
+                "NCCL_SOCKET_IFNAME=enP7s7",
+                "VLLM_ROCE_ALLGATHER_MAX_SIZE=4MB",
+                "DSV41_INDEXER_PREFILL_FACTOR=1",
+                "VLLM_ENABLE_PCIE_ALLREDUCE=0",
+                "HF_HUB_OFFLINE=1",
+                "NCCL_SHM_DISABLE=1",
+                "TRANSFORMERS_OFFLINE=1",
+                "XDG_CACHE_HOME=/cache/jit",
+                "B12X_ROCE_PEER_HCAS={\"0\":[\"rocep1s0f1\",\"roceP2p1s0f1\"],\"2\":[\"rocep1s0f0\",\"roceP2p1s0f0\"]}",
+                "NCCL_BUFFSIZE=1048576",
+                "NCCL_IB_DISABLE=0",
+                "NCCL_NET_PLUGIN=none",
+                "PYTHONPATH=/opt/ds41-r37/vllm:/opt/ds41-r37/b12x",
+                "PATH=/usr/local/cuda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "NVARCH=sbsa",
+                "NVIDIA_REQUIRE_CUDA=cuda>=13.0 brand=unknown,driver>=535,driver<536 brand=grid,driver>=535,driver<536 brand=tesla,driver>=535,driver<536 brand=nvidia,driver>=535,driver<536 brand=quadro,driver>=535,driver<536 brand=quadrortx,driver>=535,driver<536 brand=nvidiartx,driver>=535,driver<536 brand=vapps,driver>=535,driver<536 brand=vpc,driver>=535,driver<536 brand=vcs,driver>=535,driver<536 brand=vws,driver>=535,driver<536 brand=cloudgaming,driver>=535,driver<536 brand=unknown,driver>=550,driver<551 brand=grid,driver>=550,driver<551 brand=tesla,driver>=550,driver<551 brand=nvidia,driver>=550,driver<551 brand=quadro,driver>=550,driver<551 brand=quadrortx,driver>=550,driver<551 brand=nvidiartx,driver>=550,driver<551 brand=vapps,driver>=550,driver<551 brand=vpc,driver>=550,driver<551 brand=vcs,driver>=550,driver<551 brand=vws,driver>=550,driver<551 brand=cloudgaming,driver>=550,driver<551 brand=unknown,driver>=565,driver<566 brand=grid,driver>=565,driver<566 brand=tesla,driver>=565,driver<566 brand=nvidia,driver>=565,driver<566 brand=quadro,driver>=565,driver<566 brand=quadrortx,driver>=565,driver<566 brand=nvidiartx,driver>=565,driver<566 brand=vapps,driver>=565,driver<566 brand=vpc,driver>=565,driver<566 brand=vcs,driver>=565,driver<566 brand=vws,driver>=565,driver<566 brand=cloudgaming,driver>=565,driver<566 brand=unknown,driver>=570,driver<571 brand=grid,driver>=570,driver<571 brand=tesla,driver>=570,driver<571 brand=nvidia,driver>=570,driver<571 brand=quadro,driver>=570,driver<571 brand=quadrortx,driver>=570,driver<571 brand=nvidiartx,driver>=570,driver<571 brand=vapps,driver>=570,driver<571 brand=vpc,driver>=570,driver<571 brand=vcs,driver>=570,driver<571 brand=vws,driver>=570,driver<571 brand=cloudgaming,driver>=570,driver<571 brand=unknown,driver>=575,driver<576 brand=grid,driver>=575,driver<576 brand=tesla,driver>=575,driver<576 brand=nvidia,driver>=575,driver<576 brand=quadro,driver>=575,driver<576 brand=quadrortx,driver>=575,driver<576 brand=nvidiartx,driver>=575,driver<576 brand=vapps,driver>=575,driver<576 brand=vpc,driver>=575,driver<576 brand=vcs,driver>=575,driver<576 brand=vws,driver>=575,driver<576 brand=cloudgaming,driver>=575,driver<576",
+                "NV_CUDA_CUDART_VERSION=13.0.96-1",
+                "CUDA_VERSION=13.0.2",
+                "LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64",
+                "NVIDIA_VISIBLE_DEVICES=all",
+                "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
+                "DEBIAN_FRONTEND=noninteractive",
+                "CUDA_HOME=/usr/local/cuda",
+                "UV_HTTP_TIMEOUT=500",
+                "UV_INDEX_STRATEGY=unsafe-best-match",
+                "UV_LINK_MODE=copy",
+                "UV_PYTHON_INSTALL_DIR=/opt/uv/python",
+                "UV_CACHE_DIR=/opt/uv/cache",
+                "UV_OVERRIDE=/etc/uv-overrides.txt",
+                "VLLM_ENABLE_CUDA_COMPATIBILITY=0",
+                "TORCH_CUDA_ARCH_LIST=8.0 8.7 8.9 9.0 10.0 11.0 12.0",
+                "VLLM_USAGE_SOURCE=production-docker-image",
+                "VLLM_BUILD_COMMIT=af1c01499b289be555c475669ba50a88e96d846e",
+                "VLLM_BUILD_PIPELINE=019d130e-464e-4ff7-b84b-492992c0c06b",
+                "VLLM_BUILD_URL=https://buildkite.com/vllm/release-v2/builds/6692",
+                "VLLM_IMAGE_TAG=vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e"
+            ],
+            "Cmd": [
+                "/models",
+                "--served-model-name",
+                "deepseek-v4.1-flash",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--tokenizer-mode",
+                "deepseek_v41",
+                "--dtype",
+                "bfloat16",
+                "--tensor-parallel-size",
+                "3",
+                "--load-format",
+                "b12x",
+                "--safetensors-load-strategy",
+                "lazy",
+                "--model-loader-extra-config",
+                "{\"io_threads\":8}",
+                "--block-size",
+                "256",
+                "--enable-prefix-caching",
+                "--enable-chunked-prefill",
+                "--max-model-len",
+                "160000",
+                "--max-num-seqs",
+                "8",
+                "--max-parallel-prefills",
+                "1",
+                "--gpu-memory-utilization",
+                "0.91",
+                "--max-num-batched-tokens",
+                "8192",
+                "--kv-cache-memory-bytes",
+                "2147483648",
+                "--max-cudagraph-capture-size",
+                "24",
+                "--generation-config",
+                "vllm",
+                "--language-model-only",
+                "--engram-config",
+                "{\"cpu_offload\":false,\"table_memory\":\"disk\"}",
+                "--attention-backend",
+                "B12X",
+                "--linear-backend",
+                "b12x",
+                "--moe-backend",
+                "b12x",
+                "--speculative-config",
+                "{\"method\":\"dspark\",\"num_speculative_tokens\":3,\"draft_tensor_parallel_size\":1,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":true}",
+                "--jit-monitor-mode",
+                "warn",
+                "--compilation-config",
+                "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24]}",
+                "--prefix-cache-retention-interval",
+                "512",
+                "--long-prefill-token-threshold",
+                "4096",
+                "--no-async-scheduling",
+                "--reasoning-parser",
+                "deepseek_v41",
+                "--tool-call-parser",
+                "deepseek_v41",
+                "--enable-auto-tool-choice",
+                "--default-chat-template-kwargs",
+                "{\"thinking\":true}",
+                "--distributed-executor-backend",
+                "mp",
+                "--nnodes",
+                "3",
+                "--node-rank",
+                "1",
+                "--master-addr",
+                "10.0.1.71",
+                "--master-port",
+                "29570",
+                "--headless"
+            ],
+            "Image": "vllm-dsv41:r37-b12x-e4m3fix1-arm64-sm121",
+            "Volumes": null,
+            "WorkingDir": "/opt/ds41-r37/b12x",
+            "Entrypoint": [
+                "/usr/bin/python3",
+                "-m",
+                "vllm.entrypoints.cli.main",
+                "serve"
+            ],
+            "Labels": {
+                "ai.flashinfer.source": "https://github.com/flashinfer-ai/flashinfer/commit/07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
+                "ai.vllm.build.commit": "af1c01499b289be555c475669ba50a88e96d846e",
+                "ai.vllm.build.pipeline": "019d130e-464e-4ff7-b84b-492992c0c06b",
+                "ai.vllm.build.url": "https://buildkite.com/vllm/release-v2/builds/6692",
+                "ai.vllm.image.tag": "vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e",
+                "local.commander.b12x.commit": "f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+                "local.commander.base": "vllm-dsv41:upstream-af1c01499-engram-disk-b12x",
+                "local.commander.vllm.commit": "c687594b8a8082e18af9fe2f64eb5f9ee442e251",
+                "local.r37.b12x.base": "f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+                "local.r37.b12x.mhc-3072": "compact-ds41-prefill-policy",
+                "local.r37.b12x.mhc-3072.base": "f1c4e9dd+3ab21b3-mla-only",
+                "local.r37.b12x.prefill-index-bounds": "3ab21b3-mla-only",
+                "local.r37.rocenante.topology": "peer-routed-v1",
+                "maintainer": "NVIDIA CORPORATION <cudatools@nvidia.com>",
+                "org.opencontainers.image.b12x-base": "f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+                "org.opencontainers.image.b12x-upstream-patches": "02407f653609e2c4c49db2efb5f77835d2e04e32",
+                "org.opencontainers.image.base.digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+                "org.opencontainers.image.description": "DSv4.1 TP3 baseline with merged B12X E4M3 subnormal-scale correctness fix",
+                "org.opencontainers.image.ref.name": "ubuntu",
+                "org.opencontainers.image.revision": "c687594b8a8082e18af9fe2f64eb5f9ee442e251+b12x-f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
+                "org.opencontainers.image.source": "https://github.com/vllm-project/vllm",
+                "org.opencontainers.image.title": "DeepSeek V4.1 R37 source overlay for DGX Spark",
+                "org.opencontainers.image.url": "https://buildkite.com/vllm/release-v2/builds/6692",
+                "org.opencontainers.image.version": "vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e"
+            }
+        },
+        "NetworkSettings": {
+            "SandboxID": "",
+            "SandboxKey": "",
+            "Ports": {},
+            "Networks": {
+                "host": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "0661ff7ba7777e14968287615eceb263681b0c181d379558d9ba96cef0a0e6b9",
+                    "EndpointID": "",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "MacAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": null
+                }
+            }
+        }
+    }
+]
+
+[docker logs]
+2026-09-23T14:58:02.928565959Z /opt/ds41-r37/vllm/vllm/__init__.py:7: RuntimeWarning: Failed to read commit hash:
+2026-09-23T14:58:02.928609495Z No module named 'vllm._version'
+2026-09-23T14:58:02.928612647Z   from .version import __version__, __version_tuple__  # isort:skip
+2026-09-23T14:58:11.641812007Z INFO 09-23 14:58:11 [__init__.py:109] Registered model loader `<class 'b12x.integration.vllm.loader.B12xModelLoader'>` with load format `b12x`
+2026-09-23T14:58:11.667574765Z WARNING 09-23 14:58:11 [envs.py:2361] Unknown vLLM environment variable detected: VLLM_CACHE_DIR
+2026-09-23T14:58:11.677231157Z INFO 09-23 14:58:11 [config.py:788] Detected quantization_config.scale_fmt=ue8m0; enabling UE8M0 for DeepGEMM.
+2026-09-23T14:58:11.680657544Z INFO 09-23 14:58:11 [model.py:686] Resolved architecture: DeepseekV41ForCausalLM
+2026-09-23T14:58:11.680816952Z INFO 09-23 14:58:11 [model.py:2029] Using max model len 160000
+2026-09-23T14:58:12.520449150Z INFO 09-23 14:58:12 [registry.py:141] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+2026-09-23T14:58:12.521305455Z INFO 09-23 14:58:12 [model.py:894] Disabled mm_prefix attention mode because multimodal inputs are configuration-disabled. Attention backends without mm_prefix support may now be selected.
+2026-09-23T14:58:12.879749582Z INFO 09-23 14:58:12 [arg_utils.py:2343] Inferred data_parallel_rank 0 from node_rank 1
+2026-09-23T14:58:12.881700880Z INFO 09-23 14:58:12 [model.py:686] Resolved architecture: DeepseekV41ForCausalLM
+2026-09-23T14:58:12.881724336Z INFO 09-23 14:58:12 [model.py:2029] Using max model len 1048576
+2026-09-23T14:58:13.429013967Z INFO 09-23 14:58:13 [speculative.py:1641] Overriding draft model max model len from 1048576 to 160000
+2026-09-23T14:58:13.429049951Z INFO 09-23 14:58:13 [scheduler.py:339] Chunked prefill is enabled with max_num_batched_tokens=8192.
+2026-09-23T14:58:13.429952863Z INFO 09-23 14:58:13 [kernel.py:372] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+2026-09-23T14:58:13.493496437Z INFO 09-23 14:58:13 [compilation.py:329] Enabled custom fusions: norm_quant, act_quant
+2026-09-23T14:58:13.493517685Z INFO 09-23 14:58:13 [serve.py:242] Launching vLLM (vdev) headless multiproc executor, with head node address 10.0.1.71:29570 for torch.distributed process group.
+2026-09-23T14:58:13.523229982Z /opt/ds41-r37/vllm/vllm/__init__.py:7: RuntimeWarning: Failed to read commit hash:
+2026-09-23T14:58:13.523244958Z No module named 'vllm._version'
+2026-09-23T14:58:13.523246206Z   from .version import __version__, __version_tuple__  # isort:skip
+2026-09-23T14:58:18.302772842Z INFO 09-23 14:58:18 [__init__.py:109] Registered model loader `<class 'b12x.integration.vllm.loader.B12xModelLoader'>` with load format `b12x`
+2026-09-23T14:58:19.437395674Z INFO 09-23 14:58:19 [registry.py:141] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+2026-09-23T14:58:19.462558752Z (Worker pid=119) INFO 09-23 14:58:19 [parallel_state.py:1647] world_size=3 rank=1 local_rank=0 distributed_init_method=tcp://10.0.1.71:29570 backend=nccl
+2026-09-23T14:58:36.165119695Z (Worker pid=119) WARNING 09-23 14:58:36 [symm_mem.py:67] SymmMemCommunicator: Device capability 12.1 not supported, communicator is not available.
+2026-09-23T14:58:36.508404082Z (Worker pid=119) INFO 09-23 14:58:36 [parallel_state.py:1991] rank 1 in world size 3 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 1, EP rank 1, EPLB rank N/A
+2026-09-23T14:58:36.508427778Z (Worker pid=119) INFO 09-23 14:58:36 [gpu_worker.py:421] Using V2 Model Runner
+2026-09-23T14:58:36.952400411Z (Worker_TP1 pid=119) INFO 09-23 14:58:36 [model_runner.py:390] Loading model from scratch...
+2026-09-23T14:58:36.969116905Z (Worker_TP1 pid=119) /opt/ds41-r37/b12x/b12x/loader/_pool.py:76: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+2026-09-23T14:58:36.969134921Z (Worker_TP1 pid=119)   torch.cuda.memory._set_allocator_settings("expandable_segments:False")
+2026-09-23T14:58:39.291097453Z (Worker_TP1 pid=119) INFO 09-23 14:58:39 [mxfp4.py:438] Using 'B12X_MXFP4_MXFP8' Mxfp4 MoE backend.
+2026-09-23T14:58:56.055655038Z (Worker_TP1 pid=119) INFO 09-23 14:58:56 [__init__.py:869] Using B12xMxfp8LinearKernel for MXFP8 GEMM
+2026-09-23T14:58:56.056084831Z (Worker_TP1 pid=119) INFO 09-23 14:58:56 [vocab_parallel_embedding.py:392] Quantizing LM head shards to MXFP8 with BF16 activations.
+2026-09-23T14:58:56.108258299Z (Worker_TP1 pid=119) WARNING 09-23 14:58:56 [compilation.py:1348] Op 'quant_fp8' not present in model, enabling with '+quant_fp8' has no effect
+2026-09-23T14:58:56.108273947Z (Worker_TP1 pid=119) WARNING 09-23 14:58:56 [vllm.py:2921] `torch.compile` is turned on, but the model /models does not support it. Please open an issue on GitHub if you want it to be supported.
+2026-09-23T14:58:56.170288400Z (Worker_TP1 pid=119) INFO 09-23 14:58:56 [loader.py:189] b12x O_DIRECT input: 48 safetensors shards
+2026-09-23T14:59:40.302602587Z (Worker_TP1 pid=119) INFO 09-23 14:59:40 [default_loader.py:493] Loading weights took 44.13 seconds
+2026-09-23T14:59:43.567892571Z (Worker_TP1 pid=119) INFO 09-23 14:59:43 [mxfp4.py:1901] Using MoEPrepareAndFinalizeNoDPEPModular
+2026-09-23T14:59:43.567915259Z (Worker_TP1 pid=119) INFO 09-23 14:59:43 [mxfp4.py:1902] Using B12xExperts
+2026-09-23T14:59:53.673948972Z (Worker_TP1 pid=119) /opt/ds41-r37/b12x/b12x/loader/_pool.py:84: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+2026-09-23T14:59:53.673986748Z (Worker_TP1 pid=119)   torch.cuda.memory._set_allocator_settings("expandable_segments:True")
+2026-09-23T14:59:53.681358306Z (Worker_TP1 pid=119) INFO 09-23 14:59:53 [loader.py:99] b12x O_DIRECT I/O counters: {'physical_bytes': 168113252864, 'destination_bytes': 67327881216, 'realigned_bytes': 897208384, 'inplace_aligned_bytes': 67327881216, 'reads': 790081, 'scratch_bytes': 75497472, 'strided_copy_bytes': 32243865600, 'batches': 2, 'descriptors': 93894, 'execution_seconds': 39.455647477999996, 'payload_bytes': 100458269888, 'metadata_bytes': 0, 'loaded_tensors': 93894, 'transform_bytes': 0, 'inplace_transform_bytes': 4096, 'transform_scratch_bytes': 0, 'metadata_host_copy_bytes': 0, 'torch_copy_bytes': 0}
+2026-09-23T14:59:53.681387122Z (Worker_TP1 pid=119) INFO 09-23 14:59:53 [loader.py:100] b12x allocation audit: no shared non-persistent runtime buffers
+2026-09-23T14:59:53.681404066Z (Worker_TP1 pid=119) INFO 09-23 14:59:53 [loader.py:101] b12x final parameters: 3.499 / 3.499 GiB in managed shared storage; pool backing 93.301 GiB
+2026-09-23T14:59:53.681406435Z (Worker_TP1 pid=119) INFO 09-23 14:59:53 [eagle3_utils.py:28] Using Eagle3 auxiliary layers from config: (37, 38, 39)
+2026-09-23T14:59:53.751054798Z (Worker_TP1 pid=119) INFO 09-23 14:59:53 [kernel.py:372] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+2026-09-23T14:59:53.798711287Z (Worker_TP1 pid=119) /opt/ds41-r37/b12x/b12x/loader/_pool.py:76: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+2026-09-23T14:59:53.798733975Z (Worker_TP1 pid=119)   torch.cuda.memory._set_allocator_settings("expandable_segments:False")
+2026-09-23T14:59:54.305349914Z (Worker_TP1 pid=119) WARNING 09-23 14:59:54 [vllm.py:2921] `torch.compile` is turned on, but the model /models does not support it. Please open an issue on GitHub if you want it to be supported.
+2026-09-23T14:59:54.378063945Z (Worker_TP1 pid=119) INFO 09-23 14:59:54 [weight_utils.py:667] Safetensors index filter selected 3/48 checkpoint shards.
+2026-09-23T14:59:54.379738922Z (Worker_TP1 pid=119) INFO 09-23 14:59:54 [loader.py:189] b12x O_DIRECT input: 3 safetensors shards
+2026-09-23T14:59:55.403542154Z (Worker_TP1 pid=119) INFO 09-23 14:59:55 [dspark.py:641] DSpark draft model loaded: 97 params
+2026-09-23T14:59:55.403565114Z (Worker_TP1 pid=119) INFO 09-23 14:59:55 [default_loader.py:493] Loading weights took 1.02 seconds
+2026-09-23T14:59:57.671422486Z (Worker_TP1 pid=119) INFO 09-23 14:59:57 [loader.py:99] b12x O_DIRECT I/O counters: {'physical_bytes': 4683845632, 'destination_bytes': 1960755200, 'realigned_bytes': 54177648, 'inplace_aligned_bytes': 1960755200, 'reads': 51591, 'scratch_bytes': 75497472, 'strided_copy_bytes': 813968640, 'batches': 2, 'descriptors': 2437, 'execution_seconds': 2.2858153229999996, 'payload_bytes': 2828646312, 'metadata_bytes': 0, 'loaded_tensors': 2437, 'transform_bytes': 0, 'inplace_transform_bytes': 10752, 'transform_scratch_bytes': 0, 'metadata_host_copy_bytes': 0, 'torch_copy_bytes': 0}
+2026-09-23T14:59:57.671443814Z (Worker_TP1 pid=119) INFO 09-23 14:59:57 [loader.py:100] b12x allocation audit: no shared non-persistent runtime buffers
+2026-09-23T14:59:57.671445478Z (Worker_TP1 pid=119) INFO 09-23 14:59:57 [loader.py:101] b12x final parameters: 0.332 / 0.332 GiB in managed shared storage; pool backing 95.902 GiB
+2026-09-23T14:59:58.158091704Z (Worker_TP1 pid=119) INFO 09-23 14:59:58 [model_runner.py:412] Model loading took 97.4 GiB memory and 81.396077 seconds
+2026-09-23T15:00:54.544683715Z WARNING 09-23 15:00:54 [torch_utils.py:266] OMP_NUM_THREADS=8 is set; leaving Torch threads at 8 for serving. Multi-threaded torch CPU ops during serving can degrade performance through spin-wait contention and cgroup CPU-quota throttling.
+2026-09-23T15:00:59.170962904Z (Worker_TP1 pid=119) INFO 09-23 15:00:59 [gpu_worker.py:536] Initial free memory 113.04 GiB, reserved 2.0 GiB memory for KV Cache as specified by kv_cache_memory_bytes config and skipped memory profiling. This does not respect the gpu_memory_utilization config. Only use kv_cache_memory_bytes config when you want manual control of KV cache memory size. If OOM'ed, check the difference of initial free memory between the current run and the previous run where kv_cache_memory_bytes is suggested and update it correspondingly.
+2026-09-23T15:00:59.376015802Z (Worker_TP1 pid=119) INFO 09-23 15:00:59 [kernel_warmup.py:124] JIT kernel warmup starting.
+2026-09-23T15:00:59.376033114Z (Worker_TP1 pid=119) INFO 09-23 15:00:59 [kernel_warmup.py:134] JIT kernel warmup finished in 0.00s.
+2026-09-23T15:01:00.868087878Z (Worker_TP1 pid=119) INFO 09-23 15:01:00 [b12x_warmup.py:98] Warmed up 1 b12x MoE kernel signature(s).
+2026-09-23T15:01:00.868116374Z (Worker_TP1 pid=119) INFO 09-23 15:01:00 [b12x_warmup.py:98] Warmed up 1 b12x MXFP8 kernel signature(s).
+2026-09-23T15:01:01.014858709Z (Worker_TP1 pid=119) 2026-09-23 15:01:01,014 - INFO - autotuner.py:3475 - flashinfer.jit: [Autotuner]: Loaded 0 configs from /cache/jit/vllm/flashinfer_autotune_cache/0.7.0rc1/121a/9b1e97352552344519e6a1e091678d344487aac49f0ba64ecc5706a2aeedcd07/autotune_configs.json
+2026-09-23T15:01:01.014873798Z (Worker_TP1 pid=119) 2026-09-23 15:01:01,014 - INFO - autotuner.py:999 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+2026-09-23T15:01:02.831056635Z (Worker_TP1 pid=119) 2026-09-23 15:01:02,830 - INFO - autotuner.py:1022 - flashinfer.jit: [Autotuner]: Autotuning process ends
+2026-09-23T15:01:17.152597135Z (Worker_TP1 pid=119) INFO 09-23 15:01:17 [speculator.py:141] Capturing model for DSpark speculator...
+2026-09-23T15:01:49.642902730Z (Worker_TP1 pid=119) INFO 09-23 15:01:49 [model_runner.py:1081] Graph capturing finished in 47 secs, took 2.62 GiB
+2026-09-23T15:01:50.041332725Z (Worker_TP1 pid=119) 2026-09-23 15:01:50,041 - INFO - core.py:447 - flashinfer.jit: Building JIT module sampling; this can take several minutes on first use.
+2026-09-23T15:01:52.820233115Z (Worker_TP1 pid=119) INFO 09-23 15:01:52 [multiproc_executor.py:836] Parent process exited, terminating worker queues

@@ -1,0 +1,1032 @@
+node: dgx2
+container: dsv41-kkt-b8192-nofia
+inspect_returncode: 0
+
+[docker inspect]
+[
+    {
+        "Id": "acd974d4fef559d7c78d12f4c82a3daebc442009a4b5ca270d20ce1a090f995d",
+        "Created": "2026-09-24T04:41:17.80879427Z",
+        "Path": "vllm",
+        "Args": [
+            "serve",
+            "/models",
+            "--served-model-name",
+            "deepseek-v4.1-flash",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+            "--tokenizer-mode",
+            "deepseek_v41",
+            "--dtype",
+            "bfloat16",
+            "--tensor-parallel-size",
+            "3",
+            "--load-format",
+            "b12x",
+            "--block-size",
+            "256",
+            "--enable-prefix-caching",
+            "--enable-chunked-prefill",
+            "--max-model-len",
+            "160000",
+            "--max-num-seqs",
+            "8",
+            "--max-parallel-prefills",
+            "1",
+            "--gpu-memory-utilization",
+            "0.82",
+            "--max-num-batched-tokens",
+            "8192",
+            "--kv-cache-memory-bytes",
+            "2147483648",
+            "--max-cudagraph-capture-size",
+            "32",
+            "--generation-config",
+            "vllm",
+            "--language-model-only",
+            "--engram-config",
+            "{\"table_memory\":\"disk\",\"disk_resident_scales\":false}",
+            "--attention-backend",
+            "B12X",
+            "--linear-backend",
+            "b12x",
+            "--moe-backend",
+            "b12x",
+            "--speculative-config",
+            "{\"method\":\"dspark\",\"num_speculative_tokens\":3,\"draft_tensor_parallel_size\":3,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":2.0}",
+            "--jit-monitor-mode",
+            "warn",
+            "--compilation-config",
+            "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24,28,32]}",
+            "--prefix-cache-retention-interval",
+            "512",
+            "--long-prefill-token-threshold",
+            "8192",
+            "--async-scheduling",
+            "--reasoning-parser",
+            "deepseek_v41",
+            "--tool-call-parser",
+            "deepseek_v41",
+            "--enable-auto-tool-choice",
+            "--default-chat-template-kwargs",
+            "{\"thinking\":true}",
+            "--distributed-executor-backend",
+            "mp",
+            "--nnodes",
+            "3",
+            "--no-scheduler-reserve-full-isl",
+            "--node-rank",
+            "1",
+            "--master-addr",
+            "10.0.1.71",
+            "--master-port",
+            "29568",
+            "--headless"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 435220,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-09-24T04:41:17.892189264Z",
+            "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "Image": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+        "ResolvConfPath": "/var/lib/docker/containers/acd974d4fef559d7c78d12f4c82a3daebc442009a4b5ca270d20ce1a090f995d/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/acd974d4fef559d7c78d12f4c82a3daebc442009a4b5ca270d20ce1a090f995d/hostname",
+        "HostsPath": "/var/lib/docker/containers/acd974d4fef559d7c78d12f4c82a3daebc442009a4b5ca270d20ce1a090f995d/hosts",
+        "LogPath": "/var/lib/docker/containers/acd974d4fef559d7c78d12f4c82a3daebc442009a4b5ca270d20ce1a090f995d/acd974d4fef559d7c78d12f4c82a3daebc442009a4b5ca270d20ce1a090f995d-json.log",
+        "Name": "/dsv41-kkt-b8192-nofia",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "docker-default",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/blobs:/blobs:ro",
+                "/home/swank/projects/spark3-vllm-ds41f/cache:/cache:rw",
+                "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277:/models:ro"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "host",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": [
+                "CAP_IPC_LOCK"
+            ],
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "host",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": [
+                "seccomp=unconfined",
+                "label=disable"
+            ],
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 17179869184,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 120259084288,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [
+                {
+                    "PathOnHost": "/dev/infiniband",
+                    "PathInContainer": "/dev/infiniband",
+                    "CgroupPermissions": "rwm"
+                }
+            ],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": [
+                {
+                    "Driver": "",
+                    "Count": -1,
+                    "DeviceIDs": null,
+                    "Capabilities": [
+                        [
+                            "gpu"
+                        ]
+                    ],
+                    "Options": {}
+                }
+            ],
+            "MemoryReservation": 0,
+            "MemorySwap": 120259084288,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": [
+                {
+                    "Name": "memlock",
+                    "Hard": -1,
+                    "Soft": -1
+                },
+                {
+                    "Name": "stack",
+                    "Hard": 67108864,
+                    "Soft": 67108864
+                }
+            ],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "acd974d4fef559d7c78d12f4c82a3daebc442009a4b5ca270d20ce1a090f995d",
+                "LowerDir": "/var/lib/docker/overlay2/db91471fe1492d095b039c914432bd0eea6710a806e8958f3339d3e4167b2591-init/diff:/var/lib/docker/overlay2/21181bb41874af4008cd1cacfceb256b3a105753b451c1c44235d5f65c8e5dd6/diff:/var/lib/docker/overlay2/69d4efb25c7bd5353b7a594e03000340473c892aed3edd731e73e6bd0f8fbf36/diff:/var/lib/docker/overlay2/cdbf27eef00606df7f51341cfcf9d891944fc506c70aed697882cc2f81854cb2/diff:/var/lib/docker/overlay2/178ee2580e456765b33e3b4a5a3bd09e9fcf91637bb107d61ce7ca0b684392f2/diff:/var/lib/docker/overlay2/8fcb584975876e7221ec7f84005830a8d69fef8816178250eaedd26a00c4bc9b/diff:/var/lib/docker/overlay2/7bd8420e56ab1fbdce8bc4fb01ad3485619d9f88461e60883226e2b266e7ec18/diff:/var/lib/docker/overlay2/8503d5b80208b090b5656fd6b67bb797d5a4a86d0156f909b7b4626fd26f42c5/diff:/var/lib/docker/overlay2/55242712f9c7ddd8ffcf37f055690cd8eb6ded41b9b29820053c43205047ece0/diff:/var/lib/docker/overlay2/1518d413b00324f11839777898f65514155c147d9565dc7b008882435d9bcb76/diff:/var/lib/docker/overlay2/7688227d71bf81c7445f7fbd3a9c1c3fbb87b01d9c077ec5b3f9df1dbb24792a/diff:/var/lib/docker/overlay2/bacb3202f186f90d1469f525ebc793781f2493a8dab553eeca72c19f562a2875/diff:/var/lib/docker/overlay2/ce5a437464a6a7a968f44ccc15df1e79d070dbe01623131c6ded2f3d2410d052/diff:/var/lib/docker/overlay2/9a094b44399673afb8ed5e4f1b852038a5ae4f628ca9db4f8682db95043956f8/diff:/var/lib/docker/overlay2/cecb2073a5c0e7af773317b25c28a354465661685e4867db103c10f7a947c5cf/diff:/var/lib/docker/overlay2/e027eece42d9ac0a282440e9c94c5991c7900a8c3b1b3d2db537321bb48fe61b/diff:/var/lib/docker/overlay2/90cc7a00e43b7f571b5b9d723f83f6430be2d70eab47142d56554539fd5dc39a/diff:/var/lib/docker/overlay2/814ada47b574e3b96e29a40bf904d2bdac12fa1bcd2ed45f151ee4fe516de465/diff:/var/lib/docker/overlay2/42e864421bee6c3bdf4369d0f7d651e358a07f9c04f53d4dfc488bd47a33d758/diff:/var/lib/docker/overlay2/cf1edb9601c7fa8ac8189b88665850d72d52fac39118bf6a5460977c03869554/diff:/var/lib/docker/overlay2/3b804614105da6880a26e2a71d604a526ee067edf36fbfa20071b2e455ba9a08/diff:/var/lib/docker/overlay2/0654dcbe6c7685ef2c874c168eac7f8c779be8151a7e18e7b89fa76b936510b4/diff:/var/lib/docker/overlay2/67120744fd07f267442197ab1cf2d5977cd1446d66137c81f79d5c440d01031c/diff:/var/lib/docker/overlay2/fe7a5969e16130c3fa95a52c44be904be20cd3e4e274b3b69b23a3ac9399ec98/diff:/var/lib/docker/overlay2/27305457b6ab020561ca9fc156f8cab39c77f0565232b16a93457668c96a8cb8/diff:/var/lib/docker/overlay2/7f3ec13ea9f7c9e0b249e8478940242a5303f78afdc8db7cf24c74c937476530/diff:/var/lib/docker/overlay2/1793386df64d8c79b24c6d585c3fc48f50b0481aab438b60983293d605239abd/diff:/var/lib/docker/overlay2/f6c339458e23147c75bd8e9300a83b1e05e5e0965ad252886e60279991d9f05b/diff:/var/lib/docker/overlay2/3abd86cea53e02eaec6f0fbb327036c23f6db9c80046c5acd0fe5d2c1b0ea9fa/diff:/var/lib/docker/overlay2/638a0524c822c8320a6b9890a2d5ebdafc92632bbe880be4891b93a980403fd0/diff:/var/lib/docker/overlay2/feadab94abefeb8bc411cd99feb5498750c957d4a001734a1b1a46ce591f5662/diff:/var/lib/docker/overlay2/32881a58fae867dca7d074a3c6d489b48aaff1d11d5c5cb77d06d056ee646eae/diff:/var/lib/docker/overlay2/f84fe34b59eee8d36c278749e04305264bdfe333daca61b7f634bdcee416177b/diff:/var/lib/docker/overlay2/34c95377fb8d63fa4de23a5866f99c92a5c9b6d3423161598e895241fc572f6e/diff:/var/lib/docker/overlay2/a197eeb2aed5be02318b203747417f0025248f1842b2dcdb72156e5713884065/diff:/var/lib/docker/overlay2/db2694537c51c8597be036669a5355a375c91e31dfa49d0167f891164b137858/diff:/var/lib/docker/overlay2/d90bb120f1daeafdcfdcde1b96503c69474b565dff4fba2047ad1253f84e5798/diff:/var/lib/docker/overlay2/38988e3521b5e28b4f90f9d41b6b7f796b76863a256bc06b3819b0f75e7f6564/diff:/var/lib/docker/overlay2/419ac8ec11c515a5f08ff94b649f350efba4923a49dc6d6e4636fe06d62bdc25/diff:/var/lib/docker/overlay2/1ed9828bf4308e7c3f2adae7044f7a01eda0fba38d3707bfddb42746f6ee4c96/diff:/var/lib/docker/overlay2/082bbbf8130e226232da65f7596b29e4f62168801c6c7713b5d119def6eb99ba/diff:/var/lib/docker/overlay2/9b0b842499c546a09cbba1e678ffcedbb6d02f4988ae12d9dbe76d4a5a8b6d05/diff:/var/lib/docker/overlay2/ed22854803cf89f76dafd723bf5b84cf3dcfa48930f6c9f9a0bd64444224f9e9/diff:/var/lib/docker/overlay2/eaaa39ac73f4468cfc81647d380c1567e7241356cd93d0bbf55dc0ba8485765e/diff:/var/lib/docker/overlay2/710f38d206907878bbd2781471e9a5c521e82970ff77ff3a10f1c53054f54a76/diff:/var/lib/docker/overlay2/13a88b024ed5bbc5643e383046714cff83a89105d96624649a271493ec5a8ae8/diff:/var/lib/docker/overlay2/4956542dbf4e36392e5e99b1900f2fe75c0b2a8b26315bb15cfce56e6fac449e/diff:/var/lib/docker/overlay2/301a825067ecba8c53209cf67660dbe797da48a8145c55d5dbbc98aec778b5a1/diff:/var/lib/docker/overlay2/30fbe674481b979252424ed291280606485dcbb725f57417a87da866e4f331c2/diff",
+                "MergedDir": "/var/lib/docker/overlay2/db91471fe1492d095b039c914432bd0eea6710a806e8958f3339d3e4167b2591/merged",
+                "UpperDir": "/var/lib/docker/overlay2/db91471fe1492d095b039c914432bd0eea6710a806e8958f3339d3e4167b2591/diff",
+                "WorkDir": "/var/lib/docker/overlay2/db91471fe1492d095b039c914432bd0eea6710a806e8958f3339d3e4167b2591/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/blobs",
+                "Destination": "/blobs",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/swank/projects/spark3-vllm-ds41f/cache",
+                "Destination": "/cache",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+                "Destination": "/models",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "dgx2",
+            "Domainname": "",
+            "User": "root",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "B12X_BIND_COMPILE_WORKERS=2",
+                "NCCL_IB_ROCE_VERSION_NUM=2",
+                "NCCL_BUFFSIZE=1048576",
+                "NCCL_DEBUG_SUBSYS=INIT",
+                "NCCL_MAX_NCHANNELS=8",
+                "VLLM_CACHE_ROOT=/cache/kkref/jit/vllm",
+                "VLLM_HOST_IP=10.0.1.70",
+                "VLLM_USE_BREAKABLE_CUDAGRAPH=0",
+                "XDG_CACHE_HOME=/cache/kkref/jit",
+                "GLOO_SOCKET_IFNAME=enP7s7",
+                "NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f0,rocep1s0f1,roceP2p1s0f1",
+                "NCCL_PROTO=^LL128",
+                "SAFETENSORS_FAST_GPU=1",
+                "TP_SOCKET_IFNAME=enP7s7",
+                "TRITON_CACHE_DIR=/cache/kkref/jit/triton",
+                "VLLM_CACHE_DIR=/cache/kkref/jit/vllm",
+                "VLLM_ENGINE_READY_TIMEOUT_S=3600",
+                "B12X_CUTE_COMPILE_CACHE_DIR=/cache/kkref/jit/b12x/cute",
+                "B12X_WEIGHTS_COMPILE_WORKERS=4",
+                "MAX_JOBS=2",
+                "NCCL_IB_SUBNET_AWARE_ROUTING=1",
+                "NCCL_NET=IB",
+                "NCCL_NVLS_ENABLE=0",
+                "NCCL_SHM_DISABLE=1",
+                "VLLM_ENABLE_ROCE_ALLREDUCE=1",
+                "B12X_ROCE_SPIN_LIMIT=5000000",
+                "B12X_STATE_COMPILE_WORKERS=2",
+                "CUTE_DSL_ARCH=sm_121a",
+                "NCCL_IGNORE_CPU_AFFINITY=1",
+                "VLLM_MULTI_STREAM_GEMM_TOKEN_THRESHOLD=1024",
+                "B12X_COMPILE_CACHE_DIR=/cache/kkref/jit/b12x/compile",
+                "B12X_ROCE_GID_INDEX=3",
+                "NCCL_IB_GID_INDEX=3",
+                "VLLM_PLUGINS=b12x_loader",
+                "VLLM_ROCE_ALLREDUCE_MAX_SIZE=2MB",
+                "VLLM_USE_FLASHINFER_SAMPLER=1",
+                "CUDA_DEVICE_MAX_CONNECTIONS=32",
+                "CUTE_DSL_CACHE_DIR=/cache/kkref/jit/cute-dsl",
+                "NCCL_NET_PLUGIN=none",
+                "B12X_AUTOTUNE=0",
+                "B12X_ROCE_CACHE_DIR=/cache/kkref/jit/b12x/roce",
+                "HF_HOME=/cache/huggingface",
+                "VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1",
+                "VLLM_USE_MEGA_AOT_ARTIFACT=1",
+                "NCCL_IB_MERGE_NICS=1",
+                "NCCL_SOCKET_IFNAME=enP7s7",
+                "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,garbage_collection_threshold:0.6",
+                "HF_HUB_OFFLINE=1",
+                "NCCL_IB_ADDR_FAMILY=AF_INET",
+                "VLLM_ALLOW_LONG_MAX_MODEL_LEN=1",
+                "VLLM_ENABLE_PCIE_ALLREDUCE=0",
+                "VLLM_USE_STANDALONE_COMPILE=1",
+                "B12X_DENSE_SPLITK_TURBO=1",
+                "FLASHINFER_WORKSPACE_BASE=/cache/kkref/flashinfer",
+                "NCCL_DEBUG=WARN",
+                "TRANSFORMERS_OFFLINE=1",
+                "B12X_W4A8_TINY_DECODE=0",
+                "NCCL_LL128_BUFFSIZE=262144",
+                "TORCHINDUCTOR_CACHE_DIR=/cache/kkref/jit/torchinductor",
+                "NCCL_CROSS_NIC=1",
+                "NCCL_IB_DISABLE=0",
+                "NCCL_P2P_DISABLE=1",
+                "PYTHONPATH=/opt/spark3/candidate/vllm:/opt/spark3/candidate/b12x",
+                "TORCH_NCCL_ASYNC_ERROR_HANDLING=1",
+                "NCCL_CUMEM_ENABLE=0",
+                "VLLM_ROCE_ALLGATHER_MAX_SIZE=4MB",
+                "OMP_NUM_THREADS=8",
+                "VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=900",
+                "VLLM_USE_V2_MODEL_RUNNER=1",
+                "B12X_ROCE_PEER_HCAS={\"0\":[\"rocep1s0f1\",\"roceP2p1s0f1\"],\"2\":[\"rocep1s0f0\",\"roceP2p1s0f0\"]}",
+                "VLLM_USE_AOT_COMPILE=1",
+                "PATH=/usr/local/cuda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "NVARCH=sbsa",
+                "NVIDIA_REQUIRE_CUDA=cuda>=13.0 brand=unknown,driver>=535,driver<536 brand=grid,driver>=535,driver<536 brand=tesla,driver>=535,driver<536 brand=nvidia,driver>=535,driver<536 brand=quadro,driver>=535,driver<536 brand=quadrortx,driver>=535,driver<536 brand=nvidiartx,driver>=535,driver<536 brand=vapps,driver>=535,driver<536 brand=vpc,driver>=535,driver<536 brand=vcs,driver>=535,driver<536 brand=vws,driver>=535,driver<536 brand=cloudgaming,driver>=535,driver<536 brand=unknown,driver>=550,driver<551 brand=grid,driver>=550,driver<551 brand=tesla,driver>=550,driver<551 brand=nvidia,driver>=550,driver<551 brand=quadro,driver>=550,driver<551 brand=quadrortx,driver>=550,driver<551 brand=nvidiartx,driver>=550,driver<551 brand=vapps,driver>=550,driver<551 brand=vpc,driver>=550,driver<551 brand=vcs,driver>=550,driver<551 brand=vws,driver>=550,driver<551 brand=cloudgaming,driver>=550,driver<551 brand=unknown,driver>=565,driver<566 brand=grid,driver>=565,driver<566 brand=tesla,driver>=565,driver<566 brand=nvidia,driver>=565,driver<566 brand=quadro,driver>=565,driver<566 brand=quadrortx,driver>=565,driver<566 brand=nvidiartx,driver>=565,driver<566 brand=vapps,driver>=565,driver<566 brand=vpc,driver>=565,driver<566 brand=vcs,driver>=565,driver<566 brand=vws,driver>=565,driver<566 brand=cloudgaming,driver>=565,driver<566 brand=unknown,driver>=570,driver<571 brand=grid,driver>=570,driver<571 brand=tesla,driver>=570,driver<571 brand=nvidia,driver>=570,driver<571 brand=quadro,driver>=570,driver<571 brand=quadrortx,driver>=570,driver<571 brand=nvidiartx,driver>=570,driver<571 brand=vapps,driver>=570,driver<571 brand=vpc,driver>=570,driver<571 brand=vcs,driver>=570,driver<571 brand=vws,driver>=570,driver<571 brand=cloudgaming,driver>=570,driver<571 brand=unknown,driver>=575,driver<576 brand=grid,driver>=575,driver<576 brand=tesla,driver>=575,driver<576 brand=nvidia,driver>=575,driver<576 brand=quadro,driver>=575,driver<576 brand=quadrortx,driver>=575,driver<576 brand=nvidiartx,driver>=575,driver<576 brand=vapps,driver>=575,driver<576 brand=vpc,driver>=575,driver<576 brand=vcs,driver>=575,driver<576 brand=vws,driver>=575,driver<576 brand=cloudgaming,driver>=575,driver<576",
+                "NV_CUDA_CUDART_VERSION=13.0.96-1",
+                "CUDA_VERSION=13.0.2",
+                "LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64",
+                "NVIDIA_VISIBLE_DEVICES=all",
+                "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
+                "DEBIAN_FRONTEND=noninteractive",
+                "CUDA_HOME=/usr/local/cuda",
+                "UV_HTTP_TIMEOUT=500",
+                "UV_INDEX_STRATEGY=unsafe-best-match",
+                "UV_LINK_MODE=copy",
+                "UV_PYTHON_INSTALL_DIR=/opt/uv/python",
+                "UV_CACHE_DIR=/opt/uv/cache",
+                "UV_OVERRIDE=/etc/uv-overrides.txt",
+                "VLLM_ENABLE_CUDA_COMPATIBILITY=0",
+                "TORCH_CUDA_ARCH_LIST=8.0 8.7 8.9 9.0 10.0 11.0 12.0",
+                "VLLM_USAGE_SOURCE=production-docker-image",
+                "VLLM_BUILD_COMMIT=af1c01499b289be555c475669ba50a88e96d846e",
+                "VLLM_BUILD_PIPELINE=019d130e-464e-4ff7-b84b-492992c0c06b",
+                "VLLM_BUILD_URL=https://buildkite.com/vllm/release-v2/builds/6692",
+                "VLLM_IMAGE_TAG=vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e"
+            ],
+            "Cmd": [
+                "/models",
+                "--served-model-name",
+                "deepseek-v4.1-flash",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--tokenizer-mode",
+                "deepseek_v41",
+                "--dtype",
+                "bfloat16",
+                "--tensor-parallel-size",
+                "3",
+                "--load-format",
+                "b12x",
+                "--block-size",
+                "256",
+                "--enable-prefix-caching",
+                "--enable-chunked-prefill",
+                "--max-model-len",
+                "160000",
+                "--max-num-seqs",
+                "8",
+                "--max-parallel-prefills",
+                "1",
+                "--gpu-memory-utilization",
+                "0.82",
+                "--max-num-batched-tokens",
+                "8192",
+                "--kv-cache-memory-bytes",
+                "2147483648",
+                "--max-cudagraph-capture-size",
+                "32",
+                "--generation-config",
+                "vllm",
+                "--language-model-only",
+                "--engram-config",
+                "{\"table_memory\":\"disk\",\"disk_resident_scales\":false}",
+                "--attention-backend",
+                "B12X",
+                "--linear-backend",
+                "b12x",
+                "--moe-backend",
+                "b12x",
+                "--speculative-config",
+                "{\"method\":\"dspark\",\"num_speculative_tokens\":3,\"draft_tensor_parallel_size\":3,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":2.0}",
+                "--jit-monitor-mode",
+                "warn",
+                "--compilation-config",
+                "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24,28,32]}",
+                "--prefix-cache-retention-interval",
+                "512",
+                "--long-prefill-token-threshold",
+                "8192",
+                "--async-scheduling",
+                "--reasoning-parser",
+                "deepseek_v41",
+                "--tool-call-parser",
+                "deepseek_v41",
+                "--enable-auto-tool-choice",
+                "--default-chat-template-kwargs",
+                "{\"thinking\":true}",
+                "--distributed-executor-backend",
+                "mp",
+                "--nnodes",
+                "3",
+                "--no-scheduler-reserve-full-isl",
+                "--node-rank",
+                "1",
+                "--master-addr",
+                "10.0.1.71",
+                "--master-port",
+                "29568",
+                "--headless"
+            ],
+            "Image": "vllm-ds41f-kkref:01f1b874c774-r1",
+            "Volumes": null,
+            "WorkingDir": "/vllm-workspace",
+            "Entrypoint": [
+                "vllm",
+                "serve"
+            ],
+            "Labels": {
+                "ai.vllm.build.commit": "af1c01499b289be555c475669ba50a88e96d846e",
+                "ai.vllm.build.pipeline": "019d130e-464e-4ff7-b84b-492992c0c06b",
+                "ai.vllm.build.url": "https://buildkite.com/vllm/release-v2/builds/6692",
+                "ai.vllm.image.tag": "vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e",
+                "local.spark3.b12x.patch-head": "3d2439944021c3dc41aa7a597aefc67232e9f563",
+                "local.spark3.b12x.ref": "integration/karmic-kraken-beta",
+                "local.spark3.b12x.revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+                "local.spark3.b12x.tree": "d661de3161ff474a92646974584d6f5eb1958f75",
+                "local.spark3.b12x.upstream": "https://github.com/local-inference-lab/b12x",
+                "local.spark3.vllm.ref": "integration/karmic-kraken-beta",
+                "local.spark3.vllm.revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+                "local.spark3.vllm.tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
+                "local.spark3.vllm.upstream": "https://github.com/local-inference-lab/vllm",
+                "maintainer": "NVIDIA CORPORATION <cudatools@nvidia.com>",
+                "org.opencontainers.image.base.digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+                "org.opencontainers.image.base.name": "docker.io/vllm/vllm-openai",
+                "org.opencontainers.image.ref.name": "ubuntu",
+                "org.opencontainers.image.revision": "9ffea8f365bbd5df3e865f99fc70326c6e72caf0",
+                "org.opencontainers.image.source": "https://github.com/christopherowen/spark3-vllm-ds41f",
+                "org.opencontainers.image.url": "https://buildkite.com/vllm/release-v2/builds/6692",
+                "org.opencontainers.image.version": "vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e"
+            }
+        },
+        "NetworkSettings": {
+            "SandboxID": "834ac6ad2537f281714cfeb737e578d2af84a84870604c5d7fd4697de40a6e34",
+            "SandboxKey": "/var/run/docker/netns/default",
+            "Ports": {},
+            "Networks": {
+                "host": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "0661ff7ba7777e14968287615eceb263681b0c181d379558d9ba96cef0a0e6b9",
+                    "EndpointID": "1d05a67c216ea8f3f0410301a698d623e10cba6de95d44ce6ebf1ad1c5d7b667",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "MacAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": null
+                }
+            }
+        }
+    }
+]
+
+[docker logs]
+2026-09-24T04:41:24.128141373Z INFO 09-24 04:41:24 [__init__.py:112] Registered model loader `<class 'b12x.integration.vllm.loader.B12xModelLoader'>` with load format `b12x`
+2026-09-24T04:41:24.153759670Z WARNING 09-24 04:41:24 [envs.py:2393] Unknown vLLM environment variable detected: VLLM_CACHE_DIR
+2026-09-24T04:41:24.170140710Z INFO 09-24 04:41:24 [config.py:852] Detected quantization_config.scale_fmt=ue8m0; enabling UE8M0 for DeepGEMM.
+2026-09-24T04:41:24.177688429Z INFO 09-24 04:41:24 [model.py:693] Resolved architecture: DeepseekV41ForCausalLM
+2026-09-24T04:41:24.177707229Z INFO 09-24 04:41:24 [model.py:2054] Using max model len 160000
+2026-09-24T04:41:26.569865513Z INFO 09-24 04:41:26 [registry.py:146] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+2026-09-24T04:41:26.569901401Z INFO 09-24 04:41:26 [model.py:901] Disabled mm_prefix attention mode because multimodal inputs are configuration-disabled. Attention backends without mm_prefix support may now be selected.
+2026-09-24T04:41:26.833867434Z INFO 09-24 04:41:26 [arg_utils.py:2423] Inferred data_parallel_rank 0 from node_rank 1
+2026-09-24T04:41:26.835686028Z INFO 09-24 04:41:26 [model.py:693] Resolved architecture: DeepseekV41ForCausalLM
+2026-09-24T04:41:26.835706588Z INFO 09-24 04:41:26 [model.py:2054] Using max model len 1048576
+2026-09-24T04:41:27.317321009Z INFO 09-24 04:41:27 [speculative.py:1807] Overriding draft model max model len from 1048576 to 160000
+2026-09-24T04:41:27.317340017Z WARNING 09-24 04:41:27 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-24T04:41:27.317341633Z INFO 09-24 04:41:27 [scheduler.py:385] Chunked prefill is enabled with max_num_batched_tokens=8192.
+2026-09-24T04:41:27.317871186Z WARNING 09-24 04:41:27 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-24T04:41:27.317888018Z INFO 09-24 04:41:27 [vllm.py:1426] Resolved Engram configuration: EngramConfig(cpu_offload=True, embedding_across_dp=False, dp_shared_memory=False, table_memory='disk', disk_resident_scales=False, projection_tp=False)
+2026-09-24T04:41:27.317889538Z WARNING 09-24 04:41:27 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-24T04:41:27.318171362Z INFO 09-24 04:41:27 [kernel.py:430] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+2026-09-24T04:41:27.467467891Z INFO 09-24 04:41:27 [compilation.py:336] Enabled custom fusions: norm_quant, act_quant
+2026-09-24T04:41:27.467489843Z INFO 09-24 04:41:27 [serve.py:246] Launching vLLM (v0.29.1rc1.dev187+gaf1c01499) headless multiproc executor, with head node address 10.0.1.71:29568 for torch.distributed process group.
+2026-09-24T04:41:32.363677048Z INFO 09-24 04:41:32 [__init__.py:112] Registered model loader `<class 'b12x.integration.vllm.loader.B12xModelLoader'>` with load format `b12x`
+2026-09-24T04:41:33.459922469Z INFO 09-24 04:41:33 [registry.py:146] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+2026-09-24T04:41:33.605557939Z (Worker pid=120) INFO 09-24 04:41:33 [parallel_state.py:1859] world_size=3 rank=1 local_rank=0 distributed_init_method=tcp://10.0.1.71:29568 backend=nccl
+2026-09-24T04:41:47.154858989Z (Worker pid=120) WARNING 09-24 04:41:47 [symm_mem.py:67] SymmMemCommunicator: Device capability 12.1 not supported, communicator is not available.
+2026-09-24T04:41:47.466331117Z (Worker pid=120) INFO 09-24 04:41:47 [parallel_state.py:2299] rank 1 in world size 3 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 1, ETP rank 1, EP rank 1, EPLB rank N/A
+2026-09-24T04:41:47.466352829Z (Worker pid=120) INFO 09-24 04:41:47 [gpu_worker.py:472] Using V2 Model Runner
+2026-09-24T04:41:47.929162128Z (Worker_TP1 pid=120) INFO 09-24 04:41:47 [model_runner.py:412] Loading model from scratch...
+2026-09-24T04:41:49.140000029Z (Worker_TP1 pid=120) INFO 09-24 04:41:49 [mxfp4.py:453] Using 'B12X_MXFP4_MXFP8' Mxfp4 MoE backend.
+2026-09-24T04:41:53.002222868Z (Worker_TP1 pid=120) WARNING 09-24 04:41:53 [compilation.py:1361] Op 'quant_fp8' not present in model, enabling with '+quant_fp8' has no effect
+2026-09-24T04:41:53.002239332Z (Worker_TP1 pid=120) WARNING 09-24 04:41:53 [vllm.py:3584] `torch.compile` is turned on, but the model /models does not support it. Please open an issue on GitHub if you want it to be supported.
+2026-09-24T04:42:15.484202072Z (Worker_TP1 pid=120) INFO 09-24 04:42:15 [default_loader.py:510] Loading weights took 22.39 seconds
+2026-09-24T04:42:15.562418057Z (Worker_TP1 pid=120) INFO 09-24 04:42:15 [mxfp4.py:1997] Using MoEPrepareAndFinalizeNoDPEPModular
+2026-09-24T04:42:15.562436297Z (Worker_TP1 pid=120) INFO 09-24 04:42:15 [mxfp4.py:1998] Using B12xExperts
+2026-09-24T04:42:18.245832234Z (Worker_TP1 pid=120) INFO 09-24 04:42:18 [eagle3_utils.py:27] Using Eagle3 auxiliary layers from config: (37, 38, 39)
+2026-09-24T04:42:18.321248039Z (Worker_TP1 pid=120) WARNING 09-24 04:42:18 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-24T04:42:18.321270087Z (Worker_TP1 pid=120) INFO 09-24 04:42:18 [vllm.py:1426] Resolved Engram configuration: EngramConfig(cpu_offload=True, embedding_across_dp=False, dp_shared_memory=False, table_memory='disk', disk_resident_scales=False, projection_tp=False)
+2026-09-24T04:42:18.321274439Z (Worker_TP1 pid=120) WARNING 09-24 04:42:18 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-24T04:42:18.321560696Z (Worker_TP1 pid=120) INFO 09-24 04:42:18 [kernel.py:430] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+2026-09-24T04:42:18.466127738Z (Worker_TP1 pid=120) WARNING 09-24 04:42:18 [vllm.py:3584] `torch.compile` is turned on, but the model /models does not support it. Please open an issue on GitHub if you want it to be supported.
+2026-09-24T04:42:18.542670696Z (Worker_TP1 pid=120) INFO 09-24 04:42:18 [weight_utils.py:704] Safetensors index filter selected 3/48 checkpoint shards.
+2026-09-24T04:42:18.644028597Z (Worker_TP1 pid=120) INFO 09-24 04:42:18 [dspark.py:709] DSpark draft model loaded: 97 params
+2026-09-24T04:42:19.074353400Z (Worker_TP1 pid=120) INFO 09-24 04:42:19 [default_loader.py:510] Loading weights took 0.53 seconds
+2026-09-24T04:42:19.548972498Z (Worker_TP1 pid=120) INFO 09-24 04:42:19 [model_runner.py:444] Model loading took 97.48 GiB memory and 31.816762 seconds
+2026-09-24T04:42:23.586965172Z WARNING 09-24 04:42:23 [torch_utils.py:275] OMP_NUM_THREADS=8 is set; leaving Torch threads at 8 for serving. Multi-threaded torch CPU ops during serving can degrade performance through spin-wait contention and cgroup CPU-quota throttling.
+2026-09-24T04:42:24.332266426Z (Worker_TP1 pid=120) INFO 09-24 04:42:24 [b12x_prepare.py:570] b12x weights preparation uses 4 compiler workers
+2026-09-24T04:42:39.624804587Z (Worker_TP1 pid=120) INFO 09-24 04:42:39 [gpu_worker.py:638] Initial free memory 113.2 GiB, reserved 2.0 GiB memory for KV Cache as specified by kv_cache_memory_bytes config and skipped memory profiling. This does not respect the gpu_memory_utilization config. Only use kv_cache_memory_bytes config when you want manual control of KV cache memory size. If OOM'ed, check the difference of initial free memory between the current run and the previous run where kv_cache_memory_bytes is suggested and update it correspondingly.
+2026-09-24T04:42:39.654564080Z (Worker_TP1 pid=120) INFO 09-24 04:42:39 [b12x_prepare.py:631] b12x autotuning uses 34 temporary KV blocks before allocating 9425 serving blocks
+2026-09-24T04:42:39.699109254Z (Worker_TP1 pid=120) INFO 09-24 04:42:39 [b12x_prepare.py:570] b12x state preparation uses 2 compiler workers
+2026-09-24T04:42:43.502628551Z (Worker_TP1 pid=120) INFO 09-24 04:42:43 [b12x_prepare.py:570] b12x bind preparation uses 2 compiler workers
+2026-09-24T04:42:46.866713113Z (Worker_TP1 pid=120) INFO 09-24 04:42:46 [kernel_warmup.py:171] JIT kernel warmup starting.
+2026-09-24T04:42:47.274867340Z (Worker_TP1 pid=120) INFO 09-24 04:42:47 [kernel_warmup.py:184] JIT kernel warmup finished in 0.41s.
+2026-09-24T04:42:47.954453467Z (Worker_TP1 pid=120) 2026-09-24 04:42:47,954 - INFO - autotuner.py:2789 - flashinfer.jit: [Autotuner]: Loaded 0 configs from /cache/kkref/jit/vllm/flashinfer_autotune_cache/0.6.18.post1/121a/7eb5b01c3a322ae52ff291d58a6c18caf28f4ec96c37b40a3cceec3107af48f7/autotune_configs.json
+2026-09-24T04:42:47.954473531Z (Worker_TP1 pid=120) 2026-09-24 04:42:47,954 - INFO - autotuner.py:972 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+2026-09-24T04:42:47.955359164Z (Worker_TP1 pid=120) INFO 09-24 04:42:47 [kernel_warmup.py:350] Running FlashInfer autotune with 8192 tokens and token buckets (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096, 8192).
+2026-09-24T04:42:49.599789428Z (Worker_TP1 pid=120) 2026-09-24 04:42:49,599 - INFO - autotuner.py:995 - flashinfer.jit: [Autotuner]: Autotuning process ends
+2026-09-24T04:42:50.800283870Z [rank1]:[W924 04:42:50.897308012 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+2026-09-24T04:42:50.800305230Z Exception raised from recvBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:787 (most recent call first):
+2026-09-24T04:42:50.800306910Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:50.800322046Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:50.800323358Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:50.800324670Z frame #3: <unknown function> + 0x70b84d4 (0xf1b4dba584d4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:50.800326078Z frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x258 (0xf1b4dba5ab38 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:50.800327614Z frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:50.800328638Z frame #6: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:50.800329742Z frame #7: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:50.800330782Z frame #8: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:50.800331902Z 
+2026-09-24T04:42:50.800333518Z [rank1]:[W924 04:42:50.898188333 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+2026-09-24T04:42:51.802251253Z [rank1]:[W924 04:42:51.898825347 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:51.802274101Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:51.802275541Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:51.802276981Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:51.802278309Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:51.802279509Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:51.802294341Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:51.802295445Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:51.802296533Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:51.802297957Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:51.802299045Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:51.802300037Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:51.802301653Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:51.802302645Z 
+2026-09-24T04:42:51.802303653Z [rank1]:[W924 04:42:51.900270228 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:42:52.803912475Z [rank1]:[W924 04:42:52.900507401 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:52.803932443Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:52.803933739Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:52.803935515Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:52.803936731Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:52.803937915Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:52.803939003Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:52.803939995Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:52.803954507Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:52.803956347Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:52.803957355Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:52.803958315Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:52.803960155Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:52.803961243Z 
+2026-09-24T04:42:52.803962235Z [rank1]:[W924 04:42:52.901920219 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:42:53.806012657Z [rank1]:[W924 04:42:53.902058222 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:53.806033841Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:53.806035249Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:53.806036705Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:53.806038001Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:53.806039233Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:53.806040273Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:53.806041441Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:53.806042497Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:53.806053297Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:53.806054337Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:53.806055409Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:53.806056785Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:53.806057889Z 
+2026-09-24T04:42:53.806058817Z [rank1]:[W924 04:42:53.904250481 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:42:54.808902280Z [rank1]:[W924 04:42:54.904748277 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:54.808932552Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:54.808937848Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:54.808940760Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:54.808943128Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:54.808945496Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:54.808947480Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:54.808949432Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:54.808951528Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:54.808954328Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:54.808956344Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:54.808958856Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:54.808975864Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:54.808977976Z 
+2026-09-24T04:42:54.808979528Z [rank1]:[W924 04:42:54.906937352 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:42:55.811459886Z [rank1]:[W924 04:42:55.907430683 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:55.811480318Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:55.811481726Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:55.811483246Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:55.811484494Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:55.811485806Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:55.811486878Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:55.811488030Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:55.811489230Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:55.811490766Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:55.811491822Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:55.811492974Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:55.811494670Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:55.811495822Z 
+2026-09-24T04:42:55.811496798Z [rank1]:[W924 04:42:55.909619742 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:42:56.813934867Z [rank1]:[W924 04:42:56.909865792 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:56.813956867Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:56.813959491Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:56.813962339Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:56.813964755Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:56.813966995Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:56.813968963Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:56.813970867Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:56.813972835Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:56.813975443Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:56.813977187Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:56.813978867Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:56.813981235Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:56.813983155Z 
+2026-09-24T04:42:56.813984707Z [rank1]:[W924 04:42:56.912060547 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:42:57.816478088Z [rank1]:[W924 04:42:57.912309557 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:57.816499561Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:57.816518281Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:57.816519865Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:57.816521145Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:57.816522377Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:57.816523497Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:57.816524489Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:57.816525609Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:57.816527017Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:57.816528121Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:57.816529161Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:57.816530761Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:57.816531801Z 
+2026-09-24T04:42:57.816532809Z [rank1]:[W924 04:42:57.914506680 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:42:58.818627597Z [rank1]:[W924 04:42:58.914649018 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:58.818657901Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:58.818660941Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:58.818664189Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:58.818680125Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:58.818682877Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:58.818684701Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:58.818686445Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:58.818688269Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:58.818690829Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:58.818692589Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:58.818694253Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:58.818697117Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:58.818698893Z 
+2026-09-24T04:42:58.818700349Z [rank1]:[W924 04:42:58.916865933 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:42:59.821146113Z [rank1]:[W924 04:42:59.917096590 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:42:59.821167553Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:42:59.821169057Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:59.821170497Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:59.821171873Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:42:59.821186529Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:59.821187729Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:59.821188817Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:59.821189825Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:42:59.821191345Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:42:59.821192353Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:42:59.821193473Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:59.821195185Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:42:59.821196257Z 
+2026-09-24T04:42:59.821197201Z [rank1]:[W924 04:42:59.919285057 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:43:00.438367456Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057] WorkerProc hit an exception.
+2026-09-24T04:43:00.438432688Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057] Traceback (most recent call last):
+2026-09-24T04:43:00.438436528Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/executor/multiproc_executor.py", line 1049, in _execute_worker_rpc
+2026-09-24T04:43:00.438439728Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     output = func(*args, **kwargs)
+2026-09-24T04:43:00.438443136Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]              ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438446432Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/tracing/otel.py", line 178, in sync_wrapper
+2026-09-24T04:43:00.438449712Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return func(*args, **kwargs)
+2026-09-24T04:43:00.438452672Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438455760Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu_worker.py", line 924, in compile_or_warm_up_model
+2026-09-24T04:43:00.438474128Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._compile_or_warm_up_model_after_preparation()
+2026-09-24T04:43:00.438476288Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438477984Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu_worker.py", line 964, in _compile_or_warm_up_model_after_preparation
+2026-09-24T04:43:00.438479872Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     warmup_kernels(self.model_runner, self.execute_model, self.sample_tokens)
+2026-09-24T04:43:00.438481632Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+2026-09-24T04:43:00.438483456Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return func(*args, **kwargs)
+2026-09-24T04:43:00.438486224Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438487936Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu/warmup.py", line 248, in warmup_kernels
+2026-09-24T04:43:00.438489760Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     _warmup_kernels(model_runner, worker_execute_model, worker_sample_tokens)
+2026-09-24T04:43:00.438491568Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu/warmup.py", line 451, in _warmup_kernels
+2026-09-24T04:43:00.438493328Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     _run_decode_step(step_indices, step_spec_flags)
+2026-09-24T04:43:00.438495008Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu/warmup.py", line 426, in _run_decode_step
+2026-09-24T04:43:00.438496784Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     worker_execute_model(decode_output)
+2026-09-24T04:43:00.438498576Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+2026-09-24T04:43:00.438500320Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return func(*args, **kwargs)
+2026-09-24T04:43:00.438503184Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438505408Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu_worker.py", line 1425, in execute_model
+2026-09-24T04:43:00.438508240Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     output = self.model_runner.execute_model(
+2026-09-24T04:43:00.438509920Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438511552Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+2026-09-24T04:43:00.438516000Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return func(*args, **kwargs)
+2026-09-24T04:43:00.438517648Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438519232Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu/model_runner.py", line 2233, in execute_model
+2026-09-24T04:43:00.438520944Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     model_output = self.model(**model_inputs)
+2026-09-24T04:43:00.438522576Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438524144Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438525968Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438527536Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438529136Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438530848Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438532448Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438534048Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/vl_model.py", line 164, in forward
+2026-09-24T04:43:00.438535760Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self.language_model(
+2026-09-24T04:43:00.438537312Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438539296Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438540992Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438542864Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438544432Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438546208Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438547776Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438551600Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/model.py", line 884, in forward
+2026-09-24T04:43:00.438553440Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     hidden_states = self.model(
+2026-09-24T04:43:00.438555008Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]                     ^^^^^^^^^^^
+2026-09-24T04:43:00.438556592Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438558368Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438559920Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438561600Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438563328Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438564976Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438566544Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/model.py", line 587, in forward
+2026-09-24T04:43:00.438568352Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     hidden_states, residual, post_mix, res_mix, pre_mix = layer(
+2026-09-24T04:43:00.438570272Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]                                                           ^^^^^^
+2026-09-24T04:43:00.438574064Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438575888Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438577488Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438579664Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438582800Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438585264Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438588352Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/model.py", line 268, in forward
+2026-09-24T04:43:00.438598064Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     x = self.attn(positions, x, None, global_kv_ready=global_kv_ready)
+2026-09-24T04:43:00.438601120Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438604080Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438607552Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438609968Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438613056Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438617008Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438618704Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438620288Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/attention.py", line 1305, in forward
+2026-09-24T04:43:00.438621952Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return _attention(hidden_states, positions, self.prefix, global_kv_ready)
+2026-09-24T04:43:00.438623648Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438625328Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py", line 863, in __call__
+2026-09-24T04:43:00.438627057Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._opoverload(*args, **kwargs)
+2026-09-24T04:43:00.438628609Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438630193Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_ops.py", line 875, in __call__
+2026-09-24T04:43:00.438631889Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._op(*args, **kwargs)
+2026-09-24T04:43:00.438633457Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438635041Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py", line 441, in backend_impl
+2026-09-24T04:43:00.438636817Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     result = self._backend_fns[device_type](*args, **kwargs)
+2026-09-24T04:43:00.438638449Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438641841Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_compile.py", line 54, in inner
+2026-09-24T04:43:00.438643713Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return disable_fn(*args, **kwargs)
+2026-09-24T04:43:00.438645297Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438646945Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_dynamo/eval_frame.py", line 1446, in _fn
+2026-09-24T04:43:00.438648673Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return fn(*args, **kwargs)
+2026-09-24T04:43:00.438650257Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438651793Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py", line 502, in wrapped_fn
+2026-09-24T04:43:00.438653553Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return fn(*args, **kwargs)
+2026-09-24T04:43:00.438655089Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438657105Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/attention.py", line 376, in _attention
+2026-09-24T04:43:00.438659761Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return layer._forward(positions, hidden)
+2026-09-24T04:43:00.438661409Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438663681Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/attention.py", line 1370, in _forward
+2026-09-24T04:43:00.438666145Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._o_proj(output, positions, is_prefill=is_prefill)
+2026-09-24T04:43:00.438668785Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438670961Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/attention.py", line 1739, in _o_proj
+2026-09-24T04:43:00.438673297Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     local = get_tp_group().all_reduce(local)
+2026-09-24T04:43:00.438676513Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438679617Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/parallel_state.py", line 773, in all_reduce
+2026-09-24T04:43:00.438687633Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return torch.ops.vllm.all_reduce(input_, group_name=self.unique_name)
+2026-09-24T04:43:00.438690353Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438692849Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_ops.py", line 1279, in __call__
+2026-09-24T04:43:00.438695553Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._op(*args, **kwargs)
+2026-09-24T04:43:00.438698881Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438701409Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/parallel_state.py", line 226, in all_reduce
+2026-09-24T04:43:00.438704369Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return group._all_reduce_out_place(tensor)
+2026-09-24T04:43:00.438707521Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438708961Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/parallel_state.py", line 780, in _all_reduce_out_place
+2026-09-24T04:43:00.438710625Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self.device_communicator.all_reduce(input_)
+2026-09-24T04:43:00.438712161Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438713665Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/device_communicators/cuda_communicator.py", line 381, in all_reduce
+2026-09-24T04:43:00.438715841Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     out = b12x_ar_comm.custom_all_reduce(input_)
+2026-09-24T04:43:00.438717393Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438718865Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/device_communicators/b12x_roce_all_reduce.py", line 284, in custom_all_reduce
+2026-09-24T04:43:00.438720929Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._runtime.all_reduce(inp, plan=self._prepared_plan())
+2026-09-24T04:43:00.438722529Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438724081Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/b12x/b12x/comm/roce/roce_oneshot.py", line 648, in all_reduce
+2026-09-24T04:43:00.438725617Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._run_prepared_all_reduce(inp, prepared=prepared, out=out, stream=stream)
+2026-09-24T04:43:00.438742625Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438744449Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/b12x/b12x/comm/roce/roce_oneshot.py", line 660, in _run_prepared_all_reduce
+2026-09-24T04:43:00.438746081Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     self.check_health()
+2026-09-24T04:43:00.438747505Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/b12x/b12x/comm/roce/roce_oneshot.py", line 796, in check_health
+2026-09-24T04:43:00.438749121Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     raise RuntimeError(
+2026-09-24T04:43:00.438750577Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057] RuntimeError: RoCE collective on rank 1 timed out waiting for rank 0, HCA 0, at sequence 163; the runtime is poisoned (its epoch stopped at 162, later launches do nothing) and rank data is no longer trustworthy
+2026-09-24T04:43:00.438752577Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057] Traceback (most recent call last):
+2026-09-24T04:43:00.438754113Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/executor/multiproc_executor.py", line 1049, in _execute_worker_rpc
+2026-09-24T04:43:00.438755969Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     output = func(*args, **kwargs)
+2026-09-24T04:43:00.438757441Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]              ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438758881Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/tracing/otel.py", line 178, in sync_wrapper
+2026-09-24T04:43:00.438760513Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return func(*args, **kwargs)
+2026-09-24T04:43:00.438761889Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438763345Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu_worker.py", line 924, in compile_or_warm_up_model
+2026-09-24T04:43:00.438764993Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._compile_or_warm_up_model_after_preparation()
+2026-09-24T04:43:00.438766561Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438768081Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu_worker.py", line 964, in _compile_or_warm_up_model_after_preparation
+2026-09-24T04:43:00.438769777Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     warmup_kernels(self.model_runner, self.execute_model, self.sample_tokens)
+2026-09-24T04:43:00.438771329Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+2026-09-24T04:43:00.438774977Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return func(*args, **kwargs)
+2026-09-24T04:43:00.438776529Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438778209Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu/warmup.py", line 248, in warmup_kernels
+2026-09-24T04:43:00.438779777Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     _warmup_kernels(model_runner, worker_execute_model, worker_sample_tokens)
+2026-09-24T04:43:00.438781377Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu/warmup.py", line 451, in _warmup_kernels
+2026-09-24T04:43:00.438782945Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     _run_decode_step(step_indices, step_spec_flags)
+2026-09-24T04:43:00.438784433Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu/warmup.py", line 426, in _run_decode_step
+2026-09-24T04:43:00.438786017Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     worker_execute_model(decode_output)
+2026-09-24T04:43:00.438787457Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+2026-09-24T04:43:00.438789009Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return func(*args, **kwargs)
+2026-09-24T04:43:00.438790481Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438791873Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu_worker.py", line 1425, in execute_model
+2026-09-24T04:43:00.438793457Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     output = self.model_runner.execute_model(
+2026-09-24T04:43:00.438794945Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438796353Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+2026-09-24T04:43:00.438798017Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return func(*args, **kwargs)
+2026-09-24T04:43:00.438799409Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438801009Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/v1/worker/gpu/model_runner.py", line 2233, in execute_model
+2026-09-24T04:43:00.438802593Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     model_output = self.model(**model_inputs)
+2026-09-24T04:43:00.438804049Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438807649Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438809265Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438810737Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438812177Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438813777Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438815633Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438817089Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/vl_model.py", line 164, in forward
+2026-09-24T04:43:00.438818689Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self.language_model(
+2026-09-24T04:43:00.438820097Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438821537Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438823105Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438824561Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438826145Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438828033Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438829521Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438831009Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/model.py", line 884, in forward
+2026-09-24T04:43:00.438832609Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     hidden_states = self.model(
+2026-09-24T04:43:00.438834049Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]                     ^^^^^^^^^^^
+2026-09-24T04:43:00.438835473Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438837089Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438840337Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438841841Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438843585Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438845057Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438846481Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/model.py", line 587, in forward
+2026-09-24T04:43:00.438848033Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     hidden_states, residual, post_mix, res_mix, pre_mix = layer(
+2026-09-24T04:43:00.438849569Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]                                                           ^^^^^^
+2026-09-24T04:43:00.438851329Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438852897Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438854417Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438855937Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438857601Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438859025Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438860497Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/nvidia/model.py", line 268, in forward
+2026-09-24T04:43:00.438862113Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     x = self.attn(positions, x, None, global_kv_ready=global_kv_ready)
+2026-09-24T04:43:00.438863729Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438865265Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+2026-09-24T04:43:00.438866897Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._call_impl(*args, **kwargs)
+2026-09-24T04:43:00.438868369Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438874273Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+2026-09-24T04:43:00.438875905Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return forward_call(*args, **kwargs)
+2026-09-24T04:43:00.438877425Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438879665Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/attention.py", line 1305, in forward
+2026-09-24T04:43:00.438881233Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return _attention(hidden_states, positions, self.prefix, global_kv_ready)
+2026-09-24T04:43:00.438882865Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438884401Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py", line 863, in __call__
+2026-09-24T04:43:00.438886001Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._opoverload(*args, **kwargs)
+2026-09-24T04:43:00.438887409Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438888961Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_ops.py", line 875, in __call__
+2026-09-24T04:43:00.438890545Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._op(*args, **kwargs)
+2026-09-24T04:43:00.438891953Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438893473Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py", line 441, in backend_impl
+2026-09-24T04:43:00.438895041Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     result = self._backend_fns[device_type](*args, **kwargs)
+2026-09-24T04:43:00.438896881Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438898417Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_compile.py", line 54, in inner
+2026-09-24T04:43:00.438900289Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return disable_fn(*args, **kwargs)
+2026-09-24T04:43:00.438901745Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438903505Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_dynamo/eval_frame.py", line 1446, in _fn
+2026-09-24T04:43:00.438905089Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return fn(*args, **kwargs)
+2026-09-24T04:43:00.438910481Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438911985Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py", line 502, in wrapped_fn
+2026-09-24T04:43:00.438913601Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return fn(*args, **kwargs)
+2026-09-24T04:43:00.438914993Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438916465Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/attention.py", line 376, in _attention
+2026-09-24T04:43:00.438918081Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return layer._forward(positions, hidden)
+2026-09-24T04:43:00.438919537Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438921041Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/attention.py", line 1370, in _forward
+2026-09-24T04:43:00.438922609Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._o_proj(output, positions, is_prefill=is_prefill)
+2026-09-24T04:43:00.438924161Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438925697Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/models/deepseek_v4_1/attention.py", line 1739, in _o_proj
+2026-09-24T04:43:00.438927345Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     local = get_tp_group().all_reduce(local)
+2026-09-24T04:43:00.438928769Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438930401Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/parallel_state.py", line 773, in all_reduce
+2026-09-24T04:43:00.438932033Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return torch.ops.vllm.all_reduce(input_, group_name=self.unique_name)
+2026-09-24T04:43:00.438933601Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438935153Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/usr/local/lib/python3.12/dist-packages/torch/_ops.py", line 1279, in __call__
+2026-09-24T04:43:00.438936785Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._op(*args, **kwargs)
+2026-09-24T04:43:00.438938273Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438941665Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/parallel_state.py", line 226, in all_reduce
+2026-09-24T04:43:00.438943313Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return group._all_reduce_out_place(tensor)
+2026-09-24T04:43:00.438944817Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438946305Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/parallel_state.py", line 780, in _all_reduce_out_place
+2026-09-24T04:43:00.438947937Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self.device_communicator.all_reduce(input_)
+2026-09-24T04:43:00.438949377Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438950865Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/device_communicators/cuda_communicator.py", line 381, in all_reduce
+2026-09-24T04:43:00.438952481Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     out = b12x_ar_comm.custom_all_reduce(input_)
+2026-09-24T04:43:00.438954001Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438955697Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/vllm/vllm/distributed/device_communicators/b12x_roce_all_reduce.py", line 284, in custom_all_reduce
+2026-09-24T04:43:00.438957425Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._runtime.all_reduce(inp, plan=self._prepared_plan())
+2026-09-24T04:43:00.438959009Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438960545Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/b12x/b12x/comm/roce/roce_oneshot.py", line 648, in all_reduce
+2026-09-24T04:43:00.438962113Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     return self._run_prepared_all_reduce(inp, prepared=prepared, out=out, stream=stream)
+2026-09-24T04:43:00.438963713Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-24T04:43:00.438965233Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/b12x/b12x/comm/roce/roce_oneshot.py", line 660, in _run_prepared_all_reduce
+2026-09-24T04:43:00.438966865Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     self.check_health()
+2026-09-24T04:43:00.438968337Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]   File "/opt/spark3/candidate/b12x/b12x/comm/roce/roce_oneshot.py", line 796, in check_health
+2026-09-24T04:43:00.438969953Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057]     raise RuntimeError(
+2026-09-24T04:43:00.438976273Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057] RuntimeError: RoCE collective on rank 1 timed out waiting for rank 0, HCA 0, at sequence 163; the runtime is poisoned (its epoch stopped at 162, later launches do nothing) and rank data is no longer trustworthy
+2026-09-24T04:43:00.438978225Z (Worker_TP1 pid=120) ERROR 09-24 04:43:00 [multiproc_executor.py:1057] 
+2026-09-24T04:43:00.822919236Z [rank1]:[W924 04:43:00.919533010 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:43:00.822938372Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:43:00.822939780Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:00.822941220Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:00.822942596Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:00.822943924Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:00.822945092Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:00.822946180Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:00.822947652Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:00.822949204Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:43:00.822950340Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:43:00.822951508Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:43:00.822953156Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:43:00.822954196Z 
+2026-09-24T04:43:00.822955220Z [rank1]:[W924 04:43:00.920950996 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:43:01.824604407Z [rank1]:[W924 04:43:01.921286949 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:43:01.824626023Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:43:01.824627287Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:01.824628759Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:01.824629975Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:01.824631271Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:01.824632375Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:01.824633527Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:01.824634551Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:01.824636087Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:43:01.824637127Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:43:01.824638279Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:43:01.824639831Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:43:01.824640935Z 
+2026-09-24T04:43:01.824641879Z [rank1]:[W924 04:43:01.922711318 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-24T04:43:02.826055113Z [rank1]:[W924 04:43:02.922836167 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx2-direct]:41148, remote=[dgx1-direct]:29568): Broken pipe
+2026-09-24T04:43:02.826072505Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-24T04:43:02.826083465Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf1b4be0ee158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:02.826085049Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0eed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:02.826086297Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf1b4be0ef0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-24T04:43:02.826087481Z frame #3: <unknown function> + 0x70b77ec (0xf1b4dba577ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:02.826088505Z frame #4: <unknown function> + 0x70b9aa4 (0xf1b4dba59aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:02.826089561Z frame #5: <unknown function> + 0x70b9c18 (0xf1b4dba59c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:02.826090537Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf1b4dba5ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-24T04:43:02.826092089Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf1b4bf037350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-24T04:43:02.826093145Z frame #8: <unknown function> + 0xe1ae0 (0xf1b56f8e1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-24T04:43:02.826094233Z frame #9: <unknown function> + 0x8582c (0xf1b5705a582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:43:02.826095737Z frame #10: <unknown function> + 0xebb4c (0xf1b57060bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-24T04:43:02.826096857Z 
+2026-09-24T04:43:02.826097737Z [rank1]:[W924 04:43:02.924264424 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe

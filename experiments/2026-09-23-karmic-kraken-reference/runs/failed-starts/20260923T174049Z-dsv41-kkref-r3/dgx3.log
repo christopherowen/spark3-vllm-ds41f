@@ -1,0 +1,618 @@
+node: dgx3
+container: dsv41-kkref-r3
+inspect_returncode: 0
+
+[docker inspect]
+[
+    {
+        "Id": "e39574171e723cb1d192b919fda2555b698702971748cf6dd2e079501e7526b0",
+        "Created": "2026-09-23T17:37:18.382558964Z",
+        "Path": "vllm",
+        "Args": [
+            "serve",
+            "/models",
+            "--served-model-name",
+            "deepseek-v4.1-flash",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+            "--tokenizer-mode",
+            "deepseek_v41",
+            "--dtype",
+            "bfloat16",
+            "--tensor-parallel-size",
+            "3",
+            "--load-format",
+            "b12x",
+            "--block-size",
+            "256",
+            "--enable-prefix-caching",
+            "--enable-chunked-prefill",
+            "--max-model-len",
+            "160000",
+            "--max-num-seqs",
+            "8",
+            "--max-parallel-prefills",
+            "1",
+            "--gpu-memory-utilization",
+            "0.82",
+            "--max-num-batched-tokens",
+            "8192",
+            "--kv-cache-memory-bytes",
+            "2147483648",
+            "--max-cudagraph-capture-size",
+            "32",
+            "--generation-config",
+            "vllm",
+            "--language-model-only",
+            "--engram-config",
+            "{\"table_memory\":\"disk\",\"disk_resident_scales\":false}",
+            "--attention-backend",
+            "B12X",
+            "--linear-backend",
+            "b12x",
+            "--moe-backend",
+            "b12x",
+            "--speculative-config",
+            "{\"method\":\"dspark\",\"num_speculative_tokens\":7,\"draft_tensor_parallel_size\":3,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":2.0}",
+            "--jit-monitor-mode",
+            "warn",
+            "--compilation-config",
+            "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,5,6,7,8,12,16,20,24,28,32]}",
+            "--prefix-cache-retention-interval",
+            "512",
+            "--long-prefill-token-threshold",
+            "4096",
+            "--async-scheduling",
+            "--reasoning-parser",
+            "deepseek_v41",
+            "--tool-call-parser",
+            "deepseek_v41",
+            "--enable-auto-tool-choice",
+            "--default-chat-template-kwargs",
+            "{\"thinking\":true}",
+            "--distributed-executor-backend",
+            "mp",
+            "--nnodes",
+            "3",
+            "--no-scheduler-reserve-full-isl",
+            "--enable-flashinfer-autotune",
+            "--node-rank",
+            "2",
+            "--master-addr",
+            "10.0.1.71",
+            "--master-port",
+            "29580",
+            "--headless"
+        ],
+        "State": {
+            "Status": "exited",
+            "Running": false,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 0,
+            "ExitCode": 137,
+            "Error": "",
+            "StartedAt": "2026-09-23T17:37:18.49900222Z",
+            "FinishedAt": "2026-09-23T17:40:41.442271125Z"
+        },
+        "Image": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+        "ResolvConfPath": "/var/lib/docker/containers/e39574171e723cb1d192b919fda2555b698702971748cf6dd2e079501e7526b0/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/e39574171e723cb1d192b919fda2555b698702971748cf6dd2e079501e7526b0/hostname",
+        "HostsPath": "/var/lib/docker/containers/e39574171e723cb1d192b919fda2555b698702971748cf6dd2e079501e7526b0/hosts",
+        "LogPath": "/var/lib/docker/containers/e39574171e723cb1d192b919fda2555b698702971748cf6dd2e079501e7526b0/e39574171e723cb1d192b919fda2555b698702971748cf6dd2e079501e7526b0-json.log",
+        "Name": "/dsv41-kkref-r3",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "docker-default",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/home/swank/projects/spark3-vllm-ds41f/cache:/cache:rw",
+                "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277:/models:ro",
+                "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/blobs:/blobs:ro"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "host",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": [
+                "CAP_IPC_LOCK"
+            ],
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "host",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": [
+                "seccomp=unconfined",
+                "label=disable"
+            ],
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 17179869184,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 120259084288,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [
+                {
+                    "PathOnHost": "/dev/infiniband",
+                    "PathInContainer": "/dev/infiniband",
+                    "CgroupPermissions": "rwm"
+                }
+            ],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": [
+                {
+                    "Driver": "",
+                    "Count": -1,
+                    "DeviceIDs": null,
+                    "Capabilities": [
+                        [
+                            "gpu"
+                        ]
+                    ],
+                    "Options": {}
+                }
+            ],
+            "MemoryReservation": 0,
+            "MemorySwap": 120259084288,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": [
+                {
+                    "Name": "memlock",
+                    "Hard": -1,
+                    "Soft": -1
+                },
+                {
+                    "Name": "stack",
+                    "Hard": 67108864,
+                    "Soft": 67108864
+                }
+            ],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "e39574171e723cb1d192b919fda2555b698702971748cf6dd2e079501e7526b0",
+                "LowerDir": "/var/lib/docker/overlay2/751380a67acec466962e035a56951ebe383e91f1ea04588f19c66b7fda5918c2-init/diff:/var/lib/docker/overlay2/a5d1ec7cc873eba587f589dfb96c2e0d3984276cef3042c0e83890d692dd4ce7/diff:/var/lib/docker/overlay2/7d7322f91686d92e894ec03eb4cb4a7f529048ca66dbe710c7b06f494dc4c343/diff:/var/lib/docker/overlay2/5bb4fb7c3f7141965abf6498021a973c9a03a373c4a2932ce5d08f470165b94c/diff:/var/lib/docker/overlay2/54bf6c3ddfdb1e770e0bf999a97b4ad0788c215768af9657f45b6c4ff2677dbe/diff:/var/lib/docker/overlay2/3b19b0fc743518c068545f2460fec805cdee3fd2d9acb180cbb1e132221f4f6c/diff:/var/lib/docker/overlay2/65c99b188fac962423bd2ccceebb429a420155894257a797f91075268597344a/diff:/var/lib/docker/overlay2/c2661065aa8587af8a53ad00b671e122cf3ead7eefba981b3477f56c5d89b066/diff:/var/lib/docker/overlay2/ceb5164c5152bb5684b3e90e65fca9b373575a9eb29bdd33faf3bd4677406fab/diff:/var/lib/docker/overlay2/c612c7b4c173cde1400c1cd1b62aa91f7d3a8f01b0ec3b7a789c4ca98a456652/diff:/var/lib/docker/overlay2/95cbf5612dadcd773a619d9118132e126b96b1cc369f475bf648633b34888b20/diff:/var/lib/docker/overlay2/e0102728d44b273664ce83fc99de1d4cec011151de8f5abf8968ca582594f0f6/diff:/var/lib/docker/overlay2/638ae9d1b26969bf78beddbdee03acd9a794bdd2d79c31cd9c079fb034951fae/diff:/var/lib/docker/overlay2/bd7d693fcc13d6b3fc720b5439eb72ddd76da7b297835b7a94bd7d9f3cbf8348/diff:/var/lib/docker/overlay2/921107b45ac6ac46029ae56b197f7cbf6a56354ff391c87c9af5d502d97d9048/diff:/var/lib/docker/overlay2/26f28b9c89c31e83f6a91be2e13e7d2b16c415555410034f659c2ae26c842c5f/diff:/var/lib/docker/overlay2/8079fe1d991a17737324988ab3e7deea696403b2a010bfa263d8edd293f6f09a/diff:/var/lib/docker/overlay2/782fd1fd762c14b4742b099f2964eb90e7991a228a039b155486d1769554cb05/diff:/var/lib/docker/overlay2/7283471e84ee9cc7a0d8b4c1a8bd796cb397746bb9f36f4c028bfeae7d26ef93/diff:/var/lib/docker/overlay2/ccdacce1c150f2e6ab68402f641b7403460b5ef82154b963433833e57aee5037/diff:/var/lib/docker/overlay2/bb8c5f1f985516e559d6725905ec25a4f309a51dd59ead94c6bb1b737ba76f66/diff:/var/lib/docker/overlay2/83c8e0c59a17e9c762294bd0bc97f86e31c452fc930effcfbafdb5107e6eee9e/diff:/var/lib/docker/overlay2/6c05f26d52c0665eb2cd0e0d2e264be4262681d3110b2bfaa74153925e09d4b7/diff:/var/lib/docker/overlay2/df6e611e8f269847b9547fe17afbe9636dcaa1a832474ef69c4a79436d84028b/diff:/var/lib/docker/overlay2/d4a288c64c37cb2430f30016ef469f0386f9c11ab9ebdaeb940505c7121d1ee5/diff:/var/lib/docker/overlay2/bd0c65bc43ec6236e09430a65fabcfebd3ea52d1a65d8f14be58de29680b0ef5/diff:/var/lib/docker/overlay2/13fc52b3561bba955fdf08964c3be2d490cab6cd06934e342aabe57b59c0c3dc/diff:/var/lib/docker/overlay2/f44ebca63d5f1e9d2c67cda2592fccae05eb94a8a0fd36f92b123cb5ca4fb3d0/diff:/var/lib/docker/overlay2/4e878ee68378544a3f6d3cd805cac86e9ce76df7695182671facaaf994645337/diff:/var/lib/docker/overlay2/9550faa306e41c1caa2569bfdd01a79dc70a7bc5546607a460d36515cdb8b969/diff:/var/lib/docker/overlay2/c2b29d375cf0a047c7eefcbbc9a6c13a5a612cb477071273fbef860c273378e4/diff:/var/lib/docker/overlay2/287e9a47e8afdb0c1e7233602b51fb8dfd6ce095e66e5a5a388bd32aea90eaff/diff:/var/lib/docker/overlay2/938a6470a0e2658e1a094f0781f8d5269c5b6236df8d5f2b086e6718b08ec37d/diff:/var/lib/docker/overlay2/d851f963af46a492623e971f7794a5e7ac4221fd27abd2480f8b59296dc96260/diff:/var/lib/docker/overlay2/45d9256a648dcecdf511efd1eb94d49f14517ba8f8103a849fd17da43751c548/diff:/var/lib/docker/overlay2/02cf5e21f899f78cb35a46a4d8a5bd1f83e327150b8462912083b5b916a08fee/diff:/var/lib/docker/overlay2/1b223eb2c8c66cf3dd3e3efb998255d69f00f8c4b1a68ba5c332811e4055eea9/diff:/var/lib/docker/overlay2/7bc3fd6f8c2a9dc81e9f0e7d1d9f7a297b1605879cfb9f55a9bd8b51b168d8d0/diff:/var/lib/docker/overlay2/182354e643a543ccc3e2eca36b830780631fbe0d9781d6d9bff24e5b38458f79/diff:/var/lib/docker/overlay2/30f26fa638f692b846734b9d76d6ce387fc47f89362048849f2f383a45ecafc8/diff:/var/lib/docker/overlay2/2a3bdc1886c17880e98d9b0ba4dd100f24e1c1e8d91b6b845c154783a4af8994/diff:/var/lib/docker/overlay2/4227bd4a1e910982cd3612fd81c61295a5deb46fe984facef50d652dd4a2fcd6/diff:/var/lib/docker/overlay2/b8d5aa36e1d84e9cbdff4ac6d37ec142ef9b1079d80a21141d3a10d75bfd4123/diff:/var/lib/docker/overlay2/e0bb12f640293539dd7ca38fe706df7cc365fe287f7de273af60d7a1f13dca86/diff:/var/lib/docker/overlay2/d908df3f34155e510a71330d36376bfac336030e48ea655aaceba0c72e64b0c7/diff:/var/lib/docker/overlay2/74a47fa672cbb7ed427b79f008658eaaac6a6f799357c31a84aaa0e92cf2f317/diff:/var/lib/docker/overlay2/d313c25d0f4c9c16411573488717c1b6cd8917f92534d04a91a5754680ef4647/diff:/var/lib/docker/overlay2/504af8e0e67d22dd6fec1ee66952c48a436455c3e3386a1046cb056742204718/diff:/var/lib/docker/overlay2/ce00f28a8e1d9a64d28b2c98d83626237562b1ff7e766836ac5f2a44d254629b/diff",
+                "MergedDir": "/var/lib/docker/overlay2/751380a67acec466962e035a56951ebe383e91f1ea04588f19c66b7fda5918c2/merged",
+                "UpperDir": "/var/lib/docker/overlay2/751380a67acec466962e035a56951ebe383e91f1ea04588f19c66b7fda5918c2/diff",
+                "WorkDir": "/var/lib/docker/overlay2/751380a67acec466962e035a56951ebe383e91f1ea04588f19c66b7fda5918c2/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/home/swank/projects/spark3-vllm-ds41f/cache",
+                "Destination": "/cache",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+                "Destination": "/models",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/swank/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/blobs",
+                "Destination": "/blobs",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "dgx3",
+            "Domainname": "",
+            "User": "root",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "NCCL_PROTO=^LL128",
+                "TORCHINDUCTOR_CACHE_DIR=/cache/kkref/jit/torchinductor",
+                "VLLM_ENABLE_ROCE_ALLREDUCE=1",
+                "B12X_CUTE_COMPILE_CACHE_DIR=/cache/kkref/jit/b12x/cute",
+                "B12X_ROCE_PEER_HCAS={\"0\":[\"rocep1s0f0\",\"roceP2p1s0f0\"],\"1\":[\"rocep1s0f1\",\"roceP2p1s0f1\"]}",
+                "CUTE_DSL_CACHE_DIR=/cache/kkref/jit/cute-dsl",
+                "MAX_JOBS=2",
+                "NCCL_IB_MERGE_NICS=1",
+                "NCCL_IB_SUBNET_AWARE_ROUTING=1",
+                "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,garbage_collection_threshold:0.6",
+                "VLLM_ENGINE_READY_TIMEOUT_S=3600",
+                "CUDA_DEVICE_MAX_CONNECTIONS=32",
+                "NCCL_DEBUG=WARN",
+                "TP_SOCKET_IFNAME=enP7s7",
+                "VLLM_USE_AOT_COMPILE=1",
+                "VLLM_USE_BREAKABLE_CUDAGRAPH=0",
+                "HF_HOME=/cache/huggingface",
+                "NCCL_DEBUG_SUBSYS=INIT",
+                "NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f0,rocep1s0f1,roceP2p1s0f1",
+                "VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1",
+                "VLLM_ROCE_ALLGATHER_MAX_SIZE=4MB",
+                "B12X_BIND_COMPILE_WORKERS=2",
+                "B12X_WEIGHTS_COMPILE_WORKERS=4",
+                "NCCL_P2P_DISABLE=1",
+                "VLLM_HOST_IP=10.0.1.72",
+                "VLLM_USE_MEGA_AOT_ARTIFACT=1",
+                "NCCL_CUMEM_ENABLE=0",
+                "OMP_NUM_THREADS=8",
+                "VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=900",
+                "B12X_ROCE_GID_INDEX=3",
+                "B12X_STATE_COMPILE_WORKERS=2",
+                "FLASHINFER_WORKSPACE_BASE=/cache/kkref/flashinfer",
+                "NCCL_IB_DISABLE=0",
+                "B12X_DENSE_SPLITK_TURBO=1",
+                "NCCL_NET_PLUGIN=none",
+                "NCCL_SOCKET_IFNAME=enP7s7",
+                "VLLM_MULTI_STREAM_GEMM_TOKEN_THRESHOLD=1024",
+                "NCCL_NVLS_ENABLE=0",
+                "VLLM_USE_V2_MODEL_RUNNER=1",
+                "NCCL_SHM_DISABLE=1",
+                "VLLM_CACHE_DIR=/cache/kkref/jit/vllm",
+                "VLLM_PLUGINS=b12x_loader",
+                "B12X_AUTOTUNE=0",
+                "NCCL_IB_ADDR_FAMILY=AF_INET",
+                "NCCL_IB_GID_INDEX=3",
+                "SAFETENSORS_FAST_GPU=1",
+                "TRITON_CACHE_DIR=/cache/kkref/jit/triton",
+                "VLLM_USE_FLASHINFER_SAMPLER=1",
+                "VLLM_USE_STANDALONE_COMPILE=1",
+                "NCCL_CROSS_NIC=1",
+                "TRANSFORMERS_OFFLINE=1",
+                "GLOO_SOCKET_IFNAME=enP7s7",
+                "B12X_ROCE_CACHE_DIR=/cache/kkref/jit/b12x/roce",
+                "NCCL_IB_ROCE_VERSION_NUM=2",
+                "PYTHONPATH=/opt/spark3/candidate/vllm:/opt/spark3/candidate/b12x",
+                "TORCH_NCCL_ASYNC_ERROR_HANDLING=1",
+                "CUTE_DSL_ARCH=sm_121a",
+                "VLLM_ALLOW_LONG_MAX_MODEL_LEN=1",
+                "VLLM_CACHE_ROOT=/cache/kkref/jit/vllm",
+                "VLLM_ROCE_ALLREDUCE_MAX_SIZE=2MB",
+                "HF_HUB_OFFLINE=1",
+                "NCCL_IGNORE_CPU_AFFINITY=1",
+                "NCCL_NET=IB",
+                "VLLM_ENABLE_PCIE_ALLREDUCE=0",
+                "XDG_CACHE_HOME=/cache/kkref/jit",
+                "B12X_COMPILE_CACHE_DIR=/cache/kkref/jit/b12x/compile",
+                "B12X_ROCE_SPIN_LIMIT=5000000",
+                "NCCL_BUFFSIZE=1048576",
+                "NCCL_LL128_BUFFSIZE=262144",
+                "NCCL_MAX_NCHANNELS=8",
+                "PATH=/usr/local/cuda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "NVARCH=sbsa",
+                "NVIDIA_REQUIRE_CUDA=cuda>=13.0 brand=unknown,driver>=535,driver<536 brand=grid,driver>=535,driver<536 brand=tesla,driver>=535,driver<536 brand=nvidia,driver>=535,driver<536 brand=quadro,driver>=535,driver<536 brand=quadrortx,driver>=535,driver<536 brand=nvidiartx,driver>=535,driver<536 brand=vapps,driver>=535,driver<536 brand=vpc,driver>=535,driver<536 brand=vcs,driver>=535,driver<536 brand=vws,driver>=535,driver<536 brand=cloudgaming,driver>=535,driver<536 brand=unknown,driver>=550,driver<551 brand=grid,driver>=550,driver<551 brand=tesla,driver>=550,driver<551 brand=nvidia,driver>=550,driver<551 brand=quadro,driver>=550,driver<551 brand=quadrortx,driver>=550,driver<551 brand=nvidiartx,driver>=550,driver<551 brand=vapps,driver>=550,driver<551 brand=vpc,driver>=550,driver<551 brand=vcs,driver>=550,driver<551 brand=vws,driver>=550,driver<551 brand=cloudgaming,driver>=550,driver<551 brand=unknown,driver>=565,driver<566 brand=grid,driver>=565,driver<566 brand=tesla,driver>=565,driver<566 brand=nvidia,driver>=565,driver<566 brand=quadro,driver>=565,driver<566 brand=quadrortx,driver>=565,driver<566 brand=nvidiartx,driver>=565,driver<566 brand=vapps,driver>=565,driver<566 brand=vpc,driver>=565,driver<566 brand=vcs,driver>=565,driver<566 brand=vws,driver>=565,driver<566 brand=cloudgaming,driver>=565,driver<566 brand=unknown,driver>=570,driver<571 brand=grid,driver>=570,driver<571 brand=tesla,driver>=570,driver<571 brand=nvidia,driver>=570,driver<571 brand=quadro,driver>=570,driver<571 brand=quadrortx,driver>=570,driver<571 brand=nvidiartx,driver>=570,driver<571 brand=vapps,driver>=570,driver<571 brand=vpc,driver>=570,driver<571 brand=vcs,driver>=570,driver<571 brand=vws,driver>=570,driver<571 brand=cloudgaming,driver>=570,driver<571 brand=unknown,driver>=575,driver<576 brand=grid,driver>=575,driver<576 brand=tesla,driver>=575,driver<576 brand=nvidia,driver>=575,driver<576 brand=quadro,driver>=575,driver<576 brand=quadrortx,driver>=575,driver<576 brand=nvidiartx,driver>=575,driver<576 brand=vapps,driver>=575,driver<576 brand=vpc,driver>=575,driver<576 brand=vcs,driver>=575,driver<576 brand=vws,driver>=575,driver<576 brand=cloudgaming,driver>=575,driver<576",
+                "NV_CUDA_CUDART_VERSION=13.0.96-1",
+                "CUDA_VERSION=13.0.2",
+                "LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64",
+                "NVIDIA_VISIBLE_DEVICES=all",
+                "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
+                "DEBIAN_FRONTEND=noninteractive",
+                "CUDA_HOME=/usr/local/cuda",
+                "UV_HTTP_TIMEOUT=500",
+                "UV_INDEX_STRATEGY=unsafe-best-match",
+                "UV_LINK_MODE=copy",
+                "UV_PYTHON_INSTALL_DIR=/opt/uv/python",
+                "UV_CACHE_DIR=/opt/uv/cache",
+                "UV_OVERRIDE=/etc/uv-overrides.txt",
+                "VLLM_ENABLE_CUDA_COMPATIBILITY=0",
+                "TORCH_CUDA_ARCH_LIST=8.0 8.7 8.9 9.0 10.0 11.0 12.0",
+                "VLLM_USAGE_SOURCE=production-docker-image",
+                "VLLM_BUILD_COMMIT=af1c01499b289be555c475669ba50a88e96d846e",
+                "VLLM_BUILD_PIPELINE=019d130e-464e-4ff7-b84b-492992c0c06b",
+                "VLLM_BUILD_URL=https://buildkite.com/vllm/release-v2/builds/6692",
+                "VLLM_IMAGE_TAG=vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e"
+            ],
+            "Cmd": [
+                "/models",
+                "--served-model-name",
+                "deepseek-v4.1-flash",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--tokenizer-mode",
+                "deepseek_v41",
+                "--dtype",
+                "bfloat16",
+                "--tensor-parallel-size",
+                "3",
+                "--load-format",
+                "b12x",
+                "--block-size",
+                "256",
+                "--enable-prefix-caching",
+                "--enable-chunked-prefill",
+                "--max-model-len",
+                "160000",
+                "--max-num-seqs",
+                "8",
+                "--max-parallel-prefills",
+                "1",
+                "--gpu-memory-utilization",
+                "0.82",
+                "--max-num-batched-tokens",
+                "8192",
+                "--kv-cache-memory-bytes",
+                "2147483648",
+                "--max-cudagraph-capture-size",
+                "32",
+                "--generation-config",
+                "vllm",
+                "--language-model-only",
+                "--engram-config",
+                "{\"table_memory\":\"disk\",\"disk_resident_scales\":false}",
+                "--attention-backend",
+                "B12X",
+                "--linear-backend",
+                "b12x",
+                "--moe-backend",
+                "b12x",
+                "--speculative-config",
+                "{\"method\":\"dspark\",\"num_speculative_tokens\":7,\"draft_tensor_parallel_size\":3,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"standard\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":2.0}",
+                "--jit-monitor-mode",
+                "warn",
+                "--compilation-config",
+                "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,5,6,7,8,12,16,20,24,28,32]}",
+                "--prefix-cache-retention-interval",
+                "512",
+                "--long-prefill-token-threshold",
+                "4096",
+                "--async-scheduling",
+                "--reasoning-parser",
+                "deepseek_v41",
+                "--tool-call-parser",
+                "deepseek_v41",
+                "--enable-auto-tool-choice",
+                "--default-chat-template-kwargs",
+                "{\"thinking\":true}",
+                "--distributed-executor-backend",
+                "mp",
+                "--nnodes",
+                "3",
+                "--no-scheduler-reserve-full-isl",
+                "--enable-flashinfer-autotune",
+                "--node-rank",
+                "2",
+                "--master-addr",
+                "10.0.1.71",
+                "--master-port",
+                "29580",
+                "--headless"
+            ],
+            "Image": "vllm-ds41f-kkref:01f1b874c774-r1",
+            "Volumes": null,
+            "WorkingDir": "/vllm-workspace",
+            "Entrypoint": [
+                "vllm",
+                "serve"
+            ],
+            "Labels": {
+                "ai.vllm.build.commit": "af1c01499b289be555c475669ba50a88e96d846e",
+                "ai.vllm.build.pipeline": "019d130e-464e-4ff7-b84b-492992c0c06b",
+                "ai.vllm.build.url": "https://buildkite.com/vllm/release-v2/builds/6692",
+                "ai.vllm.image.tag": "vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e",
+                "local.spark3.b12x.patch-head": "3d2439944021c3dc41aa7a597aefc67232e9f563",
+                "local.spark3.b12x.ref": "integration/karmic-kraken-beta",
+                "local.spark3.b12x.revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+                "local.spark3.b12x.tree": "d661de3161ff474a92646974584d6f5eb1958f75",
+                "local.spark3.b12x.upstream": "https://github.com/local-inference-lab/b12x",
+                "local.spark3.vllm.ref": "integration/karmic-kraken-beta",
+                "local.spark3.vllm.revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+                "local.spark3.vllm.tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
+                "local.spark3.vllm.upstream": "https://github.com/local-inference-lab/vllm",
+                "maintainer": "NVIDIA CORPORATION <cudatools@nvidia.com>",
+                "org.opencontainers.image.base.digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+                "org.opencontainers.image.base.name": "docker.io/vllm/vllm-openai",
+                "org.opencontainers.image.ref.name": "ubuntu",
+                "org.opencontainers.image.revision": "9ffea8f365bbd5df3e865f99fc70326c6e72caf0",
+                "org.opencontainers.image.source": "https://github.com/christopherowen/spark3-vllm-ds41f",
+                "org.opencontainers.image.url": "https://buildkite.com/vllm/release-v2/builds/6692",
+                "org.opencontainers.image.version": "vllm/vllm-openai:nightly-af1c01499b289be555c475669ba50a88e96d846e"
+            }
+        },
+        "NetworkSettings": {
+            "SandboxID": "",
+            "SandboxKey": "",
+            "Ports": {},
+            "Networks": {
+                "host": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "c35b8f56b23a17f7c80cdd444b28ac049fad908e4d9be2846f3c2e3f93e43ea6",
+                    "EndpointID": "",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "MacAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": null
+                }
+            }
+        }
+    }
+]
+
+[docker logs]
+2026-09-23T17:37:24.856808741Z INFO 09-23 17:37:24 [__init__.py:112] Registered model loader `<class 'b12x.integration.vllm.loader.B12xModelLoader'>` with load format `b12x`
+2026-09-23T17:37:24.882681109Z WARNING 09-23 17:37:24 [envs.py:2393] Unknown vLLM environment variable detected: VLLM_CACHE_DIR
+2026-09-23T17:37:24.901521124Z INFO 09-23 17:37:24 [config.py:852] Detected quantization_config.scale_fmt=ue8m0; enabling UE8M0 for DeepGEMM.
+2026-09-23T17:37:24.910406797Z INFO 09-23 17:37:24 [model.py:693] Resolved architecture: DeepseekV41ForCausalLM
+2026-09-23T17:37:24.910422141Z INFO 09-23 17:37:24 [model.py:2054] Using max model len 160000
+2026-09-23T17:37:27.608899765Z INFO 09-23 17:37:27 [registry.py:146] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+2026-09-23T17:37:27.608958357Z INFO 09-23 17:37:27 [model.py:901] Disabled mm_prefix attention mode because multimodal inputs are configuration-disabled. Attention backends without mm_prefix support may now be selected.
+2026-09-23T17:37:27.948753861Z INFO 09-23 17:37:27 [arg_utils.py:2423] Inferred data_parallel_rank 0 from node_rank 2
+2026-09-23T17:37:27.950552894Z INFO 09-23 17:37:27 [model.py:693] Resolved architecture: DeepseekV41ForCausalLM
+2026-09-23T17:37:27.950558078Z INFO 09-23 17:37:27 [model.py:2054] Using max model len 1048576
+2026-09-23T17:37:28.522249873Z INFO 09-23 17:37:28 [speculative.py:1807] Overriding draft model max model len from 1048576 to 160000
+2026-09-23T17:37:28.522272929Z WARNING 09-23 17:37:28 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-23T17:37:28.522486720Z INFO 09-23 17:37:28 [scheduler.py:385] Chunked prefill is enabled with max_num_batched_tokens=8192.
+2026-09-23T17:37:28.522955502Z WARNING 09-23 17:37:28 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-23T17:37:28.522973038Z INFO 09-23 17:37:28 [vllm.py:1426] Resolved Engram configuration: EngramConfig(cpu_offload=True, embedding_across_dp=False, dp_shared_memory=False, table_memory='disk', disk_resident_scales=False, projection_tp=False)
+2026-09-23T17:37:28.522974462Z WARNING 09-23 17:37:28 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-23T17:37:28.523434284Z INFO 09-23 17:37:28 [kernel.py:430] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+2026-09-23T17:37:28.681489503Z INFO 09-23 17:37:28 [compilation.py:336] Enabled custom fusions: norm_quant, act_quant
+2026-09-23T17:37:28.681515279Z INFO 09-23 17:37:28 [serve.py:246] Launching vLLM (v0.29.1rc1.dev187+gaf1c01499) headless multiproc executor, with head node address 10.0.1.71:29580 for torch.distributed process group.
+2026-09-23T17:37:33.553583161Z INFO 09-23 17:37:33 [__init__.py:112] Registered model loader `<class 'b12x.integration.vllm.loader.B12xModelLoader'>` with load format `b12x`
+2026-09-23T17:37:34.702361414Z INFO 09-23 17:37:34 [registry.py:146] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+2026-09-23T17:37:34.850011878Z (Worker pid=118) INFO 09-23 17:37:34 [parallel_state.py:1859] world_size=3 rank=2 local_rank=0 distributed_init_method=tcp://10.0.1.71:29580 backend=nccl
+2026-09-23T17:37:46.162107852Z (Worker pid=118) WARNING 09-23 17:37:46 [symm_mem.py:67] SymmMemCommunicator: Device capability 12.1 not supported, communicator is not available.
+2026-09-23T17:37:46.476441864Z (Worker pid=118) INFO 09-23 17:37:46 [parallel_state.py:2299] rank 2 in world size 3 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 2, ETP rank 2, EP rank 2, EPLB rank N/A
+2026-09-23T17:37:46.476459352Z (Worker pid=118) INFO 09-23 17:37:46 [gpu_worker.py:472] Using V2 Model Runner
+2026-09-23T17:37:46.894470291Z (Worker_TP2 pid=118) INFO 09-23 17:37:46 [model_runner.py:412] Loading model from scratch...
+2026-09-23T17:37:48.105143390Z (Worker_TP2 pid=118) INFO 09-23 17:37:48 [mxfp4.py:453] Using 'B12X_MXFP4_MXFP8' Mxfp4 MoE backend.
+2026-09-23T17:37:52.252230578Z (Worker_TP2 pid=118) WARNING 09-23 17:37:52 [compilation.py:1361] Op 'quant_fp8' not present in model, enabling with '+quant_fp8' has no effect
+2026-09-23T17:37:52.252257682Z (Worker_TP2 pid=118) WARNING 09-23 17:37:52 [vllm.py:3584] `torch.compile` is turned on, but the model /models does not support it. Please open an issue on GitHub if you want it to be supported.
+2026-09-23T17:38:18.885413513Z (Worker_TP2 pid=118) INFO 09-23 17:38:18 [default_loader.py:510] Loading weights took 26.54 seconds
+2026-09-23T17:38:18.967254325Z (Worker_TP2 pid=118) INFO 09-23 17:38:18 [mxfp4.py:1997] Using MoEPrepareAndFinalizeNoDPEPModular
+2026-09-23T17:38:18.967272117Z (Worker_TP2 pid=118) INFO 09-23 17:38:18 [mxfp4.py:1998] Using B12xExperts
+2026-09-23T17:38:21.700830644Z (Worker_TP2 pid=118) INFO 09-23 17:38:21 [eagle3_utils.py:27] Using Eagle3 auxiliary layers from config: (37, 38, 39)
+2026-09-23T17:38:21.772421741Z (Worker_TP2 pid=118) WARNING 09-23 17:38:21 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-23T17:38:21.772441869Z (Worker_TP2 pid=118) INFO 09-23 17:38:21 [vllm.py:1426] Resolved Engram configuration: EngramConfig(cpu_offload=True, embedding_across_dp=False, dp_shared_memory=False, table_memory='disk', disk_resident_scales=False, projection_tp=False)
+2026-09-23T17:38:21.772445997Z (Worker_TP2 pid=118) WARNING 09-23 17:38:21 [config.py:428] Padded DeepSeek V4.1 attention for TP3: heads 64 -> 72, output groups 8 -> 9.
+2026-09-23T17:38:21.772679884Z (Worker_TP2 pid=118) INFO 09-23 17:38:21 [kernel.py:430] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+2026-09-23T17:38:21.906146055Z (Worker_TP2 pid=118) WARNING 09-23 17:38:21 [vllm.py:3584] `torch.compile` is turned on, but the model /models does not support it. Please open an issue on GitHub if you want it to be supported.
+2026-09-23T17:38:21.979825783Z (Worker_TP2 pid=118) INFO 09-23 17:38:21 [weight_utils.py:704] Safetensors index filter selected 3/48 checkpoint shards.
+2026-09-23T17:38:22.080493185Z (Worker_TP2 pid=118) INFO 09-23 17:38:22 [dspark.py:709] DSpark draft model loaded: 97 params
+2026-09-23T17:38:22.799906776Z (Worker_TP2 pid=118) INFO 09-23 17:38:22 [default_loader.py:510] Loading weights took 0.82 seconds
+2026-09-23T17:38:23.275912641Z (Worker_TP2 pid=118) INFO 09-23 17:38:23 [model_runner.py:444] Model loading took 97.48 GiB memory and 36.556272 seconds
+2026-09-23T17:38:23.326579541Z WARNING 09-23 17:38:23 [torch_utils.py:275] OMP_NUM_THREADS=8 is set; leaving Torch threads at 8 for serving. Multi-threaded torch CPU ops during serving can degrade performance through spin-wait contention and cgroup CPU-quota throttling.
+2026-09-23T17:38:24.158750529Z (Worker_TP2 pid=118) INFO 09-23 17:38:24 [b12x_prepare.py:570] b12x weights preparation uses 4 compiler workers
+2026-09-23T17:39:43.034862120Z (Worker_TP2 pid=118) INFO 09-23 17:39:43 [gpu_worker.py:638] Initial free memory 113.21 GiB, reserved 2.0 GiB memory for KV Cache as specified by kv_cache_memory_bytes config and skipped memory profiling. This does not respect the gpu_memory_utilization config. Only use kv_cache_memory_bytes config when you want manual control of KV cache memory size. If OOM'ed, check the difference of initial free memory between the current run and the previous run where kv_cache_memory_bytes is suggested and update it correspondingly.
+2026-09-23T17:39:43.141148391Z (Worker_TP2 pid=118) INFO 09-23 17:39:43 [b12x_prepare.py:631] b12x autotuning uses 34 temporary KV blocks before allocating 9425 serving blocks
+2026-09-23T17:39:43.194549725Z (Worker_TP2 pid=118) INFO 09-23 17:39:43 [b12x_prepare.py:570] b12x state preparation uses 2 compiler workers
+2026-09-23T17:39:47.468761399Z (Worker_TP2 pid=118) INFO 09-23 17:39:47 [b12x_prepare.py:570] b12x bind preparation uses 2 compiler workers
+2026-09-23T17:39:51.606199715Z (Worker_TP2 pid=118) INFO 09-23 17:39:51 [kernel_warmup.py:171] JIT kernel warmup starting.
+2026-09-23T17:40:32.932243193Z (Worker_TP2 pid=118) INFO 09-23 17:40:32 [kernel_warmup.py:184] JIT kernel warmup finished in 41.33s.
+2026-09-23T17:40:34.105648879Z (Worker_TP2 pid=118) 2026-09-23 17:40:34,105 - INFO - autotuner.py:972 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+2026-09-23T17:40:34.106672266Z (Worker_TP2 pid=118) INFO 09-23 17:40:34 [kernel_warmup.py:350] Running FlashInfer autotune with 8192 tokens and token buckets (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096, 8192).
+2026-09-23T17:40:36.249450515Z [rank2]:[W923 17:40:36.025085913 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=46, addr=[dgx3-direct]:44356, remote=[dgx1-direct]:29580): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+2026-09-23T17:40:36.249477827Z Exception raised from recvBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:787 (most recent call first):
+2026-09-23T17:40:36.249480899Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf7cb6f7ae158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:36.249484083Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf7cb6f7aed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:36.249487027Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf7cb6f7af0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:36.249506307Z frame #3: <unknown function> + 0x70b84d4 (0xf7cb8d1184d4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:36.249508803Z frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x258 (0xf7cb8d11ab38 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:36.249511363Z frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf7cb706f7350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-23T17:40:36.249513171Z frame #6: <unknown function> + 0xe1ae0 (0xf7cc20ff1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-23T17:40:36.249514803Z frame #7: <unknown function> + 0x8582c (0xf7cc21cb582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-23T17:40:36.249516483Z frame #8: <unknown function> + 0xebb4c (0xf7cc21d1bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-23T17:40:36.249518099Z 
+2026-09-23T17:40:36.249683522Z [rank2]:[W923 17:40:36.026792450 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 2] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+2026-09-23T17:40:37.252419731Z [rank2]:[W923 17:40:37.027254477 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx3-direct]:44356, remote=[dgx1-direct]:29580): Broken pipe
+2026-09-23T17:40:37.252447507Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-23T17:40:37.252450179Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf7cb6f7ae158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:37.252452787Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf7cb6f7aed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:37.252455251Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf7cb6f7af0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:37.252457363Z frame #3: <unknown function> + 0x70b77ec (0xf7cb8d1177ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:37.252459267Z frame #4: <unknown function> + 0x70b9aa4 (0xf7cb8d119aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:37.252461267Z frame #5: <unknown function> + 0x70b9c18 (0xf7cb8d119c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:37.252463123Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf7cb8d11ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:37.252480371Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf7cb706f7350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-23T17:40:37.252482483Z frame #8: <unknown function> + 0xe1ae0 (0xf7cc20ff1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-23T17:40:37.252484163Z frame #9: <unknown function> + 0x8582c (0xf7cc21cb582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-23T17:40:37.252486723Z frame #10: <unknown function> + 0xebb4c (0xf7cc21d1bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-23T17:40:37.252488403Z 
+2026-09-23T17:40:37.252489923Z [rank2]:[W923 17:40:37.029428996 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 2] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-23T17:40:38.254777126Z [rank2]:[W923 17:40:38.029641024 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=46, addr=[dgx3-direct]:44356, remote=[dgx1-direct]:29580): Broken pipe
+2026-09-23T17:40:38.254793830Z Exception raised from sendBytes at /__w/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:758 (most recent call first):
+2026-09-23T17:40:38.254795334Z frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0xc8 (0xf7cb6f7ae158 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:38.254797334Z frame #1: c10::DistError::DistError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf7cb6f7aed48 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:38.254798694Z frame #2: c10::DistNetworkError::DistNetworkError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x78 (0xf7cb6f7af0c8 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+2026-09-23T17:40:38.254799926Z frame #3: <unknown function> + 0x70b77ec (0xf7cb8d1177ec in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:38.254801062Z frame #4: <unknown function> + 0x70b9aa4 (0xf7cb8d119aa4 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:38.254802086Z frame #5: <unknown function> + 0x70b9c18 (0xf7cb8d119c18 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:38.254803318Z frame #6: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x23c (0xf7cb8d11ab1c in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+2026-09-23T17:40:38.254804918Z frame #7: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x330 (0xf7cb706f7350 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+2026-09-23T17:40:38.254818086Z frame #8: <unknown function> + 0xe1ae0 (0xf7cc20ff1ae0 in /lib/aarch64-linux-gnu/libstdc++.so.6)
+2026-09-23T17:40:38.254819142Z frame #9: <unknown function> + 0x8582c (0xf7cc21cb582c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-23T17:40:38.254820886Z frame #10: <unknown function> + 0xebb4c (0xf7cc21d1bb4c in /lib/aarch64-linux-gnu/libc.so.6)
+2026-09-23T17:40:38.254821878Z 
+2026-09-23T17:40:38.254822870Z [rank2]:[W923 17:40:38.031791462 ProcessGroupNCCL.cpp:1876] [PG ID 0 PG GUID 0 Rank 2] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+2026-09-23T17:40:38.637065513Z (Worker_TP2 pid=118) INFO 09-23 17:40:38 [multiproc_executor.py:838] Parent process exited, terminating worker queues
