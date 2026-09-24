@@ -92,3 +92,16 @@ against roughly 8-9 ms of FP8 weight traffic at the measured 215 GB/s, so
 they are the tunable share. Autotune r3 restricts tuning to
 `gemm.block_fp8_linear`, `gemm.bf16_gemv`, and `moe.decode` through the
 overlay's `SPARK3_B12X_AUTOTUNE_ONLY`.
+- Autotune r3 (`cluster-autotune3.json`, tuning limited to
+  `gemm.block_fp8_linear`, `gemm.bf16_gemv`, `moe.decode`): reached readiness
+  (dgx1 startup minimum about 6.2 GiB, `runs/kkt-autotune3-startup-memlog.txt`)
+  and saved 283 KB of selections to `/cache/kkref/jit/b12x/compile/preparation/`.
+  Matrix against capture32: prose c1 44.5 vs 39.8, code c4 112.8 vs 117.0,
+  code c8 160.0 vs 166.9, the rest within ±5%; LRU 5/5 twice. Neutral: tuned
+  selections buy nothing measurable over B12X's heuristics here. Keep
+  `B12X_AUTOTUNE=0`; with it on, the untuned components (mHC, attention) would
+  race again at startup.
+
+FlashInfer: only the top-k/top-p sampler uses it ("Using FlashInfer for top-p
+& top-k sampling"); at temperature 0 the profile contains no FlashInfer kernel.
+The `--enable-flashinfer-autotune` warmup saves 0 configs.
