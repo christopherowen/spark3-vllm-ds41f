@@ -255,3 +255,44 @@ Follow-ups, not blocking:
 - With the shared-experts stream on, one of three graph runs showed a 1.2%
   shared-expert difference at the first decode step only. Watch for it in
   broader evals; `VLLM_DISABLE_SHARED_EXPERTS_STREAM=1` removes it.
+
+## Tiny decode vs the kill switch, and the shared-expert race
+
+**Shared-expert race.** `gtrace_shared_race.py` scans every traced decode step
+for layer-0 shared-expert outputs that differ despite bit-identical MoE input.
+
+| Traced runs | Shared-expert stream | Routed kernel | Deviating (run, step) |
+|---|---|---|---|
+| mgraph1-3 | on | tiny decode | 62 (29 / 0 / 33) |
+| tgraph1-3 | on | dynamic | 0 |
+| ngraph1-3 | off | tiny decode | 0 |
+
+The deviations need tiny decode running concurrently with the aux-stream
+shared experts. `gtrace_shared_diff.py` shows two patterns:
+
+- Most deviations touch almost every element by exact powers of two (2^-9 to
+  2^-7): BF16 atomic split-K accumulation (`B12X_DENSE_SPLITK_TURBO`,
+  `out.zero_()` then atomic adds) summed in a different order when another
+  kernel shares the SMs.
+- One (mgraph1 step 32) changes 31 elements in the aligned column window
+  3008-3055 by up to 0.065 against values near 0.02. The error does not track
+  the routed output, so it is not a plain buffer alias, but it is a real
+  race: one output tile received a wrong partial.
+
+**Kill switch in r4** (`cluster-kkref-notiny.json`, `B12X_W4A8_TINY_DECODE=0`,
+`runs/kkref-notiny/`): LRU 5/5, and speed matches the patched tiny decode
+within run-to-run noise.
+
+| Case | Tiny decode + 0002 | Kill switch |
+|---|---|---|
+| prose c1 (run, repeat) | 41.7, 41.0 | 44.9, 44.7 |
+| code c1 (run, repeat) | 51.2, 47.9 | 48.1, 51.4 |
+| prose c2 / c4 / c8 | 61.9 / 101.8 / 148.1 | 62.9 / 97.6 / 138.6 |
+| code c2 / c4 / c8 | 78.0 / 118.7 / 164.6 | 73.3 / 122.1 / 160.1 |
+
+With DSpark 3, tiny decode only serves verification batches of at most four
+tokens, mainly at c1, where it shows no speed advantage. The dynamic kernel
+applies the clamp natively, quantizes activations the same way as prefill,
+and showed no shared-expert deviations. The kill switch therefore fixes
+quality with no B12X patch; 0002 remains an upstream fix for tiny decode
+itself.
