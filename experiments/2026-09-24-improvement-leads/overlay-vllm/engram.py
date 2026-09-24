@@ -19,20 +19,30 @@ from vllm.distributed import (
 )
 from vllm.logger import init_logger
 from vllm.model_executor.layers.linear import ColumnParallelLinear, ReplicatedLinear
+from vllm.model_executor.utils import set_weight_attrs
+from vllm.model_executor.weight_transfer import copy_weight, get_file_tensor_source
+from vllm.triton_utils import tl, triton
+from vllm.utils.b12x import (
+    B12xPreparationUnit,
+    B12xWorkload,
+    PreparationResourceUnavailableError,
+    set_b12x_preparation_provider,
+)
+from vllm.v1.worker.workspace import retain_cuda_graph_capture_resource
 
 
 _FP8_BLOCK_ROWS = 32
-_E8M0_ONE = 127  # E8M0 exponent bits for 2**0
 
 
 class _PaddedColumnParallelLinear(ColumnParallelLinear):
     """Column-parallel linear whose output need not divide by the TP size.
 
     The output is padded to a multiple of tp_size x 32 rows so every rank owns
-    whole block-FP8 scale blocks. Checkpoint tensors are zero-padded (weights)
-    or one-padded (E8M0 scales) before the usual shard narrowing, so the
-    padded rows compute exactly zero, and the gathered output is sliced back
-    to the logical width.
+    whole block-FP8 scale blocks. The last rank's missing checkpoint rows are
+    zero-filled through the loader's existing ``allow_tp_padding`` path (a
+    narrowed copy the B12X checkpoint loader supports), so the padded rows
+    compute exactly zero, and the gathered output is sliced back to the
+    logical width.
     """
 
     def __init__(self, input_size, output_size, **kwargs):
@@ -44,45 +54,17 @@ class _PaddedColumnParallelLinear(ColumnParallelLinear):
         self.logical_output_size = output_size
         self.padded_output_size = padded
         super().__init__(input_size, padded, **kwargs)
-
-    def _pad_rows(self, loaded_weight):
-        rows = loaded_weight.shape[0]
-        if rows == self.logical_output_size:
-            target = self.padded_output_size
-        elif rows * _FP8_BLOCK_ROWS == self.logical_output_size:
-            target = self.padded_output_size // _FP8_BLOCK_ROWS
-        else:
-            return loaded_weight
-        if target == rows:
-            return loaded_weight
-        raw = loaded_weight.view(torch.uint8)
-        fill = _E8M0_ONE if loaded_weight.dtype == torch.float8_e8m0fnu else 0
-        pad = torch.full(
-            (target - rows, *raw.shape[1:]), fill, dtype=torch.uint8, device=raw.device
-        )
-        return torch.cat((raw, pad), dim=0).view(loaded_weight.dtype)
-
-    def weight_loader(self, param, loaded_weight):
-        return super().weight_loader(param, self._pad_rows(loaded_weight))
-
-    def weight_loader_v2(self, param, loaded_weight):
-        return super().weight_loader_v2(param, self._pad_rows(loaded_weight))
+        if padded != output_size:
+            for name in ("weight", "weight_scale_inv", "weight_scale"):
+                param = getattr(self, name, None)
+                if param is not None:
+                    param.allow_tp_padding = True
 
     def forward(self, input_):
         output = super().forward(input_)
         if self.padded_output_size == self.logical_output_size:
             return output
         return output[..., : self.logical_output_size].contiguous()
-from vllm.model_executor.utils import set_weight_attrs
-from vllm.model_executor.weight_transfer import copy_weight, get_file_tensor_source
-from vllm.triton_utils import tl, triton
-from vllm.utils.b12x import (
-    B12xPreparationUnit,
-    B12xWorkload,
-    PreparationResourceUnavailableError,
-    set_b12x_preparation_provider,
-)
-from vllm.v1.worker.workspace import retain_cuda_graph_capture_resource
 
 logger = init_logger(__name__)
 DEAD_ID = -1
