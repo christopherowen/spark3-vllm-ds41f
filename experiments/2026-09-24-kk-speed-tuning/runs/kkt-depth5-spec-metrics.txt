@@ -1,0 +1,13 @@
+vllm:spec_decode_num_drafts_total{engine="0",model_name="deepseek-v4.1-flash"} 6618.0
+vllm:spec_decode_num_draft_tokens_total{engine="0",model_name="deepseek-v4.1-flash"} 19006.0
+vllm:spec_decode_num_accepted_tokens_total{engine="0",model_name="deepseek-v4.1-flash"} 11499.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="0"} 4980.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="1"} 3147.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="2"} 1799.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="3"} 1021.0
+vllm:spec_decode_num_accepted_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="4"} 552.0
+vllm:spec_decode_num_draft_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="0"} 6618.0
+vllm:spec_decode_num_draft_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="1"} 5512.0
+vllm:spec_decode_num_draft_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="2"} 3624.0
+vllm:spec_decode_num_draft_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="3"} 2241.0
+vllm:spec_decode_num_draft_tokens_per_pos_total{engine="0",model_name="deepseek-v4.1-flash",position="4"} 1011.0
