@@ -77,3 +77,18 @@ repeat runs, four samples). `summarize.py runs kkt-baseline ...` regenerates it.
   at this model size. `norm.mhc` produced 2,139 of r1's ~3,000 compilations.
 - Draft TP 1: not run. The DSpark drafter is 7.39 GiB; at TP 1 all of it lands
   on dgx1, which has 6-7 GiB of steady headroom.
+
+## Decode profile (`runs/profile-c1/`)
+
+Torch profiler on rank 0, capture32 configuration, one stream, 48 output
+tokens after warmup. The GPU is busy 90% of the 1.31 s window. Kernel time:
+routed MoE 33%, B12X dense FP8 GEMMs 27%, RoCE collectives 20%, LM-head BF16
+GEMM 6%, mHC/norms 3%, the rest under 3% each. 83 of the 1,840 all-reduce
+calls are eager ones in the prefill step, each spinning about 2.2 ms for peer
+ranks' host launches (host skew, most of the 0.25 s TTFT); the graph-captured
+decode all-reduces average about 40 µs. The routed MoE runs near memory
+bandwidth (`moe-decode-bench`). The dense GEMMs take about 15 ms per step
+against roughly 8-9 ms of FP8 weight traffic at the measured 215 GB/s, so
+they are the tunable share. Autotune r3 restricts tuning to
+`gemm.block_fp8_linear`, `gemm.bf16_gemv`, and `moe.decode` through the
+overlay's `SPARK3_B12X_AUTOTUNE_ONLY`.

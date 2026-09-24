@@ -474,8 +474,17 @@ def b12x_batches(units: Iterable[B12xPreparationUnit], *, autotune: bool = True)
     """
     tuned: list[PreparationRequest] = []
     defaults: list[PreparationRequest] = []
+    # spark3 experiment overlay: optionally tune only the listed B12X components.
+    only = {
+        name.strip()
+        for name in os.environ.get("SPARK3_B12X_AUTOTUNE_ONLY", "").split(",")
+        if name.strip()
+    }
     for unit in units:
-        (tuned if unit.autotune and autotune else defaults).extend(unit.requests)
+        for request in unit.requests:
+            component = getattr(request.plan, "component_id", None)
+            tune = unit.autotune and autotune and (not only or component in only)
+            (tuned if tune else defaults).append(request)
     batches = []
     if tuned:
         batches.append((tuple(tuned), True))
