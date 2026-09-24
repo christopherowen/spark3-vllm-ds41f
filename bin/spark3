@@ -243,9 +243,11 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
             "host.startup_memguard_gib must exceed host.memguard_gib"
         )
     deployment = cluster.get("deployment", {})
-    for key in ("repository", "branch", "path", "ready_url", "ready_timeout_seconds"):
+    for key in ("repository", "path", "ready_url", "ready_timeout_seconds"):
         if not deployment.get(key):
             problems.append(f"deployment.{key} is not configured")
+    if "branch" in deployment and not deployment["branch"]:
+        problems.append("deployment.branch must be omitted or name a branch")
     if not isinstance(deployment.get("launch_enabled"), bool):
         problems.append("deployment.launch_enabled must be true or false")
     for name, source in upstreams["sources"].items():
@@ -545,16 +547,31 @@ def command_cluster_sync(args: argparse.Namespace) -> int:
     local_revision = require_local_deployment_state(cluster, nodes, upstreams)
     if revision != local_revision and args.revision is None:
         raise SystemExit("resolved deployment revision changed unexpectedly")
-    branch = cluster["deployment"]["branch"]
-    checked(["git", "fetch", "--quiet", "origin", branch], cwd=ROOT)
-    published = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", revision, f"origin/{branch}"],
-        cwd=ROOT,
-        check=False,
-    )
-    if published.returncode:
+    # Only published commits deploy. A configured branch (the promoted config
+    # uses main) restricts deployment to that branch; without one, any commit
+    # reachable from a branch on origin qualifies, so experiment configs keep
+    # working after their branch is merged and deleted.
+    branch = cluster["deployment"].get("branch")
+    checked(["git", "fetch", "--quiet", "--prune", "origin"], cwd=ROOT)
+    containing = [
+        ref.removeprefix("origin/")
+        for ref in subprocess.run(
+            ["git", "branch", "--remotes", "--contains", revision,
+             "--format=%(refname:short)"],
+            cwd=ROOT,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        ).stdout.split()
+        if ref.startswith("origin/") and ref != "origin/HEAD"
+    ]
+    if branch is not None and branch not in containing:
         raise SystemExit(
             f"refusing to deploy {revision}: it is not published on origin/{branch}"
+        )
+    if not containing:
+        raise SystemExit(
+            f"refusing to deploy {revision}: it is not published on any origin branch"
         )
 
     previous: dict[str, str] = {}
@@ -579,7 +596,7 @@ def command_cluster_sync(args: argparse.Namespace) -> int:
 
     quoted_path = shlex.quote(path)
     fetch_script = (
-        f"cd {quoted_path} && git fetch --quiet --prune origin {shlex.quote(branch)} && "
+        f"cd {quoted_path} && git fetch --quiet --prune origin && "
         f"git cat-file -e {shlex.quote(revision)}^{{commit}}"
     )
     for node in nodes["nodes"]:

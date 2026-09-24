@@ -191,7 +191,6 @@
   "deployment": {
     "launch_enabled": true,
     "repository": "https://github.com/christopherowen/spark3-vllm-ds41f.git",
-    "branch": "main",
     "path": "{home}/projects/spark3-vllm-ds41f",
     "ready_url": "http://127.0.0.1:8000/v1/models",
     "ready_timeout_seconds": 3600

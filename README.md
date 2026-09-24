@@ -83,6 +83,10 @@ bin/spark3 build render
 `doctor`, `status`, `render`, and every cluster command without `--apply` are
 read-only. `cluster sync` fetches a published commit and detaches every clean node
 checkout at that exact revision; it never copies a working tree or ignored files.
+A commit counts as published when a branch on `origin` contains it. The
+promoted configuration sets `deployment.branch: main`, so production deploys
+only from `main`; experiment configurations omit the field, so they stay
+deployable after their branch is merged and deleted.
 The only cleanliness exception is a repository-local writable runtime mount
 declared in `cluster.json` (currently `cache/`), which is preserved in place and
 never enters Git.
