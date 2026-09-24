@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "status": "promoted-baseline",
+  "captured_at": "2026-09-24T03:52:31Z",
+  "evidence_container": "dsv41-kkref-notiny",
+  "container_name": "dsv41-karmic-kraken",
+  "image_tag": "vllm-ds41f-kkref:01f1b874c774-r1",
+  "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+  "nodes": {
+    "dgx1": {
+      "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+      "initial_free_gib": 112.7,
+      "role": "api-head-rank-0"
+    },
+    "dgx2": {
+      "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+      "initial_free_gib": 113.26,
+      "role": "headless-rank-1"
+    },
+    "dgx3": {
+      "image_id": "sha256:9f50786412ea680b80b4996953f890e18c22a0e4cc79d76f887216fcbbe39e09",
+      "initial_free_gib": 113.23,
+      "role": "headless-rank-2"
+    }
+  },
+  "source_identity": {
+    "vllm_repository": "https://github.com/local-inference-lab/vllm",
+    "vllm_ref": "integration/karmic-kraken-beta",
+    "vllm_revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+    "vllm_tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
+    "b12x_repository": "https://github.com/local-inference-lab/b12x",
+    "b12x_ref": "integration/karmic-kraken-beta",
+    "b12x_revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+    "b12x_patch_head": "3d2439944021c3dc41aa7a597aefc67232e9f563",
+    "b12x_tree": "d661de3161ff474a92646974584d6f5eb1958f75",
+    "runtime_base_image": "docker.io/vllm/vllm-openai@sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "image_build_deployment_commit": "9ffea8f365bbd5df3e865f99fc70326c6e72caf0",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277"
+  },
+  "runtime_choices": {
+    "B12X_W4A8_TINY_DECODE": "0 (tiny decode omits swiglu_limit; see experiment README)",
+    "B12X_AUTOTUNE": "0 (autotune race budget is free memory // 2 on unified memory)",
+    "speculative": "DSpark, 3 tokens, draft TP 3, adaptive verification cost scale 2",
+    "cudagraph": "FULL_AND_PIECEWISE, capture sizes 1-24",
+    "max_num_batched_tokens": 4096,
+    "memguards_gib": {
+      "startup": 5,
+      "steady": 3
+    }
+  },
+  "capacity": {
+    "kv_cache_bytes_per_rank": 2147483648,
+    "kv_cache_tokens": 933168,
+    "kv_bytes_per_token_per_rank": 2301,
+    "max_model_len": 160000,
+    "max_num_seqs": 8,
+    "reported_full_context_concurrency": 5.83,
+    "graph_capture_gib": 1.53
+  },
+  "benchmarks": {
+    "prose-c1": {
+      "aggregate_tps": 44.9,
+      "mean_ttft_s": 0.261,
+      "failed": 0
+    },
+    "prose-c2": {
+      "aggregate_tps": 62.9,
+      "mean_ttft_s": 0.464,
+      "failed": 0
+    },
+    "prose-c4": {
+      "aggregate_tps": 97.6,
+      "mean_ttft_s": 0.563,
+      "failed": 0
+    },
+    "prose-c8": {
+      "aggregate_tps": 138.6,
+      "mean_ttft_s": 0.718,
+      "failed": 0
+    },
+    "prose-c1-repeat": {
+      "aggregate_tps": 44.7,
+      "mean_ttft_s": 0.25,
+      "failed": 0
+    },
+    "code-c1": {
+      "aggregate_tps": 48.1,
+      "mean_ttft_s": 0.26,
+      "failed": 0
+    },
+    "code-c2": {
+      "aggregate_tps": 73.3,
+      "mean_ttft_s": 0.429,
+      "failed": 0
+    },
+    "code-c4": {
+      "aggregate_tps": 122.1,
+      "mean_ttft_s": 0.583,
+      "failed": 0
+    },
+    "code-c8": {
+      "aggregate_tps": 160.1,
+      "mean_ttft_s": 0.735,
+      "failed": 0
+    },
+    "code-c1-repeat": {
+      "aggregate_tps": 51.4,
+      "mean_ttft_s": 0.258,
+      "failed": 0
+    }
+  },
+  "quality": {
+    "lru_gate": {
+      "pass": 5,
+      "runs": 5
+    },
+    "full_graph_tiny_decode_off_lru": "8/8 (runs/kktrace/g-full-notiny-lru.json)"
+  },
+  "experiment": "experiments/2026-09-23-karmic-kraken-reference/",
+  "receipts": "experiments/2026-09-23-karmic-kraken-reference/runs/kkref-notiny",
+  "previous_baseline": "manifests/baselines/2026-09-20-live.json",
+  "limitations": [
+    "B12X autotune is off; tuned kernel choices are not yet measured.",
+    "The image is built by the experiment's prepare-sources/build-candidate recipe; bin/spark3 build render and docker/Dockerfile still describe the previous reconstruction.",
+    "Quality is gated on the LRU coding probe and activation traces; no broad evaluation yet.",
+    "A shared-expert race was observed only with tiny decode on; its mechanism is not identified."
+  ]
+}

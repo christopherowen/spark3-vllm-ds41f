@@ -244,8 +244,10 @@ are aggregate tok/s, 256 output tokens.
 
 The fixed build passes the quality gate and is faster than the weekend image
 at every point, including TTFT (0.24-0.26 s vs 0.32-0.33 s at c1).
-`sources.json` now pins 0001 + 0002 (tree `4e432c03`); the mounted overlays
-are byte-identical to that tree.
+The mounted overlays are byte-identical to the pinned tree with 0001 + 0002
+applied (`4e432c03`). The promoted configuration disables tiny decode instead, so
+`sources.json` pins 0001 only (tree `d661de31`, the running image); see
+`decision.md`.
 
 Follow-ups, not blocking:
 

@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "client": "experiments/2026-09-20-upstream-main-rebase/benchmark_serving.py via run_arm.sh (dgx1 -> localhost, 256 output tokens)",
+  "quality_gate": "experiments/2026-09-23-consolidated-quality/probe_quality.py, five repeats",
+  "arms": {
+    "weekend-control": {
+      "serving": {
+        "prose-c1": {
+          "aggregate_tps": 34.6,
+          "mean_ttft_s": 0.326,
+          "failed": 0
+        },
+        "prose-c2": {
+          "aggregate_tps": 57.6,
+          "mean_ttft_s": 0.484,
+          "failed": 0
+        },
+        "prose-c4": {
+          "aggregate_tps": 76.0,
+          "mean_ttft_s": 0.641,
+          "failed": 0
+        },
+        "prose-c8": {
+          "aggregate_tps": 83.1,
+          "mean_ttft_s": 0.809,
+          "failed": 0
+        },
+        "prose-c1-repeat": {
+          "aggregate_tps": 32.8,
+          "mean_ttft_s": 0.329,
+          "failed": 0
+        },
+        "code-c1": {
+          "aggregate_tps": 44.0,
+          "mean_ttft_s": 0.318,
+          "failed": 0
+        },
+        "code-c2": {
+          "aggregate_tps": 65.4,
+          "mean_ttft_s": 0.493,
+          "failed": 0
+        },
+        "code-c4": {
+          "aggregate_tps": 96.0,
+          "mean_ttft_s": 0.64,
+          "failed": 0
+        },
+        "code-c8": {
+          "aggregate_tps": 71.9,
+          "mean_ttft_s": 0.783,
+          "failed": 0
+        },
+        "code-c1-repeat": {
+          "aggregate_tps": 39.7,
+          "mean_ttft_s": 0.321,
+          "failed": 0
+        }
+      },
+      "lru": {
+        "pass": 1,
+        "runs": 5
+      },
+      "receipts": "experiments/2026-09-23-canonical-minimal/runs/weekend-control-kv2"
+    },
+    "kkref-r4-unpatched": {
+      "serving": {
+        "prose-c1": {
+          "aggregate_tps": 40.9,
+          "mean_ttft_s": 0.265,
+          "failed": 0
+        },
+        "prose-c2": {
+          "aggregate_tps": 61.5,
+          "mean_ttft_s": 0.436,
+          "failed": 0
+        },
+        "prose-c4": {
+          "aggregate_tps": 94.3,
+          "mean_ttft_s": 0.557,
+          "failed": 0
+        },
+        "prose-c8": {
+          "aggregate_tps": 133.0,
+          "mean_ttft_s": 0.716,
+          "failed": 0
+        },
+        "prose-c1-repeat": {
+          "aggregate_tps": 41.3,
+          "mean_ttft_s": 0.255,
+          "failed": 0
+        },
+        "code-c1": {
+          "aggregate_tps": 53.5,
+          "mean_ttft_s": 0.259,
+          "failed": 0
+        },
+        "code-c2": {
+          "aggregate_tps": 78.5,
+          "mean_ttft_s": 0.406,
+          "failed": 0
+        },
+        "code-c4": {
+          "aggregate_tps": 119.7,
+          "mean_ttft_s": 0.543,
+          "failed": 0
+        },
+        "code-c8": {
+          "aggregate_tps": 161.3,
+          "mean_ttft_s": 0.714,
+          "failed": 0
+        },
+        "code-c1-repeat": {
+          "aggregate_tps": 49.8,
+          "mean_ttft_s": 0.267,
+          "failed": 0
+        }
+      },
+      "lru": {
+        "pass": 0,
+        "runs": 5
+      },
+      "receipts": "experiments/2026-09-23-karmic-kraken-reference/runs/kkref-r4"
+    },
+    "kkref-tinyclamp": {
+      "serving": {
+        "prose-c1": {
+          "aggregate_tps": 41.7,
+          "mean_ttft_s": 0.241,
+          "failed": 0
+        },
+        "prose-c2": {
+          "aggregate_tps": 61.9,
+          "mean_ttft_s": 0.456,
+          "failed": 0
+        },
+        "prose-c4": {
+          "aggregate_tps": 101.8,
+          "mean_ttft_s": 0.55,
+          "failed": 0
+        },
+        "prose-c8": {
+          "aggregate_tps": 148.1,
+          "mean_ttft_s": 0.721,
+          "failed": 0
+        },
+        "prose-c1-repeat": {
+          "aggregate_tps": 41.0,
+          "mean_ttft_s": 0.251,
+          "failed": 0
+        },
+        "code-c1": {
+          "aggregate_tps": 51.2,
+          "mean_ttft_s": 0.255,
+          "failed": 0
+        },
+        "code-c2": {
+          "aggregate_tps": 78.0,
+          "mean_ttft_s": 0.414,
+          "failed": 0
+        },
+        "code-c4": {
+          "aggregate_tps": 118.7,
+          "mean_ttft_s": 0.572,
+          "failed": 0
+        },
+        "code-c8": {
+          "aggregate_tps": 164.6,
+          "mean_ttft_s": 0.762,
+          "failed": 0
+        },
+        "code-c1-repeat": {
+          "aggregate_tps": 47.9,
+          "mean_ttft_s": 0.245,
+          "failed": 0
+        }
+      },
+      "lru": {
+        "pass": 5,
+        "runs": 5
+      },
+      "receipts": "experiments/2026-09-23-karmic-kraken-reference/runs/kkref-tinyclamp"
+    },
+    "kkref-notiny": {
+      "serving": {
+        "prose-c1": {
+          "aggregate_tps": 44.9,
+          "mean_ttft_s": 0.261,
+          "failed": 0
+        },
+        "prose-c2": {
+          "aggregate_tps": 62.9,
+          "mean_ttft_s": 0.464,
+          "failed": 0
+        },
+        "prose-c4": {
+          "aggregate_tps": 97.6,
+          "mean_ttft_s": 0.563,
+          "failed": 0
+        },
+        "prose-c8": {
+          "aggregate_tps": 138.6,
+          "mean_ttft_s": 0.718,
+          "failed": 0
+        },
+        "prose-c1-repeat": {
+          "aggregate_tps": 44.7,
+          "mean_ttft_s": 0.25,
+          "failed": 0
+        },
+        "code-c1": {
+          "aggregate_tps": 48.1,
+          "mean_ttft_s": 0.26,
+          "failed": 0
+        },
+        "code-c2": {
+          "aggregate_tps": 73.3,
+          "mean_ttft_s": 0.429,
+          "failed": 0
+        },
+        "code-c4": {
+          "aggregate_tps": 122.1,
+          "mean_ttft_s": 0.583,
+          "failed": 0
+        },
+        "code-c8": {
+          "aggregate_tps": 160.1,
+          "mean_ttft_s": 0.735,
+          "failed": 0
+        },
+        "code-c1-repeat": {
+          "aggregate_tps": 51.4,
+          "mean_ttft_s": 0.258,
+          "failed": 0
+        }
+      },
+      "lru": {
+        "pass": 5,
+        "runs": 5
+      },
+      "receipts": "experiments/2026-09-23-karmic-kraken-reference/runs/kkref-notiny"
+    }
+  }
+}

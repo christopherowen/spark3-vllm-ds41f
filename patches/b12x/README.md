@@ -1,19 +1,17 @@
 # B12X patch stack
 
-Base: `local-inference-lab/b12x@f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be`.
+Base: `local-inference-lab/b12x@0f84621264a1eef19e5bcb195fd3fa4f168c2976`
+(`integration/karmic-kraken-beta`), which already contains upstream correctness
+commit `02407f65`.
 
-First apply upstream correctness commit
-`02407f653609e2c4c49db2efb5f77835d2e04e32`, then the local series.
+- `0001-switchless-rocenante.patch` adds per-peer HCA routing for the
+  direct-cabled three-node ring; Local Inference Lab's launcher targets a
+  switched fabric. Applying it to the base yields tree `d661de31`, the tree
+  recorded in the promoted image's `local.spark3.b12x.tree` label. Qualified on
+  the three Sparks by the 2026-09-23 karmic-kraken experiment (serving matrix and
+  LRU gate).
 
-The current image differs from that base in exactly six B12X files:
-
-- `b12x/_lib/intrinsics.py` — the already-upstream E4M3 correctness commit;
-- `b12x/attention/_shared/mla/prefill_mg.py` — prefill index bounds;
-- `b12x/norm/mhc/_policy.py` — DeepSeek prefill policy;
-- `b12x/comm/roce/_proxy.py` — peer-aware RoCE proxy;
-- `b12x/comm/roce/_roce_proxy.c` — peer-aware RoCE transport;
-- `b12x/comm/roce/roce_oneshot.py` — peer routing and dual-HCA selection.
-
-The three local deltas are exported as independent patches in `series`. A prepared
-upstream tree must reproduce the active B12X source hash before the new Docker build
-is promoted.
+Not in the series: the W4A8 tiny-decode `swiglu_limit` fix
+(`experiments/2026-09-23-karmic-kraken-reference/patches/b12x/0002-tiny-decode-swiglu-limit.patch`)
+is an upstream contribution. The promoted runtime disables tiny decode instead
+(`B12X_W4A8_TINY_DECODE=0`).

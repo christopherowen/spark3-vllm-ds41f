@@ -1,5 +1,13 @@
 # Image reconstruction
 
+The promoted image (`vllm-ds41f-kkref:01f1b874c774-r1`, baseline
+2026-09-24-karmic-kraken) is not built from this directory. Its recipe is
+`experiments/2026-09-23-karmic-kraken-reference/`: `prepare-sources` checks out
+the pinned Local Inference Lab trees and applies the B12X series, and
+`build-candidate` builds its `Dockerfile` on the vLLM nightly base. The rest of
+this file describes the earlier reconstruction, which `bin/spark3 build render`
+still renders.
+
 `docker/Dockerfile` is the deterministic successor to the node-local image
 chain captured on 2026-09-20. It starts at the official vLLM image digest and
 accepts only named contexts prepared from `upstreams.lock.json`:

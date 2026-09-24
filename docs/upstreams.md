@@ -3,32 +3,32 @@
 `upstreams.lock.json` is the machine-readable authority. The current chain is:
 
 ```text
-vllm-project/vllm @ c687594b
-        + patches/vllm/series
+local-inference-lab/vllm integration/karmic-kraken-beta @ 01f1b874
+        (canonical base vllm-project/vllm @ 0f8fa53a; no local patches)
                     \
-                     reproducible Docker image
+                     vllm-ds41f-kkref:01f1b874c774-r1 (sha256:9f507864…)
                     /
-local-inference-lab/b12x @ f1c4e9dd
-        + upstream fix 02407f65
-        + patches/b12x/series
+local-inference-lab/b12x integration/karmic-kraken-beta @ 0f846212
+        + patches/b12x/series (switchless RoCEnante routing)
 
-deepseek-ai/DeepSeek-V4.1-Flash @ dba1be0a
-        + config/model-config-overlay.jq (TP3 virtual heads only)
+deepseek-ai/DeepSeek-V4.1-Flash @ dba1be0a (unchanged; TP3 head padding is in
+        the serving source, so no config overlay is mounted)
 ```
 
-The official vLLM nightly at `af1c0149` supplies the current CUDA/runtime base;
-the DS4.1 serving source overlaid into it is pinned separately at `c687594b`.
-These are intentionally distinct entries.
+The official vLLM nightly at `af1c0149` supplies the CUDA/runtime base, including
+FlashInfer 0.6.18.post1; only vLLM's two stable CUDA extensions are rebuilt for
+SM121 against CUTLASS v4.7.1. Canonical vLLM main is parked while the Local
+Inference Lab integration branch is the serving source.
 
 ## Source map
 
 | Lock key | Canonical upstream | Contribution fork | Purpose |
 |---|---|---|---|
-| `vllm` | `vllm-project/vllm` | `christopherowen/vllm` | serving source and primary upstream contribution target |
+| `vllm` | `local-inference-lab/vllm` (`integration/karmic-kraken-beta`) | `christopherowen/vllm` | serving source; canonical `vllm-project/vllm` main is parked |
 | `vllm_base_image` | `docker.io/vllm/vllm-openai` | not applicable | official CUDA/Torch/native-extension foundation |
-| `b12x` | `local-inference-lab/b12x` | not created yet | DS4.1 kernels and RoCEnante transport |
-| `flashinfer` | `flashinfer-ai/flashinfer` | not created yet | native sparse-attention package at `v0.7.0rc1` |
-| `cutlass` | `NVIDIA/cutlass` | not created yet | SM121 stable-extension headers/source at `v4.4.2` |
+| `b12x` | `local-inference-lab/b12x` (`integration/karmic-kraken-beta`) | not created yet | DS4.1 kernels and RoCEnante transport |
+| `flashinfer` | `flashinfer-ai/flashinfer` | not created yet | not a promoted build input (the runtime base supplies 0.6.18.post1) |
+| `cutlass` | `NVIDIA/cutlass` | not created yet | SM121 stable-extension headers at `v4.7.1` |
 | `cutlass_dsl` | NVIDIA packages on PyPI | not applicable | SHA-256-locked ARM64 CuTe DSL wheel set |
 | `model` | `deepseek-ai/DeepSeek-V4.1-Flash` | not applicable | unchanged native model weights and tokenizer |
 

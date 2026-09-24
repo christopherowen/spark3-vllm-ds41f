@@ -283,7 +283,9 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
             problems.append(f"{name}: reference URL and role are required")
         elif reference["url"] not in watchlist:
             problems.append(f"{name}: reference URL is absent from the watchlist")
-    source_manifest = read_json("manifests/sources/2026-09-20-active-source.json")
+    source_manifest = read_json(
+        upstreams.get("source_manifest", "manifests/sources/2026-09-20-active-source.json")
+    )
     for name in ("vllm", "b12x"):
         wanted = source_manifest[name].get("patchset_sha256")
         actual = patchset_sha256(upstreams["sources"][name])
@@ -1109,7 +1111,9 @@ def patchset_sha256(source: dict) -> str:
 def build_input_problems(args: argparse.Namespace | None = None) -> list[str]:
     problems: list[str] = []
     _, _, upstreams = configuration(args)
-    source_manifest = read_json("manifests/sources/2026-09-20-active-source.json")
+    source_manifest = read_json(
+        upstreams.get("source_manifest", "manifests/sources/2026-09-20-active-source.json")
+    )
     for name, path in BUILD_CONTEXTS.items():
         if not path.is_dir():
             problems.append(f"missing {name}: {path}")

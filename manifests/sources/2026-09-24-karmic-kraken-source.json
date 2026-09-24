@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-24",
+  "vllm": {
+    "base_revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+    "patch_series": "patches/vllm/series",
+    "patchset_sha256": "cd9f067b4ee11e3331b3677dd587891557e60d9fd48442bed934719539c88a62",
+    "expected_tree": "b9788e52a3258f4c8eea9c804d6b3568fcc08e91",
+    "verification": "image label local.spark3.vllm.tree equals the pinned revision's tree; no local patches"
+  },
+  "b12x": {
+    "base_revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+    "patch_series": "patches/b12x/series",
+    "patchset_sha256": "c1d1d1906d912a36bc131e3a3079a98ab66a59036b197ba0cd5e673c6466900a",
+    "patch_head": "3d2439944021c3dc41aa7a597aefc67232e9f563",
+    "expected_tree": "d661de3161ff474a92646974584d6f5eb1958f75",
+    "verification": "prepare-sources applies the series to the pinned revision and checks this tree; image label local.spark3.b12x.tree matches"
+  },
+  "runtime_foundation": {
+    "vllm_base_image_digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "vllm_base_source_revision": "af1c01499b289be555c475669ba50a88e96d846e",
+    "flashinfer_version": "0.6.18.post1",
+    "flashinfer_evidence": "installed in the runtime base image; not rebuilt",
+    "cutlass_revision": "cb4247394dd82148787aed73e5dc7cef33cbf862",
+    "cutlass_release_tag": "v4.7.1",
+    "cutlass_dsl_version": "4.6.2",
+    "cutlass_dsl_lockfile": "requirements/cutlass-dsl-aarch64.txt",
+    "build_recipe": "experiments/2026-09-23-karmic-kraken-reference/{prepare-sources,build-candidate,Dockerfile}",
+    "build_deployment_commit": "9ffea8f365bbd5df3e865f99fc70326c6e72caf0"
+  },
+  "deployment_artifacts": {}
+}

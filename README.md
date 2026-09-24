@@ -10,24 +10,31 @@ state, or an experiment.
 
 ## Current baseline
 
-The active baseline was captured on 2026-09-20:
+The active baseline was promoted on 2026-09-24
+([manifests/baselines/2026-09-24-karmic-kraken.json](manifests/baselines/2026-09-24-karmic-kraken.json)):
 
 - three DGX Spark nodes using tensor parallelism 3;
 - direct dual ConnectX-7 paths between every pair of nodes;
-- vLLM with B12X attention, linear, MoE, and mHC kernels;
+- Local Inference Lab's `integration/karmic-kraken-beta` vLLM (unchanged) and
+  B12X (plus the switchless RoCEnante patch), with B12X attention, linear, MoE,
+  and mHC kernels;
 - DeepSeek V4.1 Flash native FP8/FP4 weights, unchanged;
-- DSpark speculative decoding with three draft tokens;
-- 160,000-token per-request limit, eight admitted sequences, and 498,145 KV
-  tokens in the measured 3 GiB-per-rank cache;
-- one concurrent prefill, 8,192 batched tokens, and a 4 GiB host-memory guard.
+- DSpark speculative decoding with three draft tokens, full CUDA graphs;
+- B12X W4A8 tiny decode disabled (`B12X_W4A8_TINY_DECODE=0`): it omits the
+  model's SwiGLU clamp and caused the incoherence seen in earlier images;
+- 160,000-token per-request limit, eight admitted sequences, and 933,168 KV
+  tokens in a 2 GiB-per-rank cache;
+- one concurrent prefill, 4,096 batched tokens, and fail-closed 5 GiB startup
+  and 3 GiB steady memory guards.
 
-The immutable baseline retains the observed 4 GiB guard. Current orchestration
-uses a fail-closed 5 GiB startup threshold sampled every quarter-second, then switches
-to the promoted 3 GiB steady threshold only after API readiness;
-`config/cluster.json` owns both desired values.
+One content-addressed image runs on all three nodes. It passes the LRU
+coherence gate 5/5 and is faster than the 2026-09-20 image at every point of
+the serving matrix; see
+[the qualifying experiment](experiments/2026-09-23-karmic-kraken-reference/README.md)
+and its [decision](experiments/2026-09-23-karmic-kraken-reference/decision.md).
 
 The machine-readable desired configuration is [config/cluster.json](config/cluster.json).
-The original live evidence is
+The previous baseline's live evidence is
 [manifests/baselines/2026-09-20-live.json](manifests/baselines/2026-09-20-live.json).
 
 ## Repository contract
@@ -107,17 +114,14 @@ but are not build inputs are kept separately in
 
 ## Transition status
 
-The active launch can now be rendered, deployed, and audited. The forensic
-source reconstruction is not yet complete: a follow-up comparison found local
-DS4.1 model changes in the live image beyond the captured indexer override. The
-recorded vLLM patch series therefore proves only that override, not the entire
-live serving tree.
+The promoted image is built reproducibly from pinned sources by
+[prepare-sources](experiments/2026-09-23-karmic-kraken-reference/prepare-sources)
+and [build-candidate](experiments/2026-09-23-karmic-kraken-reference/build-candidate),
+and one content digest runs on all three nodes. `bin/spark3 build render` and
+[docker/Dockerfile](docker/Dockerfile) still describe the earlier
+reconstruction and have not been migrated to that recipe.
 
-Rather than keep reconstructing a divergent release branch, the
-[upstream-main rebase experiment](experiments/2026-09-20-upstream-main-rebase/README.md)
-starts from current upstream architecture and carries each still-required
-change as a separate commit. Neither that experiment nor
-[docker/Dockerfile](docker/Dockerfile) has been built or qualified on a Spark.
-The current live tag still resolves to node-local image IDs and remains the
-promoted runtime until a scheduled qualification produces one tested content
-digest for all three nodes.
+Canonical vLLM main is parked. The
+[upstream-main rebase](experiments/2026-09-20-upstream-main-rebase/README.md)
+and [canonical-minimal](experiments/2026-09-23-canonical-minimal/README.md)
+experiments record that work; both shared the tiny-decode defect found later.

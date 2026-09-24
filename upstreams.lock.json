@@ -1,16 +1,20 @@
 {
   "schema_version": 1,
-  "generated_from_baseline": "2026-09-20-live",
+  "generated_from_baseline": "2026-09-24-karmic-kraken",
   "sources": {
     "vllm": {
       "kind": "git",
-      "upstream": "https://github.com/vllm-project/vllm.git",
+      "upstream": "https://github.com/local-inference-lab/vllm.git",
       "contribution_remote": "https://github.com/christopherowen/vllm.git",
-      "tracking_ref": "refs/heads/main",
-      "revision": "c687594b8a8082e18af9fe2f64eb5f9ee442e251",
-      "revision_url": "https://github.com/vllm-project/vllm/commit/c687594b8a8082e18af9fe2f64eb5f9ee442e251",
-      "role": "serving source overlaid in the current image",
-      "patch_series": "patches/vllm/series"
+      "tracking_ref": "refs/heads/integration/karmic-kraken-beta",
+      "revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+      "revision_url": "https://github.com/local-inference-lab/vllm/commit/01f1b874c774b4fade087d5f311970ee53745e01",
+      "role": "serving source: Local Inference Lab's DS4.1 integration branch, used unchanged; canonical vllm-project/vllm main is parked",
+      "patch_series": "patches/vllm/series",
+      "canonical_base": {
+        "upstream": "https://github.com/vllm-project/vllm.git",
+        "revision": "0f8fa53acf43a9a6a7a1f7e6b196950c78cd6d7a"
+      }
     },
     "vllm_base_image": {
       "kind": "oci",
@@ -24,16 +28,10 @@
       "kind": "git",
       "upstream": "https://github.com/local-inference-lab/b12x.git",
       "contribution_remote": null,
-      "tracking_ref": "refs/heads/main",
-      "revision": "f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
-      "revision_url": "https://github.com/local-inference-lab/b12x/commit/f1c4e9dd5b1d841c10cda70ee49c3190cf3db0be",
-      "applied_upstream_commits": [
-        {
-          "revision": "02407f653609e2c4c49db2efb5f77835d2e04e32",
-          "url": "https://github.com/local-inference-lab/b12x/commit/02407f653609e2c4c49db2efb5f77835d2e04e32",
-          "purpose": "correct native E4M3 conversion for subnormal FP4 scales"
-        }
-      ],
+      "tracking_ref": "refs/heads/integration/karmic-kraken-beta",
+      "revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+      "revision_url": "https://github.com/local-inference-lab/b12x/commit/0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+      "applied_upstream_commits": [],
       "role": "DeepSeek V4.1 kernels and RoCE collectives",
       "patch_series": "patches/b12x/series"
     },
@@ -45,17 +43,17 @@
       "revision": "07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
       "revision_url": "https://github.com/flashinfer-ai/flashinfer/commit/07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
       "submodules": true,
-      "role": "FlashInfer 0.7.0rc1 source used for native DeepSeek V4.1 sparse attention"
+      "role": "not a build input of the promoted image (FlashInfer 0.6.18.post1 comes from the runtime base image); retained for the docker/Dockerfile reconstruction recipe"
     },
     "cutlass": {
       "kind": "git",
       "upstream": "https://github.com/NVIDIA/cutlass.git",
       "contribution_remote": null,
       "tracking_ref": "refs/heads/main",
-      "revision": "da5e086dab31d63815acafdac9a9c5893b1c69e2",
-      "revision_url": "https://github.com/NVIDIA/cutlass/commit/da5e086dab31d63815acafdac9a9c5893b1c69e2",
-      "release_tag": "v4.4.2",
-      "role": "CUTLASS source used to build the SM121 stable vLLM extension"
+      "revision": "cb4247394dd82148787aed73e5dc7cef33cbf862",
+      "revision_url": "https://github.com/NVIDIA/cutlass/commit/cb4247394dd82148787aed73e5dc7cef33cbf862",
+      "release_tag": "v4.7.1",
+      "role": "CUTLASS headers for the SM121 _C_stable_libtorch and _moe_C_stable_libtorch rebuild"
     },
     "cutlass_dsl": {
       "kind": "pypi-wheel-set",
@@ -162,5 +160,6 @@
       "added_to_watchlist": "2026-09-20",
       "role": "upstream DeepSeek V4.1 serving recipe and current model-feature guidance"
     }
-  }
+  },
+  "source_manifest": "manifests/sources/2026-09-24-karmic-kraken-source.json"
 }
