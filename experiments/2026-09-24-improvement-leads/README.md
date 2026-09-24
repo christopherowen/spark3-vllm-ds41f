@@ -1,6 +1,7 @@
 # Improvement leads for the promoted karmic-kraken stack
 
-Desk research only; nothing here has run on the cluster. Sources: a code audit
+The leads below came from desk research; the results section records what
+then ran on the idle cluster. Sources: a code audit
 of B12X's dense MXFP8 GEMM path and vLLM's DS4.1 layers, and a survey of the
 repositories in `docs/inspiration.md`. Profile shares refer to
 `../2026-09-24-kk-speed-tuning/runs/profile-c1/` (rank-0 decode GPU time:
@@ -23,7 +24,7 @@ prompts that inflate prose and prefill.
    FP8 projection twice per forward (about 315 MB per rank per step). vLLM's
    `engram_config.projection_tp` shards it with a `ColumnParallelLinear`, which
    requires 25600 to divide by the TP size; at TP3 it needs a small padding
-   patch (pad columns to 25602, slice after the gather). Same math, so no
+   patch (pad the output to 25632 rows, slice after the gather). Same math, so no
    quality change expected. Saves about 210 MB per step (roughly 1 ms, ~2%).
    A four-Spark deployment saved 1.4 ms/step sharding this and the fused
    WQA/WKV projection with bit-identical output.
