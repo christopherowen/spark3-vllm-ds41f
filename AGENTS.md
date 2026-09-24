@@ -12,6 +12,8 @@ before changing runtime or build state.
 - `requirements/` owns hashed non-Git build inputs.
 - `patches/*/series` owns the ordered local patch stacks.
 - `manifests/baselines/` is immutable evidence. Never rewrite a published baseline.
+- `manifests/benchmarks/<baseline>.json` is that baseline's reference
+  `bin/spark3 bench` run. It is immutable too; a new promotion adds its own.
 - `experiments/` is the only place for unpromoted tuning.
 - `docs/inspiration.md` is a research watchlist, never a source or deployment
   authority.
