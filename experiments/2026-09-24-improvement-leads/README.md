@@ -70,3 +70,43 @@ shape at M=4 and M=32 in a 24 GiB-capped container under a host memory
 watchdog, then restarts the promoted service and runs `doctor --live`.
 Expected downtime 20-40 minutes (the sweep compiles every candidate on first
 use). Output: `runs/window1/*.tsv`, default plan against the fastest per shape.
+
+## Results (2026-09-24, cluster idle)
+
+- **Window 1, dense GEMM plans** (`runs/window1/`): at every DS4.1 TP3 shape
+  the heuristic plan is within 0-4% of the best offline plan at M=4 and M=32
+  (weights stream at 195-216 GB/s, the same practical ceiling as the MoE);
+  only the tiny DSpark context-KV GEMM gains (1.25x at M=4, about 4 us).
+  Pinning plans is not worth a patch. Rejected.
+- **Engram projection TP** (`overlay-vllm/engram.py`, then vLLM patch
+  `0001-engram-projection-tp-padding`): pads the 25600-row output to 25632
+  (8544 rows and 267 scale blocks per rank) and loads the last rank's missing
+  rows through `allow_tp_padding`; the first attempt, which concatenated
+  padding, was refused by the B12X checkpoint loader. Profile
+  (`runs/profile-engramtp-c1/`, `compare_profiles.py`): the projection falls
+  from ~690 to ~235 us per call, about 0.4 ms per output token at one stream
+  (~2%). The serving matrix cannot resolve 2% (all points within noise); LRU
+  5/5 twice; dgx1 minimum MemAvailable +0.25 GiB. Accepted.
+- **Block rejection** (`bench_sampled.py`, temperature 1.0, 16 requests per
+  cell): mean accepted drafts per step prose c1 0.857 vs 0.899, prose c4 0.890
+  vs 0.885, code c1 2.274 vs 2.112, code c4 2.253 vs 2.242 (block vs
+  standard); about +1% on average, within sampling noise. Lossless and the
+  upstream recipe's choice; adopted as a zero-risk setting with inconclusive
+  measured gain. No effect at temperature 0.
+- **vLLM #880** (prefill-only steps use the full token budget): not applicable.
+  This vLLM sets `max_num_scheduled_tokens` equal to `max_num_batched_tokens`
+  under DSpark (the startup warning only flags values below 8192), so there is
+  no cap to lift.
+- **Full candidate** (capture32, no FlashInfer autotune, Engram TP, block
+  rejection; `cluster-blockrej.json`): LRU 5/5 twice, every serving point
+  within noise of capture32, dgx1 minimum MemAvailable 6.50 GiB (from 6.07).
+- **Deferred:** fused activation quantization (B12X kernel work, ~1-2%),
+  LM head (bandwidth-bound BF16 GEMV; only an FP8 head would help, with a
+  numerics risk), rank-split indexer prefill (SGLang port), concurrent disk
+  Engram reads (newer B12X plus vLLM call-site change; host time mostly
+  hidden behind the GPU).
+
+The Engram patch is carried in the image recipe
+(`../2026-09-23-karmic-kraken-reference/patches/vllm/`), producing image
+`vllm-ds41f-kkref:01f1b874c774-r2` (vLLM tree `90fdd043`); `cluster-r2.json`
+is the candidate on that image with no overlays.
