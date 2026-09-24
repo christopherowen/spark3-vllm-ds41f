@@ -6,7 +6,8 @@
 set -u
 cd ~/projects/spark3-vllm-ds41f
 D=experiments/2026-09-24-improvement-leads
-OUT="$PWD/$D/runs/window1"
+# Results go outside the checkout: the launcher refuses a dirty repository.
+OUT=/tmp/claude-runs/window1
 NAME=spark3-gemm-sweep
 IMAGE=$(jq -r .container.image config/cluster.json)
 mkdir -p "$OUT"

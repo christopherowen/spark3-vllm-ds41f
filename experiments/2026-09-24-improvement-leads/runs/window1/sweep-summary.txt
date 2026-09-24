@@ -1,0 +1,256 @@
+== wqa_wkv N=1792 K=5120
+  M=4    16x64/BK128/split1/unrollauto    46.08 us cos=1.00000012
+  M=4    16x64/BK128/split2/unrollauto    47.10 us cos=0.99999583
+  M=4    16x64/BK128/split4/unrollauto    47.10 us cos=0.99999368
+  M=4    16x128/BK128/split1/unrollauto    47.07 us cos=1.00000012
+  M=4    16x128/BK128/split2/unrollauto    48.13 us cos=0.99999583
+  M=4    16x128/BK128/split4/unrollauto    48.13 us cos=0.99999350
+  M=4    32x64/BK128/split1/unrollauto    46.18 us cos=1.00000012
+  M=4    32x64/BK128/split2/unrollauto    48.22 us cos=0.99999583
+  M=4    32x64/BK128/split4/unrollauto    46.35 us cos=0.99999332
+  M=4    32x128/BK128/split1/unrollauto    47.07 us cos=1.00000012
+  M=4    32x128/BK128/split2/unrollauto    48.13 us cos=0.99999583
+  M=4    32x128/BK128/split4/unrollauto    48.10 us cos=0.99999344
+  M=4    64x64/BK128/split1/unrollauto    47.14 us cos=1.00000012
+  M=4    64x64/BK128/split2/unrollauto    49.22 us cos=0.99999583
+  M=4    64x64/BK128/split4/unrollauto    46.56 us cos=0.99999356
+  M=4    64x128/BK128/split1/unrollauto    49.15 us cos=1.00000012
+  M=4    64x128/BK128/split2/unrollauto    48.19 us cos=0.99999583
+  M=4    64x128/BK128/split4/unrollauto    48.38 us cos=0.99999338
+  M=4    128x64/BK128/split1/unrollauto    67.68 us cos=1.00000012
+  M=4    128x64/BK128/split2/unrollauto    63.89 us cos=0.99999583
+  M=4    128x64/BK128/split4/unrollauto    61.50 us cos=0.99999374
+  M=4    128x128/BK128/split1/unrollauto    96.16 us cos=1.00000012
+  M=4    128x128/BK128/split2/unrollauto    61.90 us cos=0.99999583
+  M=4    128x128/BK128/split4/unrollauto    59.39 us cos=0.99999356
+  -> M=4    winner 16x64/BK128/split1/unrollauto 46.08 us (1.022x vs default/direct/BK128)
+  M=32   16x64/BK128/split1/unrollauto    51.26 us cos=1.00000000
+  M=32   16x128/BK128/split1/unrollauto    47.10 us cos=1.00000000
+  M=32   32x64/BK128/split1/unrollauto    47.09 us cos=1.00000000
+  M=32   32x128/BK128/split1/unrollauto    47.10 us cos=1.00000000
+  M=32   64x64/BK128/split1/unrollauto    47.10 us cos=1.00000000
+  M=32   64x128/BK128/split1/unrollauto    49.15 us cos=1.00000000
+  M=32   128x64/BK128/split1/unrollauto    49.15 us cos=1.00000000
+  M=32   128x128/BK128/split1/unrollauto    92.26 us cos=1.00000000
+  -> M=32   winner 32x64/BK128/split1/unrollauto 47.09 us (1.000x vs default/direct/BK128)
+== wq_b N=12288 K=1280
+  M=4    16x64/BK128/split1/unrollauto    73.70 us cos=0.99999994
+  M=4    16x64/BK128/split2/unrollauto    73.70 us cos=0.99999589
+  M=4    16x128/BK128/split1/unrollauto    74.82 us cos=0.99999994
+  M=4    16x128/BK128/split2/unrollauto    74.72 us cos=0.99999589
+  M=4    32x64/BK128/split1/unrollauto    73.79 us cos=0.99999994
+  M=4    32x64/BK128/split2/unrollauto    73.63 us cos=0.99999589
+  M=4    32x128/BK128/split1/unrollauto    74.82 us cos=0.99999994
+  M=4    32x128/BK128/split2/unrollauto    74.75 us cos=0.99999589
+  M=4    64x64/BK128/split1/unrollauto    74.75 us cos=0.99999994
+  M=4    64x64/BK128/split2/unrollauto    73.73 us cos=0.99999589
+  M=4    64x128/BK128/split1/unrollauto    75.84 us cos=0.99999994
+  M=4    64x128/BK128/split2/unrollauto    75.71 us cos=0.99999589
+  M=4    128x64/BK128/split1/unrollauto   120.90 us cos=0.99999994
+  M=4    128x64/BK128/split2/unrollauto   122.91 us cos=0.99999589
+  M=4    128x128/BK128/split1/unrollauto    79.97 us cos=0.99999994
+  M=4    128x128/BK128/split2/unrollauto    78.82 us cos=0.99999589
+  -> M=4    winner 32x64/BK128/split2/unrollauto 73.63 us (1.016x vs default/direct/BK128)
+  M=32   16x64/BK128/split1/unrollauto    72.77 us cos=1.00000012
+  M=32   16x128/BK128/split1/unrollauto    73.76 us cos=1.00000012
+  M=32   32x64/BK128/split1/unrollauto    73.66 us cos=1.00000012
+  M=32   32x128/BK128/split1/unrollauto    74.85 us cos=1.00000012
+  M=32   64x64/BK128/split1/unrollauto    74.72 us cos=1.00000012
+  M=32   64x128/BK128/split1/unrollauto    75.78 us cos=1.00000012
+  M=32   128x64/BK128/split1/unrollauto   100.35 us cos=1.00000012
+  M=32   128x128/BK128/split1/unrollauto    78.18 us cos=1.00000012
+  -> M=32   winner 16x64/BK128/split1/unrollauto 72.77 us (1.029x vs default/direct/BK128)
+== shared_gate_up N=1536 K=5120
+  M=4    16x64/BK128/split1/unrollauto    40.90 us cos=1.00000000
+  M=4    16x64/BK128/split2/unrollauto    40.93 us cos=0.99999607
+  M=4    16x64/BK128/split4/unrollauto    39.97 us cos=0.99999374
+  M=4    16x128/BK128/split1/unrollauto    40.96 us cos=1.00000000
+  M=4    16x128/BK128/split2/unrollauto    41.02 us cos=0.99999607
+  M=4    16x128/BK128/split4/unrollauto    41.82 us cos=0.99999374
+  M=4    32x64/BK128/split1/unrollauto    40.93 us cos=1.00000000
+  M=4    32x64/BK128/split2/unrollauto    40.75 us cos=0.99999607
+  M=4    32x64/BK128/split4/unrollauto    40.14 us cos=0.99999374
+  M=4    32x128/BK128/split1/unrollauto    41.02 us cos=1.00000000
+  M=4    32x128/BK128/split2/unrollauto    42.00 us cos=0.99999607
+  M=4    32x128/BK128/split4/unrollauto    41.89 us cos=0.99999380
+  M=4    64x64/BK128/split1/unrollauto    41.41 us cos=1.00000000
+  M=4    64x64/BK128/split2/unrollauto    40.96 us cos=0.99999607
+  M=4    64x64/BK128/split4/unrollauto    40.80 us cos=0.99999362
+  M=4    64x128/BK128/split1/unrollauto    43.07 us cos=1.00000000
+  M=4    64x128/BK128/split2/unrollauto    41.98 us cos=0.99999607
+  M=4    64x128/BK128/split4/unrollauto    41.84 us cos=0.99999356
+  M=4    128x64/BK128/split1/unrollauto    59.46 us cos=1.00000000
+  M=4    128x64/BK128/split2/unrollauto    55.30 us cos=0.99999607
+  M=4    128x64/BK128/split4/unrollauto    53.31 us cos=0.99999392
+  M=4    128x128/BK128/split1/unrollauto    90.11 us cos=1.00000000
+  M=4    128x128/BK128/split2/unrollauto    57.63 us cos=0.99999607
+  M=4    128x128/BK128/split4/unrollauto    43.30 us cos=0.99999380
+  -> M=4    winner 16x64/BK128/split4/unrollauto 39.97 us (1.036x vs default/direct/BK128)
+  M=32   16x64/BK128/split1/unrollauto    40.99 us cos=1.00000000
+  M=32   16x128/BK128/split1/unrollauto    40.99 us cos=1.00000000
+  M=32   32x64/BK128/split1/unrollauto    40.99 us cos=1.00000000
+  M=32   32x128/BK128/split1/unrollauto    41.10 us cos=1.00000000
+  M=32   64x64/BK128/split1/unrollauto    40.99 us cos=1.00000000
+  M=32   64x128/BK128/split1/unrollauto    43.25 us cos=1.00000000
+  M=32   128x64/BK128/split1/unrollauto    43.01 us cos=1.00000000
+  M=32   128x128/BK128/split1/unrollauto    86.11 us cos=1.00000000
+  -> M=32   winner 16x64/BK128/split1/unrollauto 40.99 us (1.000x vs default/direct/BK128)
+== shared_down N=5120 K=768
+  M=4    16x64/BK128/split1/unrollauto    21.54 us cos=1.00000000
+  M=4    16x64/BK128/split2/unrollauto    23.52 us cos=0.99999583
+  M=4    16x128/BK128/split1/unrollauto    22.66 us cos=1.00000000
+  M=4    16x128/BK128/split2/unrollauto    23.58 us cos=0.99999583
+  M=4    32x64/BK128/split1/unrollauto    22.56 us cos=1.00000000
+  M=4    32x64/BK128/split2/unrollauto    23.58 us cos=0.99999583
+  M=4    32x128/BK128/split1/unrollauto    22.59 us cos=1.00000000
+  M=4    32x128/BK128/split2/unrollauto    23.62 us cos=0.99999583
+  M=4    64x64/BK128/split1/unrollauto    22.59 us cos=1.00000000
+  M=4    64x64/BK128/split2/unrollauto    24.59 us cos=0.99999583
+  M=4    64x128/BK128/split1/unrollauto    22.72 us cos=1.00000000
+  M=4    64x128/BK128/split2/unrollauto    24.58 us cos=0.99999583
+  M=4    128x64/BK128/split1/unrollauto    34.88 us cos=1.00000000
+  M=4    128x64/BK128/split2/unrollauto    35.10 us cos=0.99999583
+  M=4    128x128/BK128/split1/unrollauto    26.72 us cos=1.00000000
+  M=4    128x128/BK128/split2/unrollauto    26.66 us cos=0.99999583
+  -> M=4    winner 16x64/BK128/split1/unrollauto 21.54 us (1.000x vs default/direct/BK128)
+  M=32   16x64/BK128/split1/unrollauto    22.53 us cos=0.99999988
+  M=32   16x128/BK128/split1/unrollauto    21.60 us cos=0.99999988
+  M=32   32x64/BK128/split1/unrollauto    22.27 us cos=0.99999988
+  M=32   32x128/BK128/split1/unrollauto    21.79 us cos=0.99999988
+  M=32   64x64/BK128/split1/unrollauto    22.59 us cos=0.99999988
+  M=32   64x128/BK128/split1/unrollauto    23.62 us cos=0.99999988
+  M=32   128x64/BK128/split1/unrollauto    28.70 us cos=0.99999988
+  M=32   128x128/BK128/split1/unrollauto    26.70 us cos=0.99999988
+  -> M=32   winner 16x128/BK128/split1/unrollauto 21.60 us (1.009x vs default/direct/BK128)
+== indexer_wq_b N=4096 K=1280
+  M=4    16x64/BK128/split1/unrollauto    28.61 us cos=1.00000000
+  M=4    16x64/BK128/split2/unrollauto    28.70 us cos=0.99999607
+  M=4    16x128/BK128/split1/unrollauto    28.67 us cos=1.00000000
+  M=4    16x128/BK128/split2/unrollauto    29.70 us cos=0.99999607
+  M=4    32x64/BK128/split1/unrollauto    28.64 us cos=1.00000000
+  M=4    32x64/BK128/split2/unrollauto    28.70 us cos=0.99999607
+  M=4    32x128/BK128/split1/unrollauto    28.64 us cos=1.00000000
+  M=4    32x128/BK128/split2/unrollauto    29.70 us cos=0.99999607
+  M=4    64x64/BK128/split1/unrollauto    28.77 us cos=1.00000000
+  M=4    64x64/BK128/split2/unrollauto    28.74 us cos=0.99999607
+  M=4    64x128/BK128/split1/unrollauto    28.67 us cos=1.00000000
+  M=4    64x128/BK128/split2/unrollauto    29.79 us cos=0.99999607
+  M=4    128x64/BK128/split1/unrollauto    43.30 us cos=1.00000000
+  M=4    128x64/BK128/split2/unrollauto    45.12 us cos=0.99999607
+  M=4    128x128/BK128/split1/unrollauto    34.82 us cos=1.00000000
+  M=4    128x128/BK128/split2/unrollauto    35.17 us cos=0.99999607
+  -> M=4    winner 16x64/BK128/split1/unrollauto 28.61 us (1.002x vs default/direct/BK128)
+  M=32   16x64/BK128/split1/unrollauto    27.58 us cos=1.00000000
+  M=32   16x128/BK128/split1/unrollauto    28.67 us cos=1.00000000
+  M=32   32x64/BK128/split1/unrollauto    28.66 us cos=1.00000000
+  M=32   32x128/BK128/split1/unrollauto    28.66 us cos=1.00000000
+  M=32   64x64/BK128/split1/unrollauto    28.70 us cos=1.00000000
+  M=32   64x128/BK128/split1/unrollauto    28.64 us cos=1.00000000
+  M=32   128x64/BK128/split1/unrollauto    36.90 us cos=1.00000000
+  M=32   128x128/BK128/split1/unrollauto    34.82 us cos=1.00000000
+  -> M=32   winner 16x64/BK128/split1/unrollauto 27.58 us (1.039x vs default/direct/BK128)
+== engram_wkv N=25600 K=6144
+  M=4    16x64/BK128/split1/unrollauto   720.90 us cos=1.00000000
+  M=4    16x64/BK128/split2/unrollauto   725.10 us cos=0.99999583
+  M=4    16x64/BK128/split4/unrollauto   723.87 us cos=0.99999380
+  M=4    16x128/BK128/split1/unrollauto   722.48 us cos=1.00000000
+  M=4    16x128/BK128/split2/unrollauto   726.54 us cos=0.99999583
+  M=4    16x128/BK128/split4/unrollauto   724.11 us cos=0.99999368
+  M=4    32x64/BK128/split1/unrollauto   721.98 us cos=1.00000000
+  M=4    32x64/BK128/split2/unrollauto   721.76 us cos=0.99999583
+  M=4    32x64/BK128/split4/unrollauto   712.85 us cos=0.99999380
+  M=4    32x128/BK128/split1/unrollauto   724.03 us cos=1.00000000
+  M=4    32x128/BK128/split2/unrollauto   727.04 us cos=0.99999583
+  M=4    32x128/BK128/split4/unrollauto   726.38 us cos=0.99999380
+  M=4    64x64/BK128/split1/unrollauto   724.06 us cos=1.00000000
+  M=4    64x64/BK128/split2/unrollauto   721.09 us cos=0.99999583
+  M=4    64x64/BK128/split4/unrollauto   715.90 us cos=0.99999380
+  M=4    64x128/BK128/split1/unrollauto   730.86 us cos=1.00000000
+  M=4    64x128/BK128/split2/unrollauto   727.62 us cos=0.99999583
+  M=4    64x128/BK128/split4/unrollauto   729.09 us cos=0.99999380
+  M=4    128x64/BK128/split1/unrollauto   894.03 us cos=1.00000000
+  M=4    128x64/BK128/split2/unrollauto   807.09 us cos=0.99999583
+  M=4    128x64/BK128/split4/unrollauto   798.86 us cos=0.99999380
+  M=4    128x128/BK128/split1/unrollauto   792.58 us cos=1.00000000
+  M=4    128x128/BK128/split2/unrollauto   755.84 us cos=0.99999583
+  M=4    128x128/BK128/split4/unrollauto   736.42 us cos=0.99999380
+  -> M=4    winner 32x64/BK128/split4/unrollauto 712.85 us (1.013x vs default/direct/BK128)
+  M=32   16x64/BK128/split1/unrollauto   732.45 us cos=0.99999988
+  M=32   16x128/BK128/split1/unrollauto   740.00 us cos=0.99999988
+  M=32   32x64/BK128/split1/unrollauto   734.40 us cos=0.99999988
+  M=32   32x128/BK128/split1/unrollauto   739.31 us cos=0.99999988
+  M=32   64x64/BK128/split1/unrollauto   737.28 us cos=0.99999988
+  M=32   64x128/BK128/split1/unrollauto   743.42 us cos=0.99999988
+  M=32   128x64/BK128/split1/unrollauto   741.23 us cos=0.99999988
+  M=32   128x128/BK128/split1/unrollauto   802.83 us cos=0.99999988
+  -> M=32   winner 16x64/BK128/split1/unrollauto 732.45 us (1.009x vs default/direct/BK128)
+== dspark_main_proj N=5120 K=15360
+  M=4    16x64/BK128/split1/unrollauto   364.54 us cos=1.00000000
+  M=4    16x64/BK128/split2/unrollauto   366.75 us cos=0.99999583
+  M=4    16x64/BK128/split4/unrollauto   365.57 us cos=0.99999374
+  M=4    16x128/BK128/split1/unrollauto   363.52 us cos=1.00000000
+  M=4    16x128/BK128/split2/unrollauto   367.73 us cos=0.99999583
+  M=4    16x128/BK128/split4/unrollauto   365.73 us cos=0.99999356
+  M=4    32x64/BK128/split1/unrollauto   365.66 us cos=1.00000000
+  M=4    32x64/BK128/split2/unrollauto   367.62 us cos=0.99999583
+  M=4    32x64/BK128/split4/unrollauto   365.73 us cos=0.99999362
+  M=4    32x128/BK128/split1/unrollauto   363.63 us cos=1.00000000
+  M=4    32x128/BK128/split2/unrollauto   367.78 us cos=0.99999583
+  M=4    32x128/BK128/split4/unrollauto   367.58 us cos=0.99999368
+  M=4    64x64/BK128/split1/unrollauto   368.83 us cos=1.00000000
+  M=4    64x64/BK128/split2/unrollauto   368.67 us cos=0.99999583
+  M=4    64x64/BK128/split4/unrollauto   366.69 us cos=0.99999368
+  M=4    64x128/BK128/split1/unrollauto   365.60 us cos=1.00000000
+  M=4    64x128/BK128/split2/unrollauto   370.67 us cos=0.99999583
+  M=4    64x128/BK128/split4/unrollauto   368.64 us cos=0.99999356
+  M=4    128x64/BK128/split1/unrollauto   527.38 us cos=1.00000000
+  M=4    128x64/BK128/split2/unrollauto   376.54 us cos=0.99999583
+  M=4    128x64/BK128/split4/unrollauto   368.82 us cos=0.99999374
+  M=4    128x128/BK128/split1/unrollauto   382.98 us cos=1.00000000
+  M=4    128x128/BK128/split2/unrollauto   390.34 us cos=0.99999583
+  M=4    128x128/BK128/split4/unrollauto   402.48 us cos=0.99999368
+  -> M=4    winner 16x128/BK128/split1/unrollauto 363.52 us (1.003x vs default/direct/BK128)
+  M=32   16x64/BK128/split1/unrollauto   379.10 us cos=1.00000012
+  M=32   16x128/BK128/split1/unrollauto   368.77 us cos=1.00000012
+  M=32   32x64/BK128/split1/unrollauto   368.77 us cos=1.00000012
+  M=32   32x128/BK128/split1/unrollauto   365.76 us cos=1.00000012
+  M=32   64x64/BK128/split1/unrollauto   369.68 us cos=1.00000012
+  M=32   64x128/BK128/split1/unrollauto   366.75 us cos=1.00000012
+  M=32   128x64/BK128/split1/unrollauto   370.69 us cos=1.00000012
+  M=32   128x128/BK128/split1/unrollauto   380.83 us cos=1.00000012
+  -> M=32   winner 32x128/BK128/split1/unrollauto 365.76 us (1.000x vs default/direct/BK128)
+== dspark_ctx_kv N=512 K=5120
+  M=4    16x64/BK128/split1/unrollauto    18.43 us cos=1.00000000
+  M=4    16x64/BK128/split2/unrollauto    16.74 us cos=0.99999607
+  M=4    16x64/BK128/split4/unrollauto    16.42 us cos=0.99999386
+  M=4    16x128/BK128/split1/unrollauto    20.48 us cos=1.00000000
+  M=4    16x128/BK128/split2/unrollauto    18.50 us cos=0.99999607
+  M=4    16x128/BK128/split4/unrollauto    18.35 us cos=0.99999392
+  M=4    32x64/BK128/split1/unrollauto    18.50 us cos=1.00000000
+  M=4    32x64/BK128/split2/unrollauto    16.80 us cos=0.99999607
+  M=4    32x64/BK128/split4/unrollauto    16.48 us cos=0.99999332
+  M=4    32x128/BK128/split1/unrollauto    20.54 us cos=1.00000000
+  M=4    32x128/BK128/split2/unrollauto    18.53 us cos=0.99999607
+  M=4    32x128/BK128/split4/unrollauto    18.43 us cos=0.99999392
+  M=4    64x64/BK128/split1/unrollauto    20.51 us cos=1.00000000
+  M=4    64x64/BK128/split2/unrollauto    18.43 us cos=0.99999607
+  M=4    64x64/BK128/split4/unrollauto    17.47 us cos=0.99999392
+  M=4    64x128/BK128/split1/unrollauto    26.62 us cos=1.00000000
+  M=4    64x128/BK128/split2/unrollauto    20.58 us cos=0.99999607
+  M=4    64x128/BK128/split4/unrollauto    18.43 us cos=0.99999315
+  M=4    128x64/BK128/split1/unrollauto    24.67 us cos=1.00000000
+  M=4    128x64/BK128/split2/unrollauto    22.53 us cos=0.99999607
+  M=4    128x64/BK128/split4/unrollauto    20.61 us cos=0.99999356
+  M=4    128x128/BK128/split1/unrollauto    73.73 us cos=1.00000000
+  M=4    128x128/BK128/split2/unrollauto    45.02 us cos=0.99999607
+  M=4    128x128/BK128/split4/unrollauto    28.74 us cos=0.99999362
+  -> M=4    winner 16x64/BK128/split4/unrollauto 16.42 us (1.250x vs default/direct/BK128)
+  M=32   16x64/BK128/split1/unrollauto    18.53 us cos=1.00000000
+  M=32   16x128/BK128/split1/unrollauto    20.48 us cos=1.00000000
+  M=32   32x64/BK128/split1/unrollauto    20.45 us cos=1.00000000
+  M=32   32x128/BK128/split1/unrollauto    20.58 us cos=1.00000000
+  M=32   64x64/BK128/split1/unrollauto    20.48 us cos=1.00000000
+  M=32   64x128/BK128/split1/unrollauto    26.62 us cos=1.00000000
+  M=32   128x64/BK128/split1/unrollauto    24.58 us cos=1.00000000
+  M=32   128x128/BK128/split1/unrollauto    70.02 us cos=1.00000000
+  -> M=32   winner 16x64/BK128/split1/unrollauto 18.53 us (1.105x vs default/direct/BK128)
