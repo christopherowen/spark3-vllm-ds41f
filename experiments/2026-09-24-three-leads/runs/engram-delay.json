@@ -1,0 +1,426 @@
+{
+ "schema": 1,
+ "started_utc": "20260924T231452Z",
+ "identity": {
+  "cluster_config": "experiments/2026-09-24-three-leads/cluster-engram-delay.json",
+  "cluster_config_sha256": "ede2ba0918d423cf764623d6e49f3e46185cc001ed9d4d85ab5911fbdf4e1822",
+  "promoted_baseline": "2026-09-24-karmic-kraken-r2",
+  "image": "vllm-ds41f-kkref:01f1b874c774-r2",
+  "client_commit": "0303076724702236bc6e37f20ffb26c5e2847906",
+  "client_dirty": false,
+  "client_host": "dgx1",
+  "nodes": {
+   "dgx1": {
+    "image_id": "sha256:a95eb867261b713185c1591c1a13be229e93e8df64b500d9df5aff194c629475",
+    "container_started_at": "2026-09-24T23:12:37.80977942Z",
+    "checkout": "0303076724702236bc6e37f20ffb26c5e2847906"
+   },
+   "dgx2": {
+    "image_id": "sha256:a95eb867261b713185c1591c1a13be229e93e8df64b500d9df5aff194c629475",
+    "container_started_at": "2026-09-24T23:12:34.929129187Z",
+    "checkout": "0303076724702236bc6e37f20ffb26c5e2847906"
+   },
+   "dgx3": {
+    "image_id": "sha256:a95eb867261b713185c1591c1a13be229e93e8df64b500d9df5aff194c629475",
+    "container_started_at": "2026-09-24T23:12:36.38726064Z",
+    "checkout": "0303076724702236bc6e37f20ffb26c5e2847906"
+   }
+  },
+  "live_problems": []
+ },
+ "workload": {
+  "url": "http://10.0.1.71:8000",
+  "suites": [
+   "quality",
+   "decode"
+  ],
+  "seed": 0,
+  "precision_pct": 2.0,
+  "min_samples": 5,
+  "max_samples": 5,
+  "concurrency": [
+   1
+  ],
+  "sampled_requests": 32,
+  "prefill_sizes": [
+   2048,
+   32768,
+   65536,
+   131072
+  ],
+  "prefill_repeats": 3,
+  "prefix_tokens": 32768,
+  "admission_tokens": 65536,
+  "memory_floor_gib": 4.0,
+  "prompts_sha256": "cc7f29400eff69775f0d9fb016be00924f46a81be7b42dc5c15a4eb9d82da779"
+ },
+ "reference": "manifests/benchmarks/2026-09-24-karmic-kraken-r2.json",
+ "suites": {
+  "quality": {
+   "passed": 5,
+   "runs": [
+    {
+     "verdict": "pass",
+     "content": "```python\nfrom collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n```\n\nBoth `get` and `put` run in **O(1)** average time, since `OrderedDict` provides constant-time lookups, insertions, and moves to either end."
+    },
+    {
+     "verdict": "pass",
+     "content": "```python\nfrom collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n```\n\nBoth `get` and `put` run in **O(1)** average time, since `OrderedDict` provides constant-time lookups, insertions, and moves to the end."
+    },
+    {
+     "verdict": "pass",
+     "content": "```python\nfrom collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n```\n\nBoth `get` and `put` run in **O(1)** average time, since `OrderedDict` provides constant-time lookups, insertions, and moves to either end."
+    },
+    {
+     "verdict": "pass",
+     "content": "```python\nfrom collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n```\n\nBoth `get` and `put` run in **O(1)** average time, since `OrderedDict` provides constant-time lookups, insertions, and moves to either end."
+    },
+    {
+     "verdict": "pass",
+     "content": "```python\nfrom collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n```\n\nBoth `get` and `put` run in **O(1)** average time, since `OrderedDict` provides constant-time lookups, insertions, and moves to either end."
+    }
+   ],
+   "ok": true
+  },
+  "decode": {
+   "points": {
+    "prose-c1": {
+     "tps": {
+      "n": 5,
+      "mean": 28.893,
+      "median": 28.758,
+      "min": 27.411,
+      "max": 30.406,
+      "sd": 1.093,
+      "ci95": 1.358,
+      "ci95_pct": 4.7
+     },
+     "per_stream_decode_tps": {
+      "n": 5,
+      "mean": 29.562,
+      "median": 29.39,
+      "min": 28.12,
+      "max": 31.12,
+      "sd": 1.1,
+      "ci95": 1.366,
+      "ci95_pct": 4.62
+     },
+     "ttft_s": {
+      "n": 5,
+      "mean": 0.234,
+      "median": 0.226,
+      "min": 0.223,
+      "max": 0.271,
+      "sd": 0.021,
+      "ci95": 0.025,
+      "ci95_pct": 10.86
+     },
+     "accepted_per_draft": {
+      "n": 5,
+      "mean": 1.345,
+      "median": 1.339,
+      "min": 1.237,
+      "max": 1.462,
+      "sd": 0.08,
+      "ci95": 0.1,
+      "ci95_pct": 7.42
+     },
+     "step_ms": {
+      "n": 5,
+      "mean": 79.34,
+      "median": 79.545,
+      "min": 78.756,
+      "max": 79.702,
+      "sd": 0.4,
+      "ci95": 0.497,
+      "ci95_pct": 0.63
+     },
+     "verified_per_draft": {
+      "n": 5,
+      "mean": 2.976,
+      "median": 2.982,
+      "min": 2.947,
+      "max": 2.991,
+      "sd": 0.017,
+      "ci95": 0.021,
+      "ci95_pct": 0.7
+     },
+     "failed_requests": 0,
+     "distinct_outputs": 5
+    },
+    "code-c1": {
+     "tps": {
+      "n": 5,
+      "mean": 35.147,
+      "median": 33.951,
+      "min": 32.334,
+      "max": 38.415,
+      "sd": 2.808,
+      "ci95": 3.486,
+      "ci95_pct": 9.92
+     },
+     "per_stream_decode_tps": {
+      "n": 5,
+      "mean": 36.292,
+      "median": 34.88,
+      "min": 33.35,
+      "max": 39.65,
+      "sd": 2.959,
+      "ci95": 3.673,
+      "ci95_pct": 10.12
+     },
+     "ttft_s": {
+      "n": 5,
+      "mean": 0.256,
+      "median": 0.267,
+      "min": 0.23,
+      "max": 0.283,
+      "sd": 0.024,
+      "ci95": 0.03,
+      "ci95_pct": 11.73
+     },
+     "accepted_per_draft": {
+      "n": 5,
+      "mean": 1.89,
+      "median": 1.783,
+      "min": 1.656,
+      "max": 2.148,
+      "sd": 0.24,
+      "ci95": 0.298,
+      "ci95_pct": 15.78
+     },
+     "step_ms": {
+      "n": 5,
+      "mean": 79.612,
+      "median": 79.646,
+      "min": 79.137,
+      "max": 80.104,
+      "sd": 0.368,
+      "ci95": 0.457,
+      "ci95_pct": 0.57
+     },
+     "verified_per_draft": {
+      "n": 5,
+      "mean": 3.0,
+      "median": 3.0,
+      "min": 3.0,
+      "max": 3.0,
+      "sd": 0.0,
+      "ci95": 0.0,
+      "ci95_pct": 0.0
+     },
+     "failed_requests": 0,
+     "distinct_outputs": 5
+    }
+   },
+   "samples": {
+    "prose-c1": [
+     {
+      "tps": 30.406,
+      "accepted_per_draft": 1.4615,
+      "verified_per_draft": 2.9808,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2234,
+        "prompt_tokens": 68,
+        "completion_tokens": 256,
+        "decode_tps": 31.12,
+        "output_sha256": "91da2d180e3c2c84",
+        "error": null
+       }
+      ]
+     },
+     {
+      "tps": 29.315,
+      "accepted_per_draft": 1.3611,
+      "verified_per_draft": 2.9815,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2275,
+        "prompt_tokens": 68,
+        "completion_tokens": 256,
+        "decode_tps": 29.98,
+        "output_sha256": "309d16518fad86c2",
+        "error": null
+       }
+      ]
+     },
+     {
+      "tps": 28.758,
+      "accepted_per_draft": 1.3394,
+      "verified_per_draft": 2.9908,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2255,
+        "prompt_tokens": 68,
+        "completion_tokens": 256,
+        "decode_tps": 29.39,
+        "output_sha256": "b08beebcadea7d35",
+        "error": null
+       }
+      ]
+     },
+     {
+      "tps": 27.411,
+      "accepted_per_draft": 1.2368,
+      "verified_per_draft": 2.9474,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2709,
+        "prompt_tokens": 68,
+        "completion_tokens": 256,
+        "decode_tps": 28.12,
+        "output_sha256": "0cc569a1c5098919",
+        "error": null
+       }
+      ]
+     },
+     {
+      "tps": 28.575,
+      "accepted_per_draft": 1.3273,
+      "verified_per_draft": 2.9818,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2243,
+        "prompt_tokens": 68,
+        "completion_tokens": 256,
+        "decode_tps": 29.2,
+        "output_sha256": "c54fd19dba860746",
+        "error": null
+       }
+      ]
+     }
+    ],
+    "code-c1": [
+     {
+      "tps": 38.415,
+      "accepted_per_draft": 2.1481,
+      "verified_per_draft": 3.0,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2319,
+        "prompt_tokens": 75,
+        "completion_tokens": 256,
+        "decode_tps": 39.65,
+        "output_sha256": "f18d2b8423722670",
+        "error": null
+       }
+      ]
+     },
+     {
+      "tps": 33.951,
+      "accepted_per_draft": 1.7826,
+      "verified_per_draft": 3.0,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2295,
+        "prompt_tokens": 75,
+        "completion_tokens": 256,
+        "decode_tps": 34.88,
+        "output_sha256": "ceecef265983480c",
+        "error": null
+       }
+      ]
+     },
+     {
+      "tps": 33.147,
+      "accepted_per_draft": 1.7128,
+      "verified_per_draft": 3.0,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2834,
+        "prompt_tokens": 75,
+        "completion_tokens": 256,
+        "decode_tps": 34.28,
+        "output_sha256": "d4276958d1ca99ea",
+        "error": null
+       }
+      ]
+     },
+     {
+      "tps": 37.888,
+      "accepted_per_draft": 2.1481,
+      "verified_per_draft": 3.0,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2674,
+        "prompt_tokens": 75,
+        "completion_tokens": 256,
+        "decode_tps": 39.3,
+        "output_sha256": "e91733e3ea6541c1",
+        "error": null
+       }
+      ]
+     },
+     {
+      "tps": 32.334,
+      "accepted_per_draft": 1.6562,
+      "verified_per_draft": 3.0,
+      "requests": [
+       {
+        "ok": true,
+        "ttft_s": 0.2696,
+        "prompt_tokens": 75,
+        "completion_tokens": 256,
+        "decode_tps": 33.35,
+        "output_sha256": "2078accd1971e81e",
+        "error": null
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "thermal": {
+  "dgx1": {
+   "max_gpu_c": 53.0,
+   "min_headroom_c": 41.0,
+   "max_system_c": 74.8,
+   "max_power_w": 28.7,
+   "thermal_slowdown_ms": 0.0,
+   "power_cap_ms": 0.0
+  },
+  "dgx2": {
+   "max_gpu_c": 52.0,
+   "min_headroom_c": 43.0,
+   "max_system_c": 73.3,
+   "max_power_w": 31.77,
+   "thermal_slowdown_ms": 0.0,
+   "power_cap_ms": 0.0
+  },
+  "dgx3": {
+   "max_gpu_c": 61.0,
+   "min_headroom_c": 34.0,
+   "max_system_c": 77.7,
+   "max_power_w": 30.76,
+   "thermal_slowdown_ms": 0.0,
+   "power_cap_ms": 0.0
+  }
+ },
+ "memory": {
+  "dgx1": {
+   "min_available_gib": 6.24,
+   "swap_growth_gib": 0.0
+  },
+  "dgx2": {
+   "min_available_gib": 7.86,
+   "swap_growth_gib": 0.0
+  },
+  "dgx3": {
+   "min_available_gib": 7.89,
+   "swap_growth_gib": 0.0
+  }
+ },
+ "discarded_samples": [],
+ "finished_utc": "20260924T231700Z"
+}
