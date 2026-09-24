@@ -1,0 +1,25 @@
+{
+  "aggregate_e2e_tps": 50.73317343840565,
+  "case": "code",
+  "concurrency": 1,
+  "failed": 0,
+  "mean_decode_tps_approx": 53.36834747881956,
+  "mean_ttft_s": 0.2664861470111646,
+  "requested_output_tokens": 256,
+  "requests": [
+    {
+      "completion_tokens": 256,
+      "decode_tps_approx": 53.36834747881956,
+      "elapsed_s": 5.0445992430031765,
+      "error": null,
+      "ok": true,
+      "output_sha256": "84733beb410970210318e73e2757c81bbfdb0f6384ebfd55ab6d767a460937bf",
+      "prompt_tokens": 75,
+      "request": 0,
+      "status": 200,
+      "ttft_s": 0.2664861470111646
+    }
+  ],
+  "successful": 1,
+  "wall_elapsed_s": 5.046008019009605
+}
