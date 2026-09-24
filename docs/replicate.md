@@ -42,25 +42,30 @@ huggingface-cli download deepseek-ai/DeepSeek-V4.1-Flash \
 On the build host, from a clean checkout of `main`:
 
 ```sh
-experiments/2026-09-23-karmic-kraken-reference/prepare-sources
-scripts/fetch-cutlass-dsl-wheels
-scripts/fetch-cutlass
-experiments/2026-09-23-karmic-kraken-reference/build-candidate check
-CANDIDATE_TAG=vllm-ds41f-kkref:01f1b874c774-r2 \
-  experiments/2026-09-23-karmic-kraken-reference/build-candidate build
+bin/spark3 build prepare
+bin/spark3 build image --apply
 ```
 
-`prepare-sources` fetches the pinned vLLM and B12X revisions, applies the
-vLLM Engram projection patch and the B12X switchless RoCEnante patch, and
-verifies both source trees against `sources.json`. `build-candidate` refuses to run next to a live
-service, sizes compile jobs to available memory, and cancels the build if
-MemAvailable falls below 24 GiB. The image records its source trees as labels
-(`local.spark3.vllm.tree`, `local.spark3.b12x.tree`), which the launcher checks
-against `config/cluster.json`. Your digest will differ from ours because the
-image also records the deployment commit; the tree labels must match.
+`build prepare` fills `.work/build/<vllm>-<b12x>-<input hash>/`, a directory
+named by the lock's inputs. It fetches the pinned vLLM and B12X revisions,
+applies the patch series, and checks both against the source manifest's
+patch heads and trees. It also fetches CUTLASS and the hash-locked CuTe DSL
+wheels, then exports clean build contexts. Re-running it reuses or repairs the
+directory. `build image --apply`:
 
-`experiments/2026-09-23-karmic-kraken-reference/smoke-imports vllm-ds41f-kkref:01f1b874c774-r2`
-runs a GPU import check of the built image in a memory-capped container.
+- refuses to run next to a live service;
+- sizes compile jobs to available memory, and cancels if MemAvailable falls
+  below 24 GiB;
+- tags the image `container.image` from `config/cluster.json`, and never
+  overwrites an existing tag;
+- checks the tree labels, and runs a GPU import smoke test in a
+  memory-capped container.
+
+The launcher checks the image's source-tree labels
+(`local.spark3.vllm.tree`, `local.spark3.b12x.tree`) against the
+configuration. Your digest will differ from ours because the image also
+records the deployment commit; the tree labels must match. See
+[docker/README.md](../docker/README.md).
 
 ## Distribute one digest
 

@@ -46,7 +46,7 @@ launch script.
 
 Never make durable changes in exported vLLM or B12X trees. Start from the commit in
 `upstreams.lock.json`, apply the ordered patch series, and work on a named branch.
-Prepared trees under `.work/upstreams/` are disposable build inputs, not sources
+Prepared trees under `.work/upstreams/` and `.work/build/` are disposable, not sources
 of truth.
 
 Use remote names consistently:

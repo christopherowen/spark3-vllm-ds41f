@@ -71,18 +71,19 @@ bin/spark3 bench
 bin/spark3 upstream list
 bin/spark3 upstream prepare vllm
 bin/spark3 upstream prepare b12x
-bin/spark3 upstream prepare flashinfer
-bin/spark3 upstream prepare cutlass
-scripts/fetch-cutlass-dsl-wheels
-scripts/stage-build-contexts
+bin/spark3 build prepare
+bin/spark3 build check
+bin/spark3 build image
+bin/spark3 build image --apply
+bin/spark3 build smoke
 scripts/host-recovery check
 scripts/host-recovery apply
-bin/spark3 build check
-bin/spark3 build render
 ```
 
 `doctor`, `status`, `render`, and every cluster command without `--apply` are
-read-only. `bench` only sends API requests; see [Benchmarking](#benchmarking). `cluster sync` fetches a published commit and detaches every clean node
+read-only. `bench` only sends API requests; see [Benchmarking](#benchmarking).
+`build prepare` writes only under ignored `.work/build/`; see
+[docker/README.md](docker/README.md). `cluster sync` fetches a published commit and detaches every clean node
 checkout at that exact revision; it never copies a working tree or ignored files.
 A commit counts as published when a branch on `origin` contains it. The
 promoted configuration sets `deployment.branch: main`, so production deploys
@@ -105,8 +106,8 @@ karmic-kraken promotion (owner decision). Experiment configurations set
 `launch_enabled` for themselves.
 
 `scripts/` holds the memory guard that `cluster start` installs on each node
-and the build and host-recovery steps that have not yet moved into
-`bin/spark3`. Experiments keep their own scripts in their directories.
+and host recovery, which has not yet moved into `bin/spark3`. Experiments keep
+their own scripts in their directories.
 
 Host management-plane recovery is versioned separately under `host/recovery/`.
 It arms the existing hardware watchdog and protects SSH/Tailscale without
@@ -174,12 +175,11 @@ but are not build inputs are kept separately in
 
 ## Transition status
 
-The promoted image is built reproducibly from pinned sources by
-[prepare-sources](experiments/2026-09-23-karmic-kraken-reference/prepare-sources)
-and [build-candidate](experiments/2026-09-23-karmic-kraken-reference/build-candidate),
-and one content digest runs on all three nodes. `bin/spark3 build render` and
-[docker/Dockerfile](docker/Dockerfile) still describe the earlier
-reconstruction and have not been migrated to that recipe.
+`bin/spark3 build` builds the promoted image from the pinned sources in
+`upstreams.lock.json` and the patch series ([docker/README.md](docker/README.md)),
+and one content digest runs on all three nodes. The running r2 image came from
+the same recipe in
+[experiments/2026-09-23-karmic-kraken-reference](experiments/2026-09-23-karmic-kraken-reference/decision.md).
 
 Canonical vLLM main is parked. The
 [upstream-main rebase](experiments/2026-09-20-upstream-main-rebase/README.md)

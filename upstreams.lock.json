@@ -43,7 +43,7 @@
       "revision": "07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
       "revision_url": "https://github.com/flashinfer-ai/flashinfer/commit/07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
       "submodules": true,
-      "role": "not a build input of the promoted image (FlashInfer 0.6.18.post1 comes from the runtime base image); retained for the docker/Dockerfile reconstruction recipe"
+      "role": "not a build input of the promoted image (FlashInfer 0.6.18.post1 comes from the runtime base image); tracked for upstream review only"
     },
     "cutlass": {
       "kind": "git",

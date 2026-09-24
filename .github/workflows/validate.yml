@@ -41,9 +41,5 @@ jobs:
         source: [vllm, b12x]
     steps:
       - uses: actions/checkout@v5
-      - name: Apply pinned upstream and local series
-        run: bin/spark3 upstream prepare "${{ matrix.source }}"
-      - name: Reject whitespace errors
-        run: |
-          git -C ".work/upstreams/${{ matrix.source }}" diff --check
-          git -C ".work/upstreams/${{ matrix.source }}" diff --cached --check
+      - name: Apply the local series and check the recorded patch head and tree
+        run: bin/spark3 build prepare --only "${{ matrix.source }}"

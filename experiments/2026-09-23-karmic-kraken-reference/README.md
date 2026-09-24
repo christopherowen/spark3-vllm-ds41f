@@ -1,5 +1,9 @@
 # Karmic Kraken reference build
 
+The build recipe here (`prepare-sources`, `build-candidate`, `Dockerfile`,
+`smoke-imports`) produced the r1 and r2 images. It is kept as the record;
+`bin/spark3 build` now carries the same recipe (see `docker/README.md`).
+
 ## Purpose
 
 This is a reference, not the target base. The target is canonical

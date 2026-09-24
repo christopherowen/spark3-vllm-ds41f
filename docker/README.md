@@ -1,77 +1,87 @@
-# Image reconstruction
+# Image build
 
-The promoted image (`vllm-ds41f-kkref:01f1b874c774-r1`, baseline
-2026-09-24-karmic-kraken) is not built from this directory. Its recipe is
-`experiments/2026-09-23-karmic-kraken-reference/`: `prepare-sources` checks out
-the pinned Local Inference Lab trees and applies the B12X series, and
-`build-candidate` builds its `Dockerfile` on the vLLM nightly base. The rest of
-this file describes the earlier reconstruction, which `bin/spark3 build render`
-still renders.
-
-`docker/Dockerfile` is the deterministic successor to the node-local image
-chain captured on 2026-09-20. It starts at the official vLLM image digest and
-accepts only named contexts prepared from `upstreams.lock.json`:
-
-| Build context | Canonical upstream | Local treatment |
-|---|---|---|
-| `vllm-source` | `vllm-project/vllm` | pinned commit plus `patches/vllm/series` |
-| `b12x-source` | `local-inference-lab/b12x` | pinned commit, recorded upstream fix, then local series |
-| `flashinfer-source` | `flashinfer-ai/flashinfer` | pinned `v0.7.0rc1` source and submodules |
-| `cutlass-source` | `NVIDIA/cutlass` | pinned `v4.4.2` source |
-| `cutlass-dsl-wheels` | NVIDIA packages on PyPI | 4.6.2 ARM64 wheels verified by SHA-256 |
-
-Prepare the inputs at deterministic ignored paths:
+`docker/Dockerfile` builds the promoted image: Local Inference Lab's
+karmic-kraken-beta vLLM and B12X with the local patch series, on the canonical
+vLLM ARM64 nightly `af1c0149`. Only vLLM's `_C_stable_libtorch` and
+`_moe_C_stable_libtorch` are rebuilt, for SM121. FlashInfer 0.6.18.post1 comes
+from the base image. The recipe produced the running r2 image
+(`vllm-ds41f-kkref:01f1b874c774-r2`) from
+`experiments/2026-09-23-karmic-kraken-reference/`, and moved here unchanged
+apart from the build contexts described below.
 
 ```sh
-bin/spark3 upstream prepare vllm
-bin/spark3 upstream prepare b12x
-bin/spark3 upstream prepare flashinfer
-bin/spark3 upstream prepare cutlass
-scripts/fetch-cutlass-dsl-wheels
-scripts/stage-build-contexts
-bin/spark3 build check
+bin/spark3 build prepare        # create or repair the build directory
+bin/spark3 build check          # verify it
+bin/spark3 build image          # print the build command
+bin/spark3 build image --apply  # build and smoke-test on an idle host
+bin/spark3 build smoke          # rerun the GPU import smoke
 ```
 
-Staging atomically replaces each context after checking both staged and unstaged
-diffs. It strips Git metadata and Python bytecode before Docker sees the source.
-`build check` rejects source paths not recorded in the source manifest, unknown
-wheels, and any content-or-mode difference between a prepared tree and its staged
-context.
+## Build directory
 
-Render a local build or registry push without executing it:
+`upstreams.lock.json` and the source manifest it names determine every build
+input:
 
-```sh
-bin/spark3 build render
-bin/spark3 build render --push
+- the vLLM and B12X revisions;
+- the patch-series fingerprints, recorded patch heads, and trees;
+- the CUTLASS revision;
+- the CuTe DSL wheel lock;
+- the base image digest.
+
+A hash of those inputs names the directory:
+
+```
+.work/build/vllm-<12>-b12x-<12>-<input hash>/
+  inputs.json            # the inputs and a content digest of each context
+  src/vllm, src/b12x     # pinned revision + git am of patches/*/series
+  src/cutlass            # pinned CUTLASS revision (headers only)
+  context/vllm-source    # clean exports: no .git, no bytecode
+  context/b12x-source
+  context/cutlass-source
+  context/cutlass-dsl-wheels   # hash-verified wheels
+  context/vllm-deletions/deleted.txt
+  context/empty          # the main context; every COPY uses a named context
+  images/<image id>.json # receipt for each image built from it
 ```
 
-The rendered tag includes the deployment commit as well as the vLLM and B12X
-pins, so two repository states cannot silently reuse one tag. The build is a
-**reconstruction candidate**, not yet the promoted image. Do not
-deploy it until it builds on a Spark, passes import/schema checks, serves the
-quality probes, reproduces the baseline benchmark, and has one pushed OCI digest
-used by all three ranks. The captured live service remains authoritative during
-that transition.
+The same lock always yields the same directory with the same contents.
 
-## Build resource policy on DGX Spark
+**Patch heads:** `git am` runs with a fixed committer and
+`--committer-date-is-author-date`, so the patched heads reproduce the source
+manifest's `patch_head` commits exactly. Prepare refuses a head or tree that
+differs from the manifest. The patch-set fingerprint must also match the
+manifest, so a changed patch has to be recorded before it can be built.
 
-Build the current-head candidate with
-`experiments/2026-09-23-latest-head-rebase/build-candidate` after preparing its
-pinned sources. Run `check` first; run `build` only on an idle Spark with the
-DS4.1 container stopped. With no model weights resident, compilation can use
-much more of the 128 GiB host than a serving process can. The candidate build
-selects up to eight compile jobs on a 20-CPU Spark, each with two NVCC threads;
-it reserves four CPUs, budgets 8 GiB per job, and never selects more than ten
-jobs. It requires 64 GiB `MemAvailable` at start and cancels if a one-second
-sample falls below a 24 GiB host reserve. A host lock prevents overlapping
-candidate builds. The older two-job setting was chosen for caution, not
-because the previous builds exhausted host memory: the
-recorded native rebuild stayed above 100 GiB available.
+**Reuse and repair:** re-running `prepare` reuses every verified part and
+rebuilds only what is missing or wrong. It writes `inputs.json` last, so an
+interrupted run is never mistaken for a complete one. `check` recomputes each
+context's digest.
 
-Keep the build policy separate from inference startup. Once the image is built,
-verify its imports and exact image identity, then use the coordinated launch
-with its existing 5 GiB startup and 3 GiB steady guards. After an aborted
-build, confirm the Docker build has stopped and memory has recovered before
-starting a model. Record the chosen job count, minimum observed available
-memory, elapsed build time, and image digest in the experiment receipt so
-future resource changes can be compared without changing model quality gates.
+**Contexts:** these are exports without Git metadata. The earlier recipe
+copied whole checkouts, which put about 100 MB of `.git` history into the
+image and changed the build cache key on every fresh clone.
+
+**CI:** CI runs `bin/spark3 build prepare --only vllm` and `--only b12x` to
+check that the series still apply and reproduce the recorded trees.
+
+## Resource policy on DGX Spark
+
+`build image --apply` runs only on an idle Spark:
+
+- It refuses while a DS4.1 container is running and holds a host lock against
+  overlapping builds.
+- It needs 64 GiB MemAvailable to start.
+- It picks compile jobs from memory and CPUs: 8 GiB per job, 24 GiB kept in
+  reserve, four CPUs reserved, two NVCC threads per job, at most ten jobs.
+- It samples MemAvailable every second and cancels the build below 24 GiB.
+
+After the build it checks the tree labels, then imports the DS4.1 serving
+modules on the GPU in a 16 GiB container. It writes a receipt with the image
+ID, job count, elapsed time, and lowest MemAvailable.
+
+The default tag is `container.image` from the cluster configuration. The
+command refuses to overwrite an existing tag, so a node never silently holds a
+different image under the promoted name. Build once, then load the same image
+on every node and confirm all three report the same ID (`docs/replicate.md`).
+Start the service only through `bin/spark3 cluster start`, with its startup and
+steady memory guards.
