@@ -2493,6 +2493,16 @@ def command_bench(args: argparse.Namespace) -> int:
             reference_path = None
     reference = json.loads(reference_path.read_text(encoding="utf-8")) if reference_path else None
 
+    if args.report:
+        report = json.loads(Path(args.report).read_text(encoding="utf-8"))
+        lines, regressions = bench_rows(report, reference, args.tolerance)
+        print("\n".join(lines))
+        if reference_path:
+            print(f"reference: {reference_path}")
+        for regression in regressions:
+            print(f"FAIL: regression: {regression}")
+        return 1 if regressions else 0
+
     identity = bench_identity(cluster, nodes, config_name, config_path)
     if identity["live_problems"]:
         for problem in identity["live_problems"]:
@@ -2717,6 +2727,11 @@ def parser() -> argparse.ArgumentParser:
         help="fail when a point is significantly slower than the reference by more than this percent",
     )
     bench.add_argument("--seed", type=int, default=0, help="seed for sample order and prompts")
+    bench.add_argument(
+        "--report",
+        metavar="PATH",
+        help="summarize an existing bench.json against --compare instead of measuring",
+    )
     bench.add_argument(
         "--allow-mismatch",
         action="store_true",
