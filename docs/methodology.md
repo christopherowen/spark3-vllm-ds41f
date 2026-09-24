@@ -40,7 +40,8 @@ The stable suite must cover:
 7. minimum available host memory, swap movement, KV use, OOMs, allocation retries,
    request failures, and output-integrity gates.
 
-Report TTFT, per-stream and aggregate TPS, total wall time, prompt/decode token
+`bin/spark3 bench` implements items 1-5 and 7; the Strix workload remains
+manual. Report TTFT, per-stream and aggregate TPS, total wall time, prompt/decode token
 counts, and variability across complete runs. Performance is not accepted at the
 expense of model quality or silent request rejection.
 
@@ -60,7 +61,9 @@ A promotion commit must:
 3. link the accepted experiment and all native receipts;
 4. update upstream pins or patch series when source changed;
 5. prove all three ranks use the same content-addressed image;
-6. pass `bin/spark3 doctor --live` after coordinated deployment.
+6. pass `bin/spark3 doctor --live` after coordinated deployment;
+7. add the deployed service's complete `bin/spark3 bench` report as
+   `manifests/benchmarks/<baseline>.json`, the reference later runs compare with.
 
 Rollback is a new coordinated deployment of the previous promoted commit. It is
 not an ad hoc reconstruction from shell history.

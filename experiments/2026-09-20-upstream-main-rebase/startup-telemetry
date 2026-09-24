@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+script_dir=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 action=${1:-}
 config_relative=${2:-experiments/2026-09-20-upstream-main-rebase/cluster.json}
 phase=${3:-}
@@ -70,7 +71,7 @@ case "$action" in
       --setenv="CONTAINER_NAME=$name" \
       --setenv="OUTPUT_PATH=$output" \
       --setenv=SAMPLE_INTERVAL=0.5 \
-      "$repo_root/scripts/startup-telemetry-sample.sh"
+      "$script_dir/startup-telemetry-sample.sh"
     for _ in {1..50}; do
       if [[ -s "$output" ]] && sudo -n systemctl is-active --quiet "$unit"; then
         echo "startup telemetry active: $output"

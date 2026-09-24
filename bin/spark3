@@ -4,13 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import ast
+import concurrent.futures
 import hashlib
 import json
+import random
 import re
 import shlex
+import socket
 import subprocess
 import sys
+import threading
 import time
+import urllib.request
+import uuid
 from pathlib import Path
 
 
@@ -1317,6 +1324,885 @@ def command_build(args: argparse.Namespace) -> int:
     return 0
 
 
+BENCH_SCHEMA = 1
+BENCH_SUITES = ("quality", "decode", "sampled", "prefill", "prefix", "admission")
+BENCH_TIMEOUT_SECONDS = 1800
+# These prompts and settings match the client behind every baseline manifest
+# since 2026-09-20, so decode means stay comparable with published figures.
+DECODE_PROMPTS = {
+    "prose": (
+        "Explain, in precise technical prose, how speculative decoding can "
+        "increase language-model serving throughput while preserving the "
+        "target model's output distribution. Discuss acceptance rate, "
+        "verification cost, batching, and latency."
+    ),
+    "code": (
+        "Write a complete Python implementation of an LRU cache using only "
+        "the standard library. Include type hints, O(1) get and put methods, "
+        "capacity validation, and a short executable example. Explain the "
+        "complexity after the code."
+    ),
+}
+SAMPLED_PROMPTS = {
+    "prose": (
+        "Write a short essay about how rivers shape the land and the people "
+        "who live near them."
+    ),
+    "code": (
+        "Write a Python module with a thread-safe LRU cache class (get, put, "
+        "delete, clear) and unit tests using unittest."
+    ),
+}
+LRU_PROMPT = (
+    "Write a short Python LRU cache class with get and put methods using "
+    "OrderedDict. Give code and one sentence on complexity."
+)
+FILLER_WORDS = (
+    "river stone lantern orchard meadow harbor canyon glacier prairie "
+    "summit valley forest desert island marsh delta ridge basin"
+).split()
+BENCH_METRICS = (
+    "vllm:num_requests_running",
+    "vllm:num_requests_waiting",
+    "vllm:kv_cache_usage_perc",
+    "vllm:request_success_total",
+    "vllm:num_preemptions_total",
+    "vllm:prefix_cache_queries_total",
+    "vllm:prefix_cache_hits_total",
+    "vllm:spec_decode_num_drafts_total",
+    "vllm:spec_decode_num_draft_tokens_total",
+    "vllm:spec_decode_num_accepted_tokens_total",
+)
+# Two-sided 95% Student t quantiles by degrees of freedom (lower bound).
+T_95 = (
+    (1, 12.706), (2, 4.303), (3, 3.182), (4, 2.776), (5, 2.571), (6, 2.447),
+    (7, 2.365), (8, 2.306), (9, 2.262), (10, 2.228), (12, 2.179), (15, 2.131),
+    (20, 2.086), (30, 2.042), (60, 2.000), (120, 1.980),
+)
+
+
+class BenchAbort(RuntimeError):
+    """Stop issuing requests; the partial report is still written."""
+
+
+def t_95(degrees: float) -> float:
+    quantile = T_95[0][1]
+    for bound, value in T_95:
+        if degrees >= bound:
+            quantile = value
+    return quantile
+
+
+def describe(values: list[float]) -> dict:
+    count = len(values)
+    if not count:
+        return {"n": 0}
+    mean = sum(values) / count
+    ordered = sorted(values)
+    middle = count // 2
+    median = ordered[middle] if count % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    summary = {
+        "n": count,
+        "mean": round(mean, 3),
+        "median": round(median, 3),
+        "min": round(ordered[0], 3),
+        "max": round(ordered[-1], 3),
+        "sd": None,
+        "ci95": None,
+        "ci95_pct": None,
+    }
+    if count > 1:
+        sd = (sum((value - mean) ** 2 for value in values) / (count - 1)) ** 0.5
+        half = t_95(count - 1) * sd / count**0.5
+        summary.update(sd=round(sd, 3), ci95=round(half, 3))
+        if mean:
+            summary["ci95_pct"] = round(100 * half / mean, 2)
+    return summary
+
+
+def difference(new: dict, reference: dict) -> tuple[float, float, float] | None:
+    """Percent change of the new mean and its Welch 95% interval."""
+    if not new.get("n") or not reference.get("n") or not reference.get("mean"):
+        return None
+    new_var = (new.get("sd") or 0.0) ** 2 / new["n"]
+    ref_var = (reference.get("sd") or 0.0) ** 2 / reference["n"]
+    denominator = 0.0
+    if new["n"] > 1:
+        denominator += new_var**2 / (new["n"] - 1)
+    if reference["n"] > 1:
+        denominator += ref_var**2 / (reference["n"] - 1)
+    degrees = (new_var + ref_var) ** 2 / denominator if denominator else 120
+    change = new["mean"] / reference["mean"] - 1
+    half = t_95(degrees) * (new_var + ref_var) ** 0.5 / reference["mean"]
+    return 100 * change, 100 * (change - half), 100 * (change + half)
+
+
+def scrape_metrics(base: str) -> dict[str, float]:
+    with urllib.request.urlopen(f"{base}/metrics", timeout=10) as response:
+        text = response.read().decode("utf-8", errors="replace")
+    return parse_metrics(text)
+
+
+def parse_metrics(text: str) -> dict[str, float]:
+    values = dict.fromkeys(BENCH_METRICS, 0.0)
+    for line in text.splitlines():
+        name = line.split("{", 1)[0].split(" ", 1)[0]
+        if name in values:
+            values[name] += float(line.rsplit(" ", 1)[1])
+    return values
+
+
+def stream_request(
+    url: str, payload: dict, stop: threading.Event, keep_content: bool = False
+) -> dict:
+    """Stream one request; every failure stays in the receipt."""
+    body = dict(payload, stream=True, stream_options={"include_usage": True})
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    started = time.perf_counter()
+    first: float | None = None
+    status: int | None = None
+    usage: dict = {}
+    content: list[str] = []
+    digest = hashlib.sha256()
+    error: str | None = None
+    try:
+        with urllib.request.urlopen(request, timeout=BENCH_TIMEOUT_SECONDS) as response:
+            status = response.status
+            for raw in response:
+                if stop.is_set():
+                    error = "aborted by bench"
+                    break
+                line = raw.decode("utf-8", errors="replace").strip()
+                if not line.startswith("data: "):
+                    continue
+                if line == "data: [DONE]":
+                    break
+                event = json.loads(line[6:])
+                usage = event.get("usage") or usage
+                for choice in event.get("choices") or []:
+                    delta = choice.get("delta") or {}
+                    pieces = (
+                        delta.get("reasoning_content"),
+                        delta.get("reasoning"),
+                        delta.get("content"),
+                        choice.get("text"),
+                    )
+                    emitted = "".join(piece for piece in pieces if isinstance(piece, str))
+                    # Completions stream their first token directly; chat
+                    # streams open with an empty role delta.
+                    if first is None and (emitted or "text" in choice):
+                        first = time.perf_counter()
+                    if not emitted:
+                        continue
+                    digest.update(emitted.encode())
+                    if isinstance(delta.get("content"), str):
+                        content.append(delta["content"])
+    except Exception as exception:
+        error = f"{type(exception).__name__}: {exception}"
+    ended = time.perf_counter()
+    tokens = usage.get("completion_tokens")
+    decode = None
+    if tokens and tokens > 1 and first is not None and ended > first:
+        decode = (tokens - 1) / (ended - first)
+    result = {
+        "ok": error is None and status == 200 and first is not None,
+        "ttft_s": None if first is None else round(first - started, 4),
+        "elapsed_s": round(ended - started, 4),
+        "prompt_tokens": usage.get("prompt_tokens"),
+        "completion_tokens": tokens,
+        "decode_tps": None if decode is None else round(decode, 2),
+        "output_sha256": digest.hexdigest()[:16],
+        "error": error,
+    }
+    if keep_content:
+        result["content"] = "".join(content)
+    return result
+
+
+class MemoryWatch:
+    """Minimum MemAvailable and swap use per node, sampled every second."""
+
+    SCRIPT = (
+        "while :; do awk '/^(MemAvailable|SwapTotal|SwapFree):/{v[$1]=$2} "
+        'END{print v["MemAvailable:"], v["SwapTotal:"]-v["SwapFree:"]}\' '
+        "/proc/meminfo; sleep 1; done"
+    )
+
+    def __init__(self, nodes: dict, floor_gib: float, halt) -> None:
+        self.floor_kib = floor_gib * 1048576
+        self.floor_gib = floor_gib
+        self.halt = halt
+        self.lock = threading.Lock()
+        self.state: dict[str, dict] = {}
+        self.processes: list[subprocess.Popen] = []
+        for node in nodes["nodes"]:
+            process = subprocess.Popen(
+                [
+                    "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+                    "-o", "ServerAliveInterval=5", ssh_target(nodes, node),
+                    shlex.join(["bash", "-c", self.SCRIPT]),
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            self.processes.append(process)
+            self.state[node["name"]] = {"last": None}
+            threading.Thread(
+                target=self._read, args=(node["name"], process), daemon=True
+            ).start()
+
+    def _read(self, name: str, process: subprocess.Popen) -> None:
+        for line in process.stdout:
+            try:
+                available, swap = (int(float(value)) for value in line.split())
+            except ValueError:
+                continue
+            with self.lock:
+                state = self.state[name]
+                state["last"] = time.monotonic()
+                state["min_available_kib"] = min(state.get("min_available_kib", available), available)
+                state.setdefault("swap_start_kib", swap)
+                state["swap_max_kib"] = max(state.get("swap_max_kib", swap), swap)
+            if available < self.floor_kib:
+                self.halt(
+                    f"{name}: MemAvailable {available / 1048576:.2f} GiB fell below "
+                    f"the {self.floor_gib:g} GiB bench floor"
+                )
+
+    def wait_ready(self, timeout: float = 30) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            with self.lock:
+                if all(state["last"] is not None for state in self.state.values()):
+                    return
+            time.sleep(0.5)
+        raise BenchAbort("memory telemetry did not start on every node")
+
+    def check(self) -> None:
+        now = time.monotonic()
+        with self.lock:
+            for name, state in self.state.items():
+                if state["last"] is None or now - state["last"] > 15:
+                    raise BenchAbort(f"{name}: memory telemetry stopped reporting")
+
+    def close(self) -> dict:
+        for process in self.processes:
+            process.terminate()
+        for process in self.processes:
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        with self.lock:
+            return {
+                name: {
+                    "min_available_gib": round(state["min_available_kib"] / 1048576, 2),
+                    "swap_growth_gib": round(
+                        (state["swap_max_kib"] - state["swap_start_kib"]) / 1048576, 2
+                    ),
+                }
+                for name, state in self.state.items()
+                if state["last"] is not None
+            }
+
+
+class PeakWatch:
+    """Peak KV use and request counts while one sample runs."""
+
+    def __init__(self, base: str) -> None:
+        self.base = base
+        self.peak = {"kv_cache_usage": 0.0, "running": 0.0, "active": 0.0}
+        self.done = threading.Event()
+        self.thread = threading.Thread(target=self._poll, daemon=True)
+        self.thread.start()
+
+    def _poll(self) -> None:
+        while not self.done.wait(1.0):
+            try:
+                metrics = scrape_metrics(self.base)
+            except Exception:
+                continue
+            running = metrics["vllm:num_requests_running"]
+            active = running + metrics["vllm:num_requests_waiting"]
+            self.peak["kv_cache_usage"] = max(self.peak["kv_cache_usage"], metrics["vllm:kv_cache_usage_perc"])
+            self.peak["running"] = max(self.peak["running"], running)
+            self.peak["active"] = max(self.peak["active"], active)
+
+    def finish(self) -> dict:
+        self.done.set()
+        self.thread.join()
+        return self.peak
+
+
+class Bench:
+    def __init__(self, base: str, nodes: dict, floor_gib: float) -> None:
+        self.base = base
+        self.stop = threading.Event()
+        self.reason: str | None = None
+        self.sent = 0
+        self.foreign = 0
+        self.start_total: float | None = None
+        self.discarded: list[dict] = []
+        self.memory = MemoryWatch(nodes, floor_gib, self.halt)
+
+    def halt(self, reason: str) -> None:
+        if not self.stop.is_set():
+            self.reason = reason
+            self.stop.set()
+
+    def wait_idle(self, timeout: float = 300) -> dict:
+        deadline = time.monotonic() + timeout
+        while True:
+            if self.stop.is_set():
+                raise BenchAbort(self.reason)
+            self.memory.check()
+            metrics = scrape_metrics(self.base)
+            if not metrics["vllm:num_requests_running"] and not metrics["vllm:num_requests_waiting"]:
+                # Let the success counter settle before attributing requests.
+                time.sleep(0.5)
+                metrics = scrape_metrics(self.base)
+                if self.start_total is None:
+                    self.start_total = metrics["vllm:request_success_total"]
+                finished = metrics["vllm:request_success_total"] - self.start_total
+                self.foreign = max(self.foreign, int(finished) - self.sent)
+                return metrics
+            if time.monotonic() > deadline:
+                raise BenchAbort("the service stayed busy with other requests")
+            time.sleep(2)
+
+    def run(
+        self,
+        label: str,
+        payloads: list[tuple[str, dict]],
+        concurrency: int | None = None,
+        keep_content: bool = False,
+        retries: int = 3,
+    ) -> dict:
+        """Send one sample; repeat it when other traffic overlapped."""
+        concurrency = concurrency or len(payloads)
+        for attempt in range(retries + 1):
+            before = self.wait_idle()
+            peak = PeakWatch(self.base)
+            started = time.perf_counter()
+            with concurrent.futures.ThreadPoolExecutor(concurrency) as pool:
+                try:
+                    results = list(
+                        pool.map(
+                            lambda item: stream_request(
+                                f"{self.base}{item[0]}", item[1], self.stop, keep_content
+                            ),
+                            payloads,
+                        )
+                    )
+                except BaseException:
+                    self.halt("interrupted")
+                    raise
+            wall = time.perf_counter() - started
+            peaks = peak.finish()
+            self.sent += len(payloads)
+            if self.stop.is_set():
+                raise BenchAbort(self.reason)
+            after = scrape_metrics(self.base)
+            finished = after["vllm:request_success_total"] - self.start_total
+            foreign = int(finished) - self.sent - self.foreign
+            # A closed loop may briefly show a finished request beside its successor.
+            slack = 1 if len(payloads) > concurrency else 0
+            if foreign > 0 or peaks["active"] > concurrency + slack:
+                self.foreign += max(foreign, 0)
+                self.discarded.append({"label": label, "attempt": attempt, "foreign": foreign})
+                print(f"  {label}: other traffic overlapped; repeating", flush=True)
+                continue
+            metrics = {
+                name.removeprefix("vllm:").removesuffix("_total"): after[name] - before[name]
+                for name in BENCH_METRICS
+                if name.endswith("_total")
+            }
+            return {"wall_s": wall, "requests": results, "metrics": metrics, "peak": peaks}
+        raise BenchAbort(f"{label}: other traffic overlapped {retries + 1} attempts")
+
+
+def chat_payload(model: str, prompt: str, max_tokens: int, **extra) -> tuple[str, dict]:
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }
+    payload.update(extra)
+    return "/v1/chat/completions", payload
+
+
+def filler(tokens: int, seed: int) -> str:
+    # About one token per word for these plain lowercase words.
+    body = " ".join(FILLER_WORDS[(i * 7 + seed) % len(FILLER_WORDS)] for i in range(tokens))
+    return f"Document {seed}:\n{body}"
+
+
+def acceptance(metrics: dict) -> float | None:
+    drafts = metrics["spec_decode_num_drafts"]
+    return round(metrics["spec_decode_num_accepted_tokens"] / drafts, 4) if drafts else None
+
+
+def compact(results: list[dict]) -> list[dict]:
+    keys = ("ok", "ttft_s", "prompt_tokens", "completion_tokens", "decode_tps", "output_sha256", "error")
+    return [{key: result[key] for key in keys} for result in results]
+
+
+def assess_lru(content: str) -> str:
+    match = re.search(r"```(?:python)?\s*\n(.*?)```", content, re.DOTALL)
+    if match is None:
+        return "missing Python code block"
+    try:
+        tree = ast.parse(match.group(1))
+    except SyntaxError as error:
+        return f"Python syntax error: {error.msg} at line {error.lineno}"
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        methods = {item.name: item for item in node.body if isinstance(item, ast.FunctionDef)}
+        if {"get", "put"} <= methods.keys():
+            arguments = [argument.arg for argument in methods["put"].args.args]
+            if arguments != ["self", "key", "value"]:
+                return f"put signature uses {arguments!r}"
+            return "pass"
+    return "missing LRU class with get and put methods"
+
+
+def suite_quality(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
+    """The fixed LRU request, five times; every answer must pass."""
+    runs = []
+    for index in range(5):
+        sample = bench.run(
+            f"quality {index + 1}/5",
+            [chat_payload(options.model, LRU_PROMPT, 256, temperature=0, seed=42,
+                          chat_template_kwargs={"thinking": False})],
+            keep_content=True,
+        )
+        result = sample["requests"][0]
+        verdict = assess_lru(result["content"]) if result["ok"] else f"request failed: {result['error']}"
+        runs.append({"verdict": verdict, "content": result["content"]})
+        print(f"  quality {index + 1}/5: {verdict}", flush=True)
+    passed = sum(run["verdict"] == "pass" for run in runs)
+    return {"passed": passed, "runs": runs, "ok": passed == len(runs)}
+
+
+def suite_decode(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
+    """Temperature-0 serving matrix, sampled until every point is precise."""
+    points = [f"{case}-c{concurrency}" for case in DECODE_PROMPTS for concurrency in options.concurrency]
+
+    def sample(point: str) -> dict:
+        case, concurrency = point.rsplit("-c", 1)
+        payload = chat_payload(options.model, DECODE_PROMPTS[case], 256, temperature=0, seed=42)
+        return bench.run(point, [payload] * int(concurrency))
+
+    print("  warmup: one discarded sample per point", flush=True)
+    for point in rng.sample(points, len(points)):
+        sample(point)
+    samples: dict[str, list[dict]] = {point: [] for point in points}
+    active = list(points)
+    rounds = 0
+    while active:
+        rounds += 1
+        rng.shuffle(active)
+        for point in active:
+            result = sample(point)
+            requests = result["requests"]
+            tokens = sum(request["completion_tokens"] or 0 for request in requests if request["ok"])
+            samples[point].append({
+                "tps": round(tokens / result["wall_s"], 3),
+                "accepted_per_draft": acceptance(result["metrics"]),
+                "requests": compact(requests),
+            })
+        remaining = []
+        for point in active:
+            summary = describe([entry["tps"] for entry in samples[point]])
+            if summary["n"] >= options.max_samples:
+                continue
+            if summary["n"] < options.min_samples or (summary["ci95_pct"] or 100) > options.precision:
+                remaining.append(point)
+        status = ", ".join(
+            f"{point} ±{describe([entry['tps'] for entry in samples[point]])['ci95_pct'] or '-'}%"
+            for point in sorted(remaining)
+        )
+        print(f"  round {rounds}: {status or 'all points converged'}", flush=True)
+        active = remaining
+    summary = {}
+    for point in points:
+        entries = samples[point]
+        requests = [request for entry in entries for request in entry["requests"]]
+        ok = [request for request in requests if request["ok"]]
+        summary[point] = {
+            "tps": describe([entry["tps"] for entry in entries]),
+            "per_stream_decode_tps": describe([request["decode_tps"] for request in ok if request["decode_tps"]]),
+            "ttft_s": describe([request["ttft_s"] for request in ok]),
+            "accepted_per_draft": describe([entry["accepted_per_draft"] for entry in entries if entry["accepted_per_draft"] is not None]),
+            "failed_requests": len(requests) - len(ok),
+            "distinct_outputs": len({request["output_sha256"] for request in ok}),
+        }
+    return {"points": summary, "samples": samples}
+
+
+def suite_sampled(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
+    """DSpark acceptance on temperature-1.0 traffic, from the engine counters."""
+    points = {}
+    for case, prompt in SAMPLED_PROMPTS.items():
+        for concurrency in (1, 4):
+            label = f"{case}-c{concurrency}"
+            payloads = [
+                chat_payload(options.model, prompt, 256, temperature=1.0, top_p=0.95,
+                             seed=1000 + index, chat_template_kwargs={"thinking": False})
+                for index in range(options.sampled_requests)
+            ]
+            result = bench.run(label, payloads, concurrency=concurrency)
+            requests = result["requests"]
+            tokens = sum(request["completion_tokens"] or 0 for request in requests if request["ok"])
+            metrics = result["metrics"]
+            draft_tokens = metrics["spec_decode_num_draft_tokens"]
+            points[label] = {
+                "requests": len(requests),
+                "failed_requests": sum(not request["ok"] for request in requests),
+                "aggregate_tps": round(tokens / result["wall_s"], 2),
+                "accepted_per_draft": acceptance(metrics),
+                "acceptance_rate": round(metrics["spec_decode_num_accepted_tokens"] / draft_tokens, 4) if draft_tokens else None,
+                "drafts": metrics["spec_decode_num_drafts"],
+            }
+            print(f"  {label}: {points[label]['accepted_per_draft']} accepted per draft", flush=True)
+    return {"points": points}
+
+
+def suite_prefill(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
+    """Cold prefill: unique uncached prompts, one output token."""
+    sizes = [size for size in options.prefill_sizes if size < options.max_model_len - 64]
+    samples: dict[str, list[dict]] = {str(size): [] for size in sizes}
+    for _ in range(options.prefill_repeats):
+        for size in rng.sample(sizes, len(sizes)):
+            payload = {
+                "model": options.model,
+                "prompt": filler(int(size * 0.97), rng.randrange(1 << 30)) + "\n\nReply with the word ok.",
+                "max_tokens": 1,
+                "temperature": 0,
+                "cache_salt": uuid.uuid4().hex,
+            }
+            request = bench.run(f"prefill {size}", [("/v1/completions", payload)])["requests"][0]
+            samples[str(size)].append(compact([request])[0])
+            if request["ok"]:
+                print(f"  prefill {size}: {request['prompt_tokens'] / request['ttft_s']:.0f} tok/s", flush=True)
+    summary = {}
+    for size, requests in samples.items():
+        ok = [request for request in requests if request["ok"]]
+        summary[size] = {
+            "prefill_tps": describe([request["prompt_tokens"] / request["ttft_s"] for request in ok]),
+            "ttft_s": describe([request["ttft_s"] for request in ok]),
+            "prompt_tokens": ok[0]["prompt_tokens"] if ok else None,
+            "failed_requests": len(requests) - len(ok),
+        }
+    return {"points": summary, "samples": samples}
+
+
+def suite_prefix(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
+    """Prefix-cache replay: one cold request, then two identical replays."""
+    runs = []
+    for index in range(3):
+        payload = {
+            "model": options.model,
+            "prompt": filler(int(options.prefix_tokens * 0.97), rng.randrange(1 << 30)) + "\n\nReply with the word ok.",
+            "max_tokens": 1,
+            "temperature": 0,
+            "cache_salt": uuid.uuid4().hex,
+        }
+        cold = bench.run(f"prefix cold {index + 1}/3", [("/v1/completions", payload)])
+        warm = [bench.run(f"prefix warm {index + 1}/3", [("/v1/completions", payload)]) for _ in range(2)]
+        queries = sum(sample["metrics"]["prefix_cache_queries"] for sample in warm)
+        hits = sum(sample["metrics"]["prefix_cache_hits"] for sample in warm)
+        runs.append({
+            "cold_ttft_s": cold["requests"][0]["ttft_s"],
+            "warm_ttft_s": [sample["requests"][0]["ttft_s"] for sample in warm],
+            "warm_hit_rate": round(hits / queries, 4) if queries else None,
+            "ok": all(sample["requests"][0]["ok"] for sample in [cold, *warm]),
+        })
+        print(f"  prefix {index + 1}/3: cold {runs[-1]['cold_ttft_s']} s, warm {runs[-1]['warm_ttft_s']} s", flush=True)
+    return {
+        "prompt_tokens": options.prefix_tokens,
+        "cold_ttft_s": describe([run["cold_ttft_s"] for run in runs if run["ok"]]),
+        "warm_ttft_s": describe([value for run in runs if run["ok"] for value in run["warm_ttft_s"]]),
+        "warm_hit_rate": describe([run["warm_hit_rate"] for run in runs if run["warm_hit_rate"] is not None]),
+        "runs": runs,
+    }
+
+
+def suite_admission(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
+    """Four concurrent long contexts must all be admitted without preemption."""
+    tokens = min(options.admission_tokens, options.max_model_len - 1024)
+    payloads = [
+        chat_payload(
+            options.model,
+            filler(int(tokens * 0.97), rng.randrange(1 << 30))
+            + "\n\nWrite a 400-word story that uses words from the document above.",
+            256,
+            temperature=0,
+            seed=42,
+            chat_template_kwargs={"thinking": False},
+        )
+        for _ in range(4)
+    ]
+    for _, payload in payloads:
+        payload["cache_salt"] = uuid.uuid4().hex
+    result = bench.run("admission 4 x %d" % tokens, payloads)
+    requests = result["requests"]
+    ok = [request for request in requests if request["ok"]]
+    admitted = (
+        len(ok) == len(requests)
+        and not result["metrics"]["num_preemptions"]
+        and result["peak"]["running"] >= len(requests)
+    )
+    print(f"  admission: {'pass' if admitted else 'FAIL'}; peak KV {result['peak']['kv_cache_usage']:.0%}", flush=True)
+    return {
+        "context_tokens": tokens,
+        "ok": admitted,
+        "preemptions": result["metrics"]["num_preemptions"],
+        "peak_running": result["peak"]["running"],
+        "peak_kv_cache_usage": round(result["peak"]["kv_cache_usage"], 4),
+        "wall_s": round(result["wall_s"], 2),
+        "ttft_s": [request["ttft_s"] for request in requests],
+        "per_stream_decode_tps": describe([request["decode_tps"] for request in ok if request["decode_tps"]]),
+        "requests": compact(requests),
+    }
+
+
+BENCH_SUITE_FUNCTIONS = {
+    "quality": suite_quality,
+    "decode": suite_decode,
+    "sampled": suite_sampled,
+    "prefill": suite_prefill,
+    "prefix": suite_prefix,
+    "admission": suite_admission,
+}
+
+
+def serve_arg(cluster: dict, flag: str) -> str | None:
+    arguments = cluster["serve_args"]
+    return arguments[arguments.index(flag) + 1] if flag in arguments else None
+
+
+def bench_identity(cluster: dict, nodes: dict, config_name: str, config_path: Path) -> dict:
+    name = cluster["container"]["name"]
+    identity = {
+        "cluster_config": config_name,
+        "cluster_config_sha256": sha256(config_path),
+        "promoted_baseline": cluster.get("promoted_baseline"),
+        "image": cluster["container"]["image"],
+        "client_commit": repository_revision(),
+        "client_dirty": bool(repository_dirty()),
+        "client_host": socket.gethostname(),
+        "nodes": {},
+    }
+    for node in nodes["nodes"]:
+        container = run_ssh(nodes, node, "docker", "inspect", "--format", "{{.Image}} {{.State.StartedAt}}", name)
+        checkout = run_ssh(nodes, node, "git", "-C", repository_path(cluster), "rev-parse", "HEAD")
+        image_id, _, started_at = container.stdout.strip().partition(" ")
+        identity["nodes"][node["name"]] = {
+            "image_id": image_id or None,
+            "container_started_at": started_at or None,
+            "checkout": checkout.stdout.strip() or None,
+        }
+    identity["live_problems"] = live_doctor(cluster, nodes)
+    return identity
+
+
+def bench_rows(report: dict, reference: dict | None, tolerance: float) -> tuple[list[str], list[str]]:
+    """Summary lines and regressions against the reference run."""
+    lines: list[str] = []
+    regressions: list[str] = []
+    suites = report["suites"]
+    ref_suites = (reference or {}).get("suites", {})
+
+    def compare(label: str, new: dict, ref: dict | None, unit: str) -> None:
+        text = f"  {label:<18} {new['mean']:>9.1f} ±{new['ci95_pct'] or 0:>4.1f}% n={new['n']:<3}"
+        change = difference(new, ref) if ref else None
+        if change:
+            mean, low, high = change
+            verdict = "faster" if low > 0 else "slower" if high < 0 else "same"
+            text += f" ref {ref['mean']:>8.1f}  {mean:+5.1f}% [{low:+.1f}, {high:+.1f}] {verdict}"
+            if verdict == "slower" and mean < -tolerance:
+                regressions.append(f"{label} {unit} {mean:+.1f}%")
+        lines.append(text)
+
+    if "quality" in suites:
+        quality = suites["quality"]
+        lines.append(f"quality: LRU {quality['passed']}/{len(quality['runs'])}")
+    if "decode" in suites:
+        lines.append("decode (aggregate tok/s, 95% CI):")
+        ref_points = ref_suites.get("decode", {}).get("points", {})
+        for point, summary in suites["decode"]["points"].items():
+            if summary["tps"]["n"]:
+                compare(point, summary["tps"], ref_points.get(point, {}).get("tps"), "tok/s")
+    if "sampled" in suites:
+        lines.append("sampled (accepted drafts per step, temperature 1.0):")
+        ref_points = ref_suites.get("sampled", {}).get("points", {})
+        for point, summary in suites["sampled"]["points"].items():
+            ref = ref_points.get(point, {}).get("accepted_per_draft")
+            suffix = f" ref {ref}" if ref is not None else ""
+            lines.append(f"  {point:<18} {summary['accepted_per_draft']}  {summary['aggregate_tps']} tok/s{suffix}")
+    if "prefill" in suites:
+        lines.append("prefill (tok/s):")
+        ref_points = ref_suites.get("prefill", {}).get("points", {})
+        for size, summary in suites["prefill"]["points"].items():
+            if summary["prefill_tps"]["n"]:
+                compare(f"{size} tokens", summary["prefill_tps"], ref_points.get(size, {}).get("prefill_tps"), "prefill tok/s")
+    if "prefix" in suites:
+        prefix = suites["prefix"]
+        lines.append(
+            f"prefix replay: cold {prefix['cold_ttft_s'].get('mean')} s, warm "
+            f"{prefix['warm_ttft_s'].get('mean')} s, hit rate {prefix['warm_hit_rate'].get('mean')}"
+        )
+    if "admission" in suites:
+        admission = suites["admission"]
+        lines.append(
+            f"admission 4 x {admission['context_tokens']}: {'pass' if admission['ok'] else 'FAIL'}, "
+            f"peak KV {admission['peak_kv_cache_usage']:.0%}, per-stream "
+            f"{admission['per_stream_decode_tps'].get('mean')} tok/s"
+        )
+    for name, memory in report.get("memory", {}).items():
+        lines.append(
+            f"{name}: min MemAvailable {memory['min_available_gib']} GiB, "
+            f"swap growth {memory['swap_growth_gib']} GiB"
+        )
+    return lines, regressions
+
+
+def command_bench(args: argparse.Namespace) -> int:
+    cluster, nodes, _ = configuration(args)
+    config_path, config_name = cluster_config_path(args)
+    suites = [suite.strip() for suite in args.suites.split(",") if suite.strip()]
+    unknown = sorted(set(suites) - set(BENCH_SUITES))
+    if unknown:
+        raise SystemExit(f"unknown suites: {', '.join(unknown)}")
+    head = next(node for node in nodes["nodes"] if node["head"])
+    base = (args.url or f"http://{head['management_ip']}:{serve_arg(cluster, '--port')}").rstrip("/")
+    args.model = serve_arg(cluster, "--served-model-name")
+    args.max_model_len = int(serve_arg(cluster, "--max-model-len"))
+    max_seqs = int(serve_arg(cluster, "--max-num-seqs") or 1)
+    if not args.concurrency or max(args.concurrency) > max_seqs or min(args.concurrency) < 1:
+        raise SystemExit(f"--concurrency values must be between 1 and --max-num-seqs ({max_seqs})")
+    if args.min_samples < 2 or args.max_samples < args.min_samples:
+        raise SystemExit("--min-samples must be at least 2 and no more than --max-samples")
+    floor_gib = float(cluster["host"]["memguard_gib"]) + 1
+
+    reference_path = None
+    if args.compare != "none":
+        reference_path = Path(args.compare) if args.compare else ROOT / "manifests/benchmarks" / f"{cluster.get('promoted_baseline')}.json"
+        if not reference_path.is_absolute():
+            reference_path = ROOT / reference_path
+        if not reference_path.is_file():
+            if args.compare:
+                raise SystemExit(f"reference does not exist: {args.compare}")
+            reference_path = None
+    reference = json.loads(reference_path.read_text(encoding="utf-8")) if reference_path else None
+
+    identity = bench_identity(cluster, nodes, config_name, config_path)
+    if identity["live_problems"]:
+        for problem in identity["live_problems"]:
+            print(f"WARN: {problem}")
+        if not args.allow_mismatch:
+            print("refusing to benchmark a cluster that differs from its configuration")
+            return 1
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    output = Path(args.output) if args.output else ROOT / "results/private/bench" / stamp
+    output.mkdir(parents=True, exist_ok=True)
+    report_path = output / "bench.json"
+    report = {
+        "schema": BENCH_SCHEMA,
+        "started_utc": stamp,
+        "identity": identity,
+        "workload": {
+            "url": base,
+            "suites": suites,
+            "seed": args.seed,
+            "precision_pct": args.precision,
+            "min_samples": args.min_samples,
+            "max_samples": args.max_samples,
+            "concurrency": args.concurrency,
+            "sampled_requests": args.sampled_requests,
+            "prefill_sizes": args.prefill_sizes,
+            "prefill_repeats": args.prefill_repeats,
+            "prefix_tokens": args.prefix_tokens,
+            "admission_tokens": args.admission_tokens,
+            "memory_floor_gib": floor_gib,
+            "prompts_sha256": hashlib.sha256(
+                json.dumps([DECODE_PROMPTS, SAMPLED_PROMPTS, LRU_PROMPT], sort_keys=True).encode()
+            ).hexdigest(),
+        },
+        "reference": str(reference_path.relative_to(ROOT)) if reference_path and reference_path.is_relative_to(ROOT) else (str(reference_path) if reference_path else None),
+        "suites": {},
+    }
+
+    def save() -> None:
+        report_path.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
+
+    print(f"benchmarking {base} ({config_name}); writing {report_path}", flush=True)
+    rng = random.Random(args.seed)
+    bench = Bench(base, nodes, floor_gib)
+    try:
+        bench.memory.wait_ready()
+        for suite in BENCH_SUITES:
+            if suite not in suites:
+                continue
+            print(f"{suite}:", flush=True)
+            report["suites"][suite] = BENCH_SUITE_FUNCTIONS[suite](bench, args, rng)
+            save()
+            if suite == "quality" and not report["suites"][suite]["ok"]:
+                raise BenchAbort("the quality gate failed; performance numbers would be meaningless")
+    except BenchAbort as abort:
+        report["aborted"] = str(abort)
+    except OSError as error:
+        bench.halt(str(error))
+        report["aborted"] = f"API or telemetry error: {error}"
+    except KeyboardInterrupt:
+        bench.halt("interrupted")
+        report["aborted"] = "interrupted"
+    finally:
+        report["memory"] = bench.memory.close()
+        report["discarded_samples"] = bench.discarded
+        report["finished_utc"] = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        save()
+
+    lines, regressions = bench_rows(report, reference, args.tolerance)
+    print("\n".join(lines))
+    failures = []
+    if report.get("aborted"):
+        failures.append(f"aborted: {report['aborted']}")
+    if "quality" in report["suites"] and not report["suites"]["quality"]["ok"]:
+        failures.append("quality gate failed")
+    if "admission" in report["suites"] and not report["suites"]["admission"]["ok"]:
+        failures.append("admission failed")
+    failed_requests = sum(
+        point.get("failed_requests", 0)
+        for suite in ("decode", "sampled", "prefill")
+        for point in report["suites"].get(suite, {}).get("points", {}).values()
+    )
+    if failed_requests:
+        failures.append(f"{failed_requests} requests failed")
+    failures.extend(f"regression: {item}" for item in regressions)
+    if reference_path:
+        print(f"reference: {report['reference']}")
+    for failure in failures:
+        print(f"FAIL: {failure}")
+    print(f"report: {report_path}")
+    return 1 if failures else 0
+
+
+def int_list(value: str) -> list[int]:
+    try:
+        return [int(item) for item in value.split(",") if item.strip()]
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"expected comma-separated integers: {value!r}") from error
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="spark3")
     root.add_argument(
@@ -1382,6 +2268,51 @@ def parser() -> argparse.ArgumentParser:
         "--push", action="store_true", help="render a registry push instead of a local load"
     )
     build_render.set_defaults(func=command_build)
+    bench = commands.add_parser(
+        "bench", help="benchmark the live service and compare it with a reference run"
+    )
+    bench.add_argument(
+        "--suites",
+        default=",".join(BENCH_SUITES),
+        help="comma-separated subset of: " + ", ".join(BENCH_SUITES),
+    )
+    bench.add_argument("--url", help="API base URL (default: head node management IP)")
+    bench.add_argument(
+        "--output", metavar="DIR", help="report directory (default: results/private/bench/<UTC time>)"
+    )
+    bench.add_argument(
+        "--compare",
+        metavar="PATH",
+        help="reference bench.json (default: manifests/benchmarks/<promoted_baseline>.json "
+        "when present; 'none' skips the comparison)",
+    )
+    bench.add_argument(
+        "--precision",
+        type=float,
+        default=2.0,
+        help="sample each decode point until its 95%% CI is within this percent of the mean",
+    )
+    bench.add_argument("--min-samples", type=int, default=6)
+    bench.add_argument("--max-samples", type=int, default=40)
+    bench.add_argument("--concurrency", type=int_list, default=[1, 2, 4, 8])
+    bench.add_argument("--sampled-requests", type=int, default=32)
+    bench.add_argument("--prefill-sizes", type=int_list, default=[2048, 32768, 65536, 131072])
+    bench.add_argument("--prefill-repeats", type=int, default=3)
+    bench.add_argument("--prefix-tokens", type=int, default=32768)
+    bench.add_argument("--admission-tokens", type=int, default=65536)
+    bench.add_argument(
+        "--tolerance",
+        type=float,
+        default=3.0,
+        help="fail when a point is significantly slower than the reference by more than this percent",
+    )
+    bench.add_argument("--seed", type=int, default=0, help="seed for sample order and prompts")
+    bench.add_argument(
+        "--allow-mismatch",
+        action="store_true",
+        help="benchmark even when doctor --live reports differences",
+    )
+    bench.set_defaults(func=command_bench)
     return root
 
 

@@ -67,6 +67,7 @@ bin/spark3 render dgx1
 bin/spark3 cluster sync
 bin/spark3 cluster start --replace
 bin/spark3 cluster stop
+bin/spark3 bench
 bin/spark3 upstream list
 bin/spark3 upstream prepare vllm
 bin/spark3 upstream prepare b12x
@@ -81,7 +82,7 @@ bin/spark3 build render
 ```
 
 `doctor`, `status`, `render`, and every cluster command without `--apply` are
-read-only. `cluster sync` fetches a published commit and detaches every clean node
+read-only. `bench` only sends API requests; see [Benchmarking](#benchmarking). `cluster sync` fetches a published commit and detaches every clean node
 checkout at that exact revision; it never copies a working tree or ignored files.
 A commit counts as published when a branch on `origin` contains it. The
 promoted configuration sets `deployment.branch: main`, so production deploys
@@ -100,16 +101,65 @@ service additionally requires `--replace`, and an experiment with
 `deployment.launch_enabled=false` refuses mutation locally.
 
 The promoted configuration is launch-enabled on `main` since the 2026-09-24
-karmic-kraken promotion (owner decision). Experiment configurations enable
-launch only on their own branches.
+karmic-kraken promotion (owner decision). Experiment configurations set
+`launch_enabled` for themselves.
 
-The compatibility helpers in `scripts/` are thin wrappers around these commands.
-They contain no independent topology, credentials, or launch logic.
+`scripts/` holds the memory guard that `cluster start` installs on each node
+and the build and host-recovery steps that have not yet moved into
+`bin/spark3`. Experiments keep their own scripts in their directories.
 
 Host management-plane recovery is versioned separately under `host/recovery/`.
 It arms the existing hardware watchdog and protects SSH/Tailscale without
 restarting Docker or the inference service. The incident evidence and exact
 policy boundary are documented in [docs/recovery.md](docs/recovery.md).
+
+## Benchmarking
+
+`bin/spark3 bench` measures the live service from the head node and writes one
+self-contained report to `results/private/bench/<UTC time>/bench.json`
+(`--output` to change). Before sending anything it runs the `doctor --live`
+comparison and refuses a cluster that differs from its configuration. It also
+records the configuration hash, each node's image ID and checkout, and the
+client commit.
+
+Suites, in order (`--suites` selects a subset):
+
+- `quality`: the fixed LRU request five times at temperature 0; all five must
+  pass, or the run stops before measuring anything.
+- `decode`: prose and code prompts at concurrency 1, 2, 4, and 8, 256 output
+  tokens, reasoning on, temperature 0, and the same prompts and metric
+  (aggregate completion tokens per wall second) as every published baseline.
+  Output text still differs from run to run, so each point is a random
+  draw. Points are sampled in shuffled rounds after a discarded warmup round,
+  and each point keeps sampling until its 95% confidence interval is within
+  `--precision` (2%) of the mean, between `--min-samples` (6) and
+  `--max-samples` (40) samples.
+- `sampled`: DSpark accepted drafts per step at temperature 1.0 from the
+  engine counters, 32 requests per case at concurrency 1 and 4.
+- `prefill`: cold prefill at 2K, 32K, 64K, and 128K tokens, three unique
+  uncached prompts each.
+- `prefix`: a 32K prompt followed by two identical replays, reporting cold and
+  warm TTFT and the cache hit rate.
+- `admission`: four concurrent 64K-token contexts; all four must run at once
+  without preemption.
+
+Measurements stay clean and safe:
+
+- A sample starts only when the engine reports no running or waiting requests.
+- A sample that overlaps anyone else's request is repeated. Overlap shows up
+  in the engine's request counters and peak running count.
+- A per-node memory monitor stops the run, cancelling in-flight requests, if
+  MemAvailable falls within 1 GiB of the steady memory guard.
+
+The report is still written if the run stops early.
+
+With a reference run (by default
+`manifests/benchmarks/<promoted_baseline>.json`, or `--compare PATH`), each
+decode and prefill point shows its percent change with a Welch 95% interval.
+The command exits non-zero on a failed quality or admission check, any failed
+request, an early stop, or a point that is significantly slower by more than
+`--tolerance` (3%). A promotion adds its reference run to
+`manifests/benchmarks/`.
 
 ## Upstreams
 

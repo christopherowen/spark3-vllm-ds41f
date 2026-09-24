@@ -106,13 +106,14 @@ The API is OpenAI-compatible on the head node's port 8000, model
 
 ## Verify
 
-From the head node against the running service:
+From the head node against the running, otherwise idle service:
 
 ```sh
-experiments/2026-09-24-kk-speed-tuning/run_arm.sh my-check
+bin/spark3 bench
 ```
 
-It runs the serving matrix (prose and code, concurrency 1-8, 256 output tokens)
-and the five-repeat LRU coherence gate, writing to `/tmp/claude-runs/my-check`.
-Expect the LRU gate at 5/5 and numbers near the baseline manifest's
-`benchmarks` (single passes vary by about ±7%).
+It checks that the live cluster matches `config/cluster.json`, runs the quality
+gate and every benchmark suite (about 35 minutes), and compares the result with
+the promoted reference run in `manifests/benchmarks/`. It exits non-zero if the
+quality gate fails, any request fails, or a point is significantly slower than
+the reference by more than 3%. See the README's Benchmarking section.
