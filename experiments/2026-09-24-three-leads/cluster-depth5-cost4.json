@@ -2,7 +2,7 @@
   "schema_version": 1,
   "promoted_baseline": "2026-09-24-karmic-kraken-r2",
   "container": {
-    "name": "dsv41-tl-depth5-cost1",
+    "name": "dsv41-tl-depth5-cost4",
     "image": "vllm-ds41f-kkref:01f1b874c774-r2",
     "expected_labels": {
       "local.spark3.vllm.tree": "90fdd043cf678aab95fc23c83056d4376b9c305f",
@@ -165,7 +165,7 @@
     "--moe-backend",
     "b12x",
     "--speculative-config",
-    "{\"method\":\"dspark\",\"num_speculative_tokens\":5,\"draft_tensor_parallel_size\":3,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"block\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":1.0}",
+    "{\"method\":\"dspark\",\"num_speculative_tokens\":5,\"draft_tensor_parallel_size\":3,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"block\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":4.0}",
     "--jit-monitor-mode",
     "warn",
     "--compilation-config",
