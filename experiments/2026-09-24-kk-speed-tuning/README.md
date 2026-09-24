@@ -27,3 +27,29 @@ steady memory guards stay in force; a guard kill fails the arm.
 Acceptance: faster than the baseline beyond pass-to-pass variation, LRU 5/5 in
 both passes, no guard kill, and at least 3 GiB above the steady guard on every
 node.
+
+## Results
+
+Two passes per arm; mean aggregate tok/s with the pass range (c1 includes the
+repeat runs, four samples). `summarize.py runs kkt-baseline ...` regenerates it.
+
+| Point | Baseline | capture32 | depth5 (on capture32) |
+|---|---|---|---|
+| prose c1 | 42.4 [38.9-45.6] | 39.8 [37.6-42.0] | 40.1 [37.6-43.2] |
+| prose c2 | 61.6 | 65.9 | 66.2 |
+| prose c4 | 99.1 | 101.4 | 99.0 |
+| prose c8 | 137.8 | 138.4 | 142.9 |
+| code c1 | 49.1 [45.8-55.1] | 52.7 [50.7-53.9] | 52.5 [49.8-56.7] |
+| code c2 | 79.3 | 81.0 | 81.6 |
+| code c4 | 118.0 | 117.0 | 122.3 |
+| code c8 | 155.7 [154.5-156.9] | 166.9 [160.7-173.1] | 164.4 |
+| LRU | 5/5, 5/5 | 5/5, 5/5 | 5/5, 5/5 |
+| min MemAvailable (GiB, dgx1/2/3) | 6.98/7.68/7.72 | 6.07/7.71/6.89 | 6.77/6.82/7.50 |
+
+- `capture32`: code c8 +7% with non-overlapping ranges; every other point is
+  within pass-to-pass variation. Keep.
+- `depth5`: accepted draft tokens per step rose from 1.53 to 1.74 over the
+  matrix (4.9-5.0 at one stream), but throughput did not. On GB10 the routed
+  MoE streams each verified token's experts from memory
+  (`../2026-09-23-karmic-kraken-reference/runs/moe-decode-bench/`), so
+  verification cost grows almost linearly with depth. Reject; keep depth 3.
