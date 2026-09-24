@@ -10,4 +10,4 @@ S=$!
 for pass in 1 2; do bash $D/run_arm.sh "$1-p$pass" > /dev/null 2>&1; done
 kill -TERM $S; wait $S
 cat "/tmp/claude-runs/$1-mem.json"
-tail -3 "/tmp/claude-runs/$1-p1/log.txt" "/tmp/claude-runs/$1-p2/log.txt" | grep -E "pass|/5"
+grep -hE "/5:" "/tmp/claude-runs/$1-p1/log.txt" "/tmp/claude-runs/$1-p2/log.txt" | sort | uniq -c

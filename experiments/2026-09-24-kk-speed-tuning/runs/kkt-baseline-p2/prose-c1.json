@@ -1,0 +1,25 @@
+{
+  "aggregate_e2e_tps": 38.855570018335236,
+  "case": "prose",
+  "concurrency": 1,
+  "failed": 0,
+  "mean_decode_tps_approx": 40.186425806516894,
+  "mean_ttft_s": 0.2417987970111426,
+  "requested_output_tokens": 256,
+  "requests": [
+    {
+      "completion_tokens": 256,
+      "decode_tps_approx": 40.186425806516894,
+      "elapsed_s": 6.587225016992306,
+      "error": null,
+      "ok": true,
+      "output_sha256": "0f01ef80d3ba80f63b3df8d1ba7b6695b5d0b8e09ad0258e8b5628127eb24417",
+      "prompt_tokens": 68,
+      "request": 0,
+      "status": 200,
+      "ttft_s": 0.2417987970111426
+    }
+  ],
+  "successful": 1,
+  "wall_elapsed_s": 6.5885019800043665
+}
