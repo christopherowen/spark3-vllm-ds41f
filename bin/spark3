@@ -1873,13 +1873,60 @@ def stream_request(
     return result
 
 
+THERMAL_FIELDS = (
+    "temperature.gpu",
+    "temperature.gpu.tlimit",
+    "clocks.sm",
+    "power.draw",
+    "clocks_event_reasons_counters.sw_thermal_slowdown",
+    "clocks_event_reasons_counters.hw_thermal_slowdown",
+    "clocks_event_reasons_counters.sw_power_cap",
+    "clocks_event_reasons_counters.hw_power_brake_slowdown",
+)
+# Stop measuring when a GPU comes within this many degrees of its slowdown limit.
+THERMAL_HEADROOM_FLOOR_C = 5.0
+
+
+def parse_thermal(text: str) -> dict:
+    """One node sample: nvidia-smi fields, then the hottest thermal zone (m°C)."""
+
+    def number(value: str) -> float | None:
+        try:
+            return float(value)
+        except ValueError:
+            return None
+
+    values = [number(value) for value in text.strip().split(",")]
+    values += [None] * (len(THERMAL_FIELDS) + 1 - len(values))
+    gpu, headroom, clock, power, sw_thermal, hw_thermal, sw_power, hw_brake, zone = values[: len(THERMAL_FIELDS) + 1]
+
+    def total(*parts: float | None) -> float | None:
+        known = [part for part in parts if part is not None]
+        return sum(known) if known else None
+
+    return {
+        "gpu_c": gpu,
+        "headroom_c": headroom,
+        "sm_mhz": clock,
+        "power_w": power,
+        "thermal_slowdown_us": total(sw_thermal, hw_thermal),
+        "power_cap_us": total(sw_power, hw_brake),
+        "system_c": None if zone is None else zone / 1000,
+    }
+
+
 class MemoryWatch:
-    """Minimum MemAvailable and swap use per node, sampled every second."""
+    """Per-node memory each second and GPU/board temperatures every five."""
 
     SCRIPT = (
-        "while :; do awk '/^(MemAvailable|SwapTotal|SwapFree):/{v[$1]=$2} "
-        'END{print v["MemAvailable:"], v["SwapTotal:"]-v["SwapFree:"]}\' '
-        "/proc/meminfo; sleep 1; done"
+        "i=0; while :; do "
+        "awk '/^(MemAvailable|SwapTotal|SwapFree):/{v[$1]=$2} "
+        'END{print "M", v["MemAvailable:"], v["SwapTotal:"]-v["SwapFree:"]}\' /proc/meminfo; '
+        'if [ $((i % 5)) -eq 0 ]; then echo "T $(nvidia-smi --query-gpu='
+        + ",".join(THERMAL_FIELDS)
+        + " --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' '),"
+        + '$(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | sort -n | tail -1)"; fi; '
+        "i=$((i + 1)); sleep 1; done"
     )
 
     def __init__(self, nodes: dict, floor_gib: float, halt) -> None:
@@ -1888,6 +1935,7 @@ class MemoryWatch:
         self.halt = halt
         self.lock = threading.Lock()
         self.state: dict[str, dict] = {}
+        self.thermal: dict[str, dict] = {}
         self.processes: list[subprocess.Popen] = []
         for node in nodes["nodes"]:
             process = subprocess.Popen(
@@ -1902,27 +1950,52 @@ class MemoryWatch:
             )
             self.processes.append(process)
             self.state[node["name"]] = {"last": None}
+            self.thermal[node["name"]] = {}
             threading.Thread(
                 target=self._read, args=(node["name"], process), daemon=True
             ).start()
 
     def _read(self, name: str, process: subprocess.Popen) -> None:
         for line in process.stdout:
-            try:
-                available, swap = (int(float(value)) for value in line.split())
-            except ValueError:
-                continue
-            with self.lock:
-                state = self.state[name]
-                state["last"] = time.monotonic()
-                state["min_available_kib"] = min(state.get("min_available_kib", available), available)
-                state.setdefault("swap_start_kib", swap)
-                state["swap_max_kib"] = max(state.get("swap_max_kib", swap), swap)
-            if available < self.floor_kib:
-                self.halt(
-                    f"{name}: MemAvailable {available / 1048576:.2f} GiB fell below "
-                    f"the {self.floor_gib:g} GiB bench floor"
-                )
+            kind, _, rest = line.strip().partition(" ")
+            if kind == "M":
+                self._memory(name, rest)
+            elif kind == "T":
+                self._temperature(name, parse_thermal(rest))
+
+    def _memory(self, name: str, text: str) -> None:
+        try:
+            available, swap = (int(float(value)) for value in text.split())
+        except ValueError:
+            return
+        with self.lock:
+            state = self.state[name]
+            state["last"] = time.monotonic()
+            state["min_available_kib"] = min(state.get("min_available_kib", available), available)
+            state.setdefault("swap_start_kib", swap)
+            state["swap_max_kib"] = max(state.get("swap_max_kib", swap), swap)
+        if available < self.floor_kib:
+            self.halt(
+                f"{name}: MemAvailable {available / 1048576:.2f} GiB fell below "
+                f"the {self.floor_gib:g} GiB bench floor"
+            )
+
+    def _temperature(self, name: str, sample: dict) -> None:
+        with self.lock:
+            state = self.thermal[name]
+            for key, better in (("gpu_c", max), ("system_c", max), ("power_w", max), ("headroom_c", min)):
+                if sample[key] is not None:
+                    state[key] = better(state.get(key, sample[key]), sample[key])
+            for key in ("thermal_slowdown_us", "power_cap_us"):
+                if sample[key] is not None:
+                    state.setdefault(f"{key}_start", sample[key])
+                    state[f"{key}_last"] = sample[key]
+        headroom = sample["headroom_c"]
+        if headroom is not None and headroom <= THERMAL_HEADROOM_FLOOR_C:
+            self.halt(
+                f"{name}: GPU at {sample['gpu_c']:g} C is within {headroom:g} C of its "
+                "thermal slowdown limit"
+            )
 
     def wait_ready(self, timeout: float = 30) -> None:
         deadline = time.monotonic() + timeout
@@ -1939,6 +2012,24 @@ class MemoryWatch:
             for name, state in self.state.items():
                 if state["last"] is None or now - state["last"] > 15:
                     raise BenchAbort(f"{name}: memory telemetry stopped reporting")
+
+    def thermal_summary(self) -> dict:
+        summary = {}
+        with self.lock:
+            for name, state in self.thermal.items():
+                if not state:
+                    continue
+                entry = {
+                    "max_gpu_c": state.get("gpu_c"),
+                    "min_headroom_c": state.get("headroom_c"),
+                    "max_system_c": state.get("system_c"),
+                    "max_power_w": state.get("power_w"),
+                }
+                for key, label in (("thermal_slowdown_us", "thermal_slowdown_ms"), ("power_cap_us", "power_cap_ms")):
+                    if f"{key}_last" in state:
+                        entry[label] = round((state[f"{key}_last"] - state[f"{key}_start"]) / 1000, 1)
+                summary[name] = entry
+        return summary
 
     def close(self) -> dict:
         for process in self.processes:
@@ -2467,6 +2558,18 @@ def bench_rows(report: dict, reference: dict | None, tolerance: float) -> tuple[
             f"{name}: min MemAvailable {memory['min_available_gib']} GiB, "
             f"swap growth {memory['swap_growth_gib']} GiB"
         )
+    for name, thermal in report.get("thermal", {}).items():
+        lines.append(
+            f"{name}: GPU max {thermal.get('max_gpu_c')} C "
+            f"({thermal.get('min_headroom_c')} C below its limit at the closest), "
+            f"board max {thermal.get('max_system_c')} C, power max {thermal.get('max_power_w')} W, "
+            f"thermal slowdown {thermal.get('thermal_slowdown_ms')} ms"
+        )
+        if thermal.get("thermal_slowdown_ms"):
+            regressions.append(
+                f"{name} spent {thermal['thermal_slowdown_ms']} ms in thermal slowdown; "
+                "results are not comparable"
+            )
     return lines, regressions
 
 
@@ -2571,6 +2674,7 @@ def command_bench(args: argparse.Namespace) -> int:
         bench.halt("interrupted")
         report["aborted"] = "interrupted"
     finally:
+        report["thermal"] = bench.memory.thermal_summary()
         report["memory"] = bench.memory.close()
         report["discarded_samples"] = bench.discarded
         report["finished_utc"] = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())

@@ -67,6 +67,17 @@ class ParsingTest(unittest.TestCase):
         self.assertEqual(values["vllm:num_requests_running"], 2.0)
         self.assertEqual(values["vllm:num_preemptions_total"], 0.0)
 
+    def test_parse_thermal_sample(self) -> None:
+        sample = spark3.parse_thermal("62,34,2405,14.25,0,0,27131561741,0,64900")
+        self.assertEqual(sample["gpu_c"], 62.0)
+        self.assertEqual(sample["headroom_c"], 34.0)
+        self.assertEqual(sample["thermal_slowdown_us"], 0.0)
+        self.assertEqual(sample["power_cap_us"], 27131561741.0)
+        self.assertAlmostEqual(sample["system_c"], 64.9)
+        missing = spark3.parse_thermal("[N/A],[N/A],2405,14.25")
+        self.assertIsNone(missing["gpu_c"])
+        self.assertIsNone(missing["system_c"])
+
     def test_assess_lru(self) -> None:
         good = "```python\nclass LRU:\n    def get(self, key):\n        pass\n    def put(self, key, value):\n        pass\n```"
         self.assertEqual(spark3.assess_lru(good), "pass")
