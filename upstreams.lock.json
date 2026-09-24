@@ -89,6 +89,21 @@
       "added_to_watchlist": "2026-09-24",
       "role": "disk-Engram host-path fixes, GB10 memory hygiene, and one-lever-per-boot measurement discipline on vLLM TP2; EXL3 2-bit experts and an MXFP8 LM head change quality and are not deployment inputs"
     },
+    "tpurtell_ds41rt": {
+      "kind": "git-watch",
+      "url": "https://github.com/tpurtell/ds41rt",
+      "observed_revision": "58d929c517d5a3655403f6145f13cb0ea784d08f",
+      "observed_tag": "v14",
+      "added_to_watchlist": "2026-09-24",
+      "role": "native DeepSeek V4.1 Flash runtime with an RTX coordinator and DGX Spark expert workers; verification-cycle and host-synchronization mechanisms, dSpark policy, and A/B release methodology; not a vLLM/B12X source"
+    },
+    "cudafast_qwen38_engine": {
+      "kind": "git-watch",
+      "url": "https://github.com/Layr-Labs/cudafast-qwen38-125b-a6b-engine",
+      "observed_revision": "5707d4f23362a7208483028e6d34519267266729",
+      "added_to_watchlist": "2026-09-24",
+      "role": "engine for the cuda.fast single-DGX-Spark optimization challenge (Qwen 3.8 Flash); GB10 decode, prefill, and speculative-decoding techniques under a sealed benchmark harness; different model"
+    },
     "mia_exl3_ds41f_2x": {
       "kind": "git-watch",
       "url": "https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-EXL3-2x-DGX-Sparks",
@@ -131,6 +146,7 @@
     "glm_switchless_tp4": {
       "kind": "git-watch",
       "url": "https://github.com/jnardiello/GLM-5.3-Flash-FP8-4-DGX-Spark-Switchless",
+      "observed_revision": "ee2ad05a3c8ca41347a5e1dd545ceb5e9fba7972",
       "added_to_watchlist": "2026-09-20",
       "role": "four-node switchless topology and profiling reference; GLM-specific changes are not deployment inputs"
     },
