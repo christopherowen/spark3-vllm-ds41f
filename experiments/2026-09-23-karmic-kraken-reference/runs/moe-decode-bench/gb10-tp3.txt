@@ -1,0 +1,21 @@
+tiny=1 routing=random m=1 impl=micro      174.1 us/layer
+tiny=1 routing=random m=2 impl=micro      334.8 us/layer
+tiny=1 routing=random m=3 impl=micro      511.5 us/layer
+tiny=1 routing=random m=4 impl=micro      698.7 us/layer
+tiny=1 routing=random m=8 impl=dynamic   1279.3 us/layer
+tiny=1 routing=shared m=1 impl=micro      175.4 us/layer
+tiny=1 routing=shared m=2 impl=micro      235.1 us/layer
+tiny=1 routing=shared m=3 impl=micro      316.4 us/layer
+tiny=1 routing=shared m=4 impl=micro      384.9 us/layer
+tiny=1 routing=shared m=8 impl=dynamic    189.3 us/layer
+tiny=0 routing=random m=1 impl=dynamic    172.0 us/layer
+tiny=0 routing=random m=2 impl=dynamic    339.2 us/layer
+tiny=0 routing=random m=3 impl=dynamic    518.3 us/layer
+tiny=0 routing=random m=4 impl=dynamic    672.6 us/layer
+tiny=0 routing=random m=8 impl=dynamic   1278.2 us/layer
+tiny=0 routing=shared m=1 impl=dynamic    171.8 us/layer
+tiny=0 routing=shared m=2 impl=dynamic    185.5 us/layer
+tiny=0 routing=shared m=3 impl=dynamic    242.7 us/layer
+tiny=0 routing=shared m=4 impl=dynamic    347.3 us/layer
+tiny=0 routing=shared m=8 impl=dynamic    187.7 us/layer
+BENCH_DONE rc=0

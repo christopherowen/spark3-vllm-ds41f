@@ -296,3 +296,37 @@ applies the clamp natively, quantizes activations the same way as prefill,
 and showed no shared-expert deviations. The kill switch therefore fixes
 quality with no B12X patch; 0002 remains an upstream fix for tiny decode
 itself.
+
+## Why tiny decode exists, and what it buys on GB10
+
+B12X added tiny decode on 2026-07-02 (`a5f0e0cf`) for single-token W4A8-MX
+decode. On an RTX PRO 6000 at DS4-Flash TP2 shapes it measured 20.6 µs per
+MoE layer against 37.8 µs for the dynamic kernel, and serve decode at one
+stream went from 133.7 to 140.2 tok/s. There the six experts' weights stream
+in about 20 µs, so the dynamic kernel's fixed costs (routing tables, MXFP8
+activation quantization, 16-row MMA tiles padded from one row, a grid-wide
+barrier between FC1 and FC2) roughly doubled the layer time. Tiny decode is
+two plain kernels that stream the weights with coalesced loads and FP4 dot
+products on BF16 activations. It works per route rather than per expert, so
+tokens that share an expert read its weights again.
+
+`bench_ds41_moe_decode.py` times both on GB10 at the DS4.1 TP3 per-rank shape
+(E=384, K=5120, I_tp=768, top-6, clamp 10), through the same prepare/bind/run
+calls vLLM makes, under CUDA-graph replay, eight launches with different
+routes per replay (`runs/moe-decode-bench/gb10-tp3.txt`). µs per layer:
+
+| Tokens | Random routes: tiny | Random: dynamic | Shared experts: tiny | Shared: dynamic |
+|---|---|---|---|---|
+| 1 | 174.1 | 172.0 | 175.4 | 171.8 |
+| 2 | 334.8 | 339.2 | 235.1 | 185.5 |
+| 3 | 511.5 | 518.3 | 316.4 | 242.7 |
+| 4 | 698.7 | 672.6 | 384.9 | 347.3 |
+
+On GB10 the MoE is bandwidth-bound: about 37 MB of expert weights per token
+per layer per rank streams at about 215 GB/s, 79% of the 273 GB/s peak, so
+both kernels take about 172 µs per token with distinct routes, and the
+dynamic kernel's fixed costs disappear into the weight read. When tokens
+share experts (typical of a DSpark verification batch from one sequence),
+the dynamic kernel reads each expert once and is 10-23% faster. Tiny decode
+therefore buys nothing on GB10 and loses when routes overlap; disabling it
+costs no performance.
