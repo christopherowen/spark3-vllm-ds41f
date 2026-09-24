@@ -1,0 +1,34 @@
+{
+  "sizes": [
+    {
+      "requested": 1024,
+      "prompt_tokens": 1004,
+      "seconds": 0.345,
+      "prefill_tps": 2912.5
+    },
+    {
+      "requested": 8192,
+      "prompt_tokens": 7958,
+      "seconds": 1.887,
+      "prefill_tps": 4216.9
+    },
+    {
+      "requested": 32768,
+      "prompt_tokens": 31796,
+      "seconds": 7.68,
+      "prefill_tps": 4140.4
+    },
+    {
+      "requested": 65536,
+      "prompt_tokens": 63580,
+      "seconds": 15.689,
+      "prefill_tps": 4052.5
+    },
+    {
+      "requested": 131072,
+      "prompt_tokens": 127151,
+      "seconds": 33.139,
+      "prefill_tps": 3836.9
+    }
+  ]
+}
