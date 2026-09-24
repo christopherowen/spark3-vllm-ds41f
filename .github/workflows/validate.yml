@@ -20,7 +20,12 @@ jobs:
         run: |
           find scripts -type f -print0 | xargs -0 -n1 bash -n
           find experiments -type f -name 'prepare-sources' -print0 \
-            | xargs -0 -n1 sh -n
+            | while IFS= read -r -d '' file; do
+                case "$(head -n1 "$file")" in
+                  *python*) python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' "$file" ;;
+                  *) sh -n "$file" ;;
+                esac
+              done
       - name: Validate JSON and patches
         run: |
           git diff --check
