@@ -11,7 +11,8 @@ state, or an experiment.
 ## Current baseline
 
 The active baseline was promoted on 2026-09-24
-([manifests/baselines/2026-09-24-karmic-kraken.json](manifests/baselines/2026-09-24-karmic-kraken.json)):
+([manifests/baselines/2026-09-24-karmic-kraken-capture32.json](manifests/baselines/2026-09-24-karmic-kraken-capture32.json);
+[speed tuning](experiments/2026-09-24-kk-speed-tuning/decision.md)):
 
 - three DGX Spark nodes using tensor parallelism 3;
 - direct dual ConnectX-7 paths between every pair of nodes;
@@ -19,7 +20,8 @@ The active baseline was promoted on 2026-09-24
   B12X (plus the switchless RoCEnante patch), with B12X attention, linear, MoE,
   and mHC kernels;
 - DeepSeek V4.1 Flash native FP8/FP4 weights, unchanged;
-- DSpark speculative decoding with three draft tokens, full CUDA graphs;
+- DSpark speculative decoding with three draft tokens, full CUDA graphs for
+  decode batches up to 32 tokens;
 - B12X W4A8 tiny decode disabled (`B12X_W4A8_TINY_DECODE=0`): it omits the
   model's SwiGLU clamp and caused the incoherence seen in earlier images;
 - 160,000-token per-request limit, eight admitted sequences, and 933,168 KV
@@ -89,9 +91,9 @@ node to the lower steady-state guard. Mutating operations require an explicit
 service additionally requires `--replace`, and an experiment with
 `deployment.launch_enabled=false` refuses mutation locally.
 
-Both tracked cluster configurations are launch-disabled during the physical
-recovery pause. Re-enabling either one requires an explicit reviewed config
-change after the hosts have been power-cycled and inspected.
+The promoted configuration is launch-enabled on `main` since the 2026-09-24
+karmic-kraken promotion (owner decision). Experiment configurations enable
+launch only on their own branches.
 
 The compatibility helpers in `scripts/` are thin wrappers around these commands.
 They contain no independent topology, credentials, or launch logic.

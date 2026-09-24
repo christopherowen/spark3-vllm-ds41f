@@ -1,0 +1,16 @@
+{
+  "sizes": [
+    {
+      "requested": 8192,
+      "prompt_tokens": 7958,
+      "seconds": 1.917,
+      "prefill_tps": 4151.0
+    },
+    {
+      "requested": 32768,
+      "prompt_tokens": 31796,
+      "seconds": 7.767,
+      "prefill_tps": 4094.0
+    }
+  ]
+}

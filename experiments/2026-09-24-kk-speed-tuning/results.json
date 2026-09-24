@@ -1,0 +1,502 @@
+{
+  "kkt-baseline": {
+    "serving": {
+      "prose-c1": {
+        "mean_tps": 42.4,
+        "min": 38.9,
+        "max": 45.6,
+        "n": 4
+      },
+      "prose-c2": {
+        "mean_tps": 61.6,
+        "min": 61.0,
+        "max": 62.3,
+        "n": 2
+      },
+      "prose-c4": {
+        "mean_tps": 99.1,
+        "min": 98.9,
+        "max": 99.2,
+        "n": 2
+      },
+      "prose-c8": {
+        "mean_tps": 137.8,
+        "min": 137.3,
+        "max": 138.3,
+        "n": 2
+      },
+      "code-c1": {
+        "mean_tps": 49.1,
+        "min": 45.8,
+        "max": 55.1,
+        "n": 4
+      },
+      "code-c2": {
+        "mean_tps": 79.3,
+        "min": 75.2,
+        "max": 83.3,
+        "n": 2
+      },
+      "code-c4": {
+        "mean_tps": 118.0,
+        "min": 117.4,
+        "max": 118.5,
+        "n": 2
+      },
+      "code-c8": {
+        "mean_tps": 155.7,
+        "min": 154.5,
+        "max": 156.9,
+        "n": 2
+      }
+    },
+    "lru": [
+      "5/5",
+      "5/5"
+    ],
+    "min_mem_available_gib": {
+      "dgx1_min_gib": 6.98,
+      "dgx2_min_gib": 7.68,
+      "dgx3_min_gib": 7.72
+    }
+  },
+  "kkt-capture32": {
+    "serving": {
+      "prose-c1": {
+        "mean_tps": 39.8,
+        "min": 37.6,
+        "max": 42.0,
+        "n": 4
+      },
+      "prose-c2": {
+        "mean_tps": 65.9,
+        "min": 61.9,
+        "max": 69.9,
+        "n": 2
+      },
+      "prose-c4": {
+        "mean_tps": 101.4,
+        "min": 100.6,
+        "max": 102.3,
+        "n": 2
+      },
+      "prose-c8": {
+        "mean_tps": 138.4,
+        "min": 137.1,
+        "max": 139.8,
+        "n": 2
+      },
+      "code-c1": {
+        "mean_tps": 52.7,
+        "min": 50.7,
+        "max": 53.9,
+        "n": 4
+      },
+      "code-c2": {
+        "mean_tps": 81.0,
+        "min": 76.4,
+        "max": 85.7,
+        "n": 2
+      },
+      "code-c4": {
+        "mean_tps": 117.0,
+        "min": 116.5,
+        "max": 117.4,
+        "n": 2
+      },
+      "code-c8": {
+        "mean_tps": 166.9,
+        "min": 160.7,
+        "max": 173.1,
+        "n": 2
+      }
+    },
+    "lru": [
+      "5/5",
+      "5/5"
+    ],
+    "min_mem_available_gib": {
+      "dgx1_min_gib": 6.07,
+      "dgx2_min_gib": 7.71,
+      "dgx3_min_gib": 6.89
+    }
+  },
+  "kkt-depth5": {
+    "serving": {
+      "prose-c1": {
+        "mean_tps": 40.1,
+        "min": 37.6,
+        "max": 43.2,
+        "n": 4
+      },
+      "prose-c2": {
+        "mean_tps": 66.2,
+        "min": 63.0,
+        "max": 69.4,
+        "n": 2
+      },
+      "prose-c4": {
+        "mean_tps": 99.0,
+        "min": 95.6,
+        "max": 102.4,
+        "n": 2
+      },
+      "prose-c8": {
+        "mean_tps": 142.9,
+        "min": 142.9,
+        "max": 143.0,
+        "n": 2
+      },
+      "code-c1": {
+        "mean_tps": 52.5,
+        "min": 49.8,
+        "max": 56.7,
+        "n": 4
+      },
+      "code-c2": {
+        "mean_tps": 81.6,
+        "min": 76.7,
+        "max": 86.5,
+        "n": 2
+      },
+      "code-c4": {
+        "mean_tps": 122.3,
+        "min": 117.4,
+        "max": 127.2,
+        "n": 2
+      },
+      "code-c8": {
+        "mean_tps": 164.4,
+        "min": 164.3,
+        "max": 164.5,
+        "n": 2
+      }
+    },
+    "lru": [
+      "5/5",
+      "5/5"
+    ],
+    "min_mem_available_gib": {
+      "dgx1_min_gib": 6.77,
+      "dgx2_min_gib": 6.82,
+      "dgx3_min_gib": 7.5
+    }
+  },
+  "kkt-autotune3": {
+    "serving": {
+      "prose-c1": {
+        "mean_tps": 44.5,
+        "min": 42.3,
+        "max": 46.7,
+        "n": 4
+      },
+      "prose-c2": {
+        "mean_tps": 66.6,
+        "min": 64.0,
+        "max": 69.2,
+        "n": 2
+      },
+      "prose-c4": {
+        "mean_tps": 98.7,
+        "min": 96.5,
+        "max": 100.9,
+        "n": 2
+      },
+      "prose-c8": {
+        "mean_tps": 142.1,
+        "min": 141.5,
+        "max": 142.6,
+        "n": 2
+      },
+      "code-c1": {
+        "mean_tps": 50.9,
+        "min": 48.6,
+        "max": 55.2,
+        "n": 4
+      },
+      "code-c2": {
+        "mean_tps": 78.8,
+        "min": 75.8,
+        "max": 81.9,
+        "n": 2
+      },
+      "code-c4": {
+        "mean_tps": 112.8,
+        "min": 111.1,
+        "max": 114.4,
+        "n": 2
+      },
+      "code-c8": {
+        "mean_tps": 160.0,
+        "min": 155.3,
+        "max": 164.8,
+        "n": 2
+      }
+    },
+    "lru": [
+      "5/5",
+      "5/5"
+    ],
+    "min_mem_available_gib": {
+      "dgx1_min_gib": 6.07,
+      "dgx2_min_gib": 7.66,
+      "dgx3_min_gib": 6.89
+    }
+  },
+  "kkt-cost1": {
+    "serving": {
+      "prose-c1": {
+        "mean_tps": 43.0,
+        "min": 42.3,
+        "max": 43.6,
+        "n": 4
+      },
+      "prose-c2": {
+        "mean_tps": 65.7,
+        "min": 64.2,
+        "max": 67.2,
+        "n": 2
+      },
+      "prose-c4": {
+        "mean_tps": 99.0,
+        "min": 96.5,
+        "max": 101.4,
+        "n": 2
+      },
+      "prose-c8": {
+        "mean_tps": 138.8,
+        "min": 138.0,
+        "max": 139.6,
+        "n": 2
+      },
+      "code-c1": {
+        "mean_tps": 52.2,
+        "min": 48.2,
+        "max": 54.8,
+        "n": 4
+      },
+      "code-c2": {
+        "mean_tps": 80.4,
+        "min": 76.2,
+        "max": 84.6,
+        "n": 2
+      },
+      "code-c4": {
+        "mean_tps": 116.1,
+        "min": 112.8,
+        "max": 119.4,
+        "n": 2
+      },
+      "code-c8": {
+        "mean_tps": 162.4,
+        "min": 160.8,
+        "max": 164.0,
+        "n": 2
+      }
+    },
+    "lru": [
+      "5/5",
+      "5/5"
+    ],
+    "min_mem_available_gib": {
+      "dgx1_min_gib": 6.08,
+      "dgx2_min_gib": 7.68,
+      "dgx3_min_gib": 6.9
+    }
+  },
+  "kkt-cost4": {
+    "serving": {
+      "prose-c1": {
+        "mean_tps": 42.1,
+        "min": 39.9,
+        "max": 43.9,
+        "n": 4
+      },
+      "prose-c2": {
+        "mean_tps": 67.2,
+        "min": 64.4,
+        "max": 70.0,
+        "n": 2
+      },
+      "prose-c4": {
+        "mean_tps": 102.5,
+        "min": 100.8,
+        "max": 104.2,
+        "n": 2
+      },
+      "prose-c8": {
+        "mean_tps": 147.4,
+        "min": 147.2,
+        "max": 147.7,
+        "n": 2
+      },
+      "code-c1": {
+        "mean_tps": 50.3,
+        "min": 48.1,
+        "max": 53.2,
+        "n": 4
+      },
+      "code-c2": {
+        "mean_tps": 82.8,
+        "min": 82.1,
+        "max": 83.5,
+        "n": 2
+      },
+      "code-c4": {
+        "mean_tps": 113.9,
+        "min": 112.1,
+        "max": 115.8,
+        "n": 2
+      },
+      "code-c8": {
+        "mean_tps": 159.0,
+        "min": 158.8,
+        "max": 159.1,
+        "n": 2
+      }
+    },
+    "lru": [
+      "5/5",
+      "5/5"
+    ],
+    "min_mem_available_gib": {
+      "dgx1_min_gib": 6.04,
+      "dgx2_min_gib": 7.63,
+      "dgx3_min_gib": 6.87
+    }
+  },
+  "kkt-len512k": {
+    "serving": {
+      "prose-c1": {
+        "mean_tps": 41.0,
+        "min": 37.8,
+        "max": 43.0,
+        "n": 4
+      },
+      "prose-c2": {
+        "mean_tps": 65.2,
+        "min": 65.1,
+        "max": 65.4,
+        "n": 2
+      },
+      "prose-c4": {
+        "mean_tps": 95.2,
+        "min": 94.4,
+        "max": 96.0,
+        "n": 2
+      },
+      "prose-c8": {
+        "mean_tps": 142.7,
+        "min": 139.1,
+        "max": 146.3,
+        "n": 2
+      },
+      "code-c1": {
+        "mean_tps": 49.0,
+        "min": 45.4,
+        "max": 52.9,
+        "n": 4
+      },
+      "code-c2": {
+        "mean_tps": 80.2,
+        "min": 74.6,
+        "max": 85.7,
+        "n": 2
+      },
+      "code-c4": {
+        "mean_tps": 117.6,
+        "min": 115.5,
+        "max": 119.7,
+        "n": 2
+      },
+      "code-c8": {
+        "mean_tps": 156.9,
+        "min": 156.5,
+        "max": 157.3,
+        "n": 2
+      }
+    },
+    "lru": [
+      "5/5",
+      "5/5"
+    ],
+    "min_mem_available_gib": {
+      "dgx1_min_gib": 5.41,
+      "dgx2_min_gib": 7.19,
+      "dgx3_min_gib": 7.04
+    }
+  },
+  "prefill_reference_cost4": {
+    "sizes": [
+      {
+        "requested": 1024,
+        "prompt_tokens": 1004,
+        "seconds": 0.345,
+        "prefill_tps": 2912.5
+      },
+      {
+        "requested": 8192,
+        "prompt_tokens": 7958,
+        "seconds": 1.887,
+        "prefill_tps": 4216.9
+      },
+      {
+        "requested": 32768,
+        "prompt_tokens": 31796,
+        "seconds": 7.68,
+        "prefill_tps": 4140.4
+      },
+      {
+        "requested": 65536,
+        "prompt_tokens": 63580,
+        "seconds": 15.689,
+        "prefill_tps": 4052.5
+      },
+      {
+        "requested": 131072,
+        "prompt_tokens": 127151,
+        "seconds": 33.139,
+        "prefill_tps": 3836.9
+      }
+    ]
+  },
+  "prefill_len512k": [
+    {
+      "sizes": [
+        {
+          "requested": 8192,
+          "prompt_tokens": 7957,
+          "seconds": 2.208,
+          "prefill_tps": 3604.1
+        },
+        {
+          "requested": 262144,
+          "prompt_tokens": 254291,
+          "seconds": 72.863,
+          "prefill_tps": 3490.0
+        }
+      ]
+    },
+    {
+      "sizes": [
+        {
+          "requested": 8192,
+          "prompt_tokens": 7958,
+          "seconds": 1.917,
+          "prefill_tps": 4151.0
+        },
+        {
+          "requested": 32768,
+          "prompt_tokens": 31796,
+          "seconds": 7.767,
+          "prefill_tps": 4094.0
+        }
+      ]
+    }
+  ],
+  "not_measurable": {
+    "batched8192": "startup guard stop on dgx1 in three launches (runs/failed-starts on dgx1)",
+    "draft_tp1": "not run: 7.39 GiB drafter on dgx1 exceeds its headroom",
+    "autotune_full": "r1 guard stop, r2 stopped by hand: resident candidate programs grow ~1.6 MB per compilation"
+  }
+}

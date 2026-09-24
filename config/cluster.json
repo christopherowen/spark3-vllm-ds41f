@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "promoted_baseline": "2026-09-24-karmic-kraken",
+  "promoted_baseline": "2026-09-24-karmic-kraken-capture32",
   "container": {
     "name": "dsv41-karmic-kraken",
     "image": "vllm-ds41f-kkref:01f1b874c774-r1",
@@ -152,7 +152,7 @@
     "--kv-cache-memory-bytes",
     "2147483648",
     "--max-cudagraph-capture-size",
-    "24",
+    "32",
     "--generation-config",
     "vllm",
     "--language-model-only",
@@ -169,7 +169,7 @@
     "--jit-monitor-mode",
     "warn",
     "--compilation-config",
-    "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24]}",
+    "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24,28,32]}",
     "--prefix-cache-retention-interval",
     "512",
     "--long-prefill-token-threshold",
