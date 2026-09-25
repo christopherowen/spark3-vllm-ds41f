@@ -1,6 +1,6 @@
 # Replicating the promoted baseline
 
-This reproduces `manifests/baselines/2026-09-25-karmic-kraken-r3.json`:
+This reproduces `manifests/baselines/2026-09-25-karmic-kraken-r3-vision.json`:
 DeepSeek V4.1 Flash on three DGX Spark (GB10) nodes, tensor parallelism 3,
 direct-cabled dual ConnectX-7 ring, Local Inference Lab's
 `integration/karmic-kraken-beta` vLLM and B12X.
@@ -14,6 +14,14 @@ direct-cabled dual ConnectX-7 ring, Local Inference Lab's
   `ssh_user` in `config/nodes.json`.
 - About 480 GiB of free disk per node for the model (the Engram tables are read
   from disk) plus caches, and 64 GiB of free memory on the build host.
+- `vm.watermark_boost_factor=0` on every node. With the kernel default (15000)
+  a watermark boost hides up to 0.87 GiB from MemAvailable, which the memory
+  guards read, and the head node's startup margin is about 1.2 GiB:
+
+  ```sh
+  echo "vm.watermark_boost_factor = 0" | sudo tee /etc/sysctl.d/90-watermark-boost.conf
+  sudo sysctl -w vm.watermark_boost_factor=0
+  ```
 
 ## Site configuration
 

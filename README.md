@@ -11,22 +11,23 @@ state, or an experiment.
 ## Current baseline
 
 The active baseline is recorded in
-[manifests/baselines/2026-09-25-karmic-kraken-r3.json](manifests/baselines/2026-09-25-karmic-kraken-r3.json):
+[manifests/baselines/2026-09-25-karmic-kraken-r3-vision.json](manifests/baselines/2026-09-25-karmic-kraken-r3-vision.json):
 
 - three DGX Spark nodes using tensor parallelism 3;
 - direct dual ConnectX-7 paths between every pair of nodes;
 - Local Inference Lab's `integration/karmic-kraken-beta` vLLM (plus Engram
   projection sharding and asynchronous Engram row patches) and B12X (plus the switchless RoCEnante patch),
   with B12X attention, linear, MoE, and mHC kernels;
-- DeepSeek V4.1 Flash native FP8/FP4 weights, unchanged;
+- DeepSeek V4.1 Flash native FP8/FP4 weights, unchanged, with the vision
+  tower loaded (up to four images per request);
 - DSpark speculative decoding with three draft tokens and block rejection,
   full CUDA graphs for decode batches up to 32 tokens;
 - B12X W4A8 tiny decode disabled (`B12X_W4A8_TINY_DECODE=0`): it omits the
   model's SwiGLU clamp and caused the incoherence seen in earlier images;
-- 160,000-token per-request limit, eight admitted sequences, and 933,168 KV
-  tokens in a 2 GiB-per-rank cache;
+- 131,072-token per-request limit, eight admitted sequences, and 575,304 KV
+  tokens in a 1.4 GiB-per-rank cache;
 - one concurrent prefill, 4,096 batched tokens, and fail-closed 5 GiB startup
-  and 3 GiB steady memory guards;
+  and 3 GiB steady memory guards, on hosts with `vm.watermark_boost_factor=0`;
 - FlashInfer autotune disabled (`--no-enable-flashinfer-autotune`): only the
   sampler uses FlashInfer, and the pass saved no configs.
 
@@ -44,29 +45,30 @@ prompts, temperature 0, reasoning on, 256 output tokens.
 
 | Prompt | Streams | Aggregate tok/s | Per-stream decode tok/s | First token |
 |---|---:|---:|---:|---:|
-| prose | 1 | 41.6 | 43.2 | 0.25 s |
-| prose | 2 | 70.5 | 37.6 | 0.37 s |
-| prose | 4 | 102.4 | 28.4 | 0.48 s |
-| prose | 8 | 150.4 | 20.6 | 0.56 s |
-| code | 1 | 50.6 | 52.9 | 0.24 s |
-| code | 2 | 83.6 | 44.7 | 0.34 s |
-| code | 4 | 120.9 | 33.3 | 0.50 s |
-| code | 8 | 173.0 | 24.3 | 0.58 s |
+| prose | 1 | 40.8 | 42.3 | 0.25 s |
+| prose | 2 | 70.2 | 37.7 | 0.37 s |
+| prose | 4 | 102.3 | 28.1 | 0.49 s |
+| prose | 8 | 151.8 | 20.6 | 0.58 s |
+| code | 1 | 53.4 | 56.2 | 0.26 s |
+| code | 2 | 80.6 | 44.8 | 0.37 s |
+| code | 4 | 121.3 | 33.7 | 0.51 s |
+| code | 8 | 175.6 | 24.3 | 0.62 s |
 
 | Other measurements | |
 |---|---|
 | Quality gate (fixed LRU task, 5 repeats) | 5/5 |
-| Single-stream decode step | about 51 ms; 1.2 accepted drafts per step on prose, 1.7 on code |
-| Cold prefill | 2K 3.8k, 32K 4.1k, 64K 4.0k, 128K 3.8k tok/s |
-| Prefix-cache replay, 32K prompt | 7.75 s cold, 0.26 s warm |
-| Four concurrent 64K contexts | all admitted without preemption, peak KV use 22%, 12.1 tok/s per stream |
-| KV capacity | 933,168 tokens in 2 GiB per rank (5.8 full 160K contexts) |
-| Host memory headroom under load | dgx1 at least 5.8 GiB MemAvailable (3 GiB guard) |
+| Single-stream decode step | about 50 ms; 1.1 accepted drafts per step on prose, 1.9 on code |
+| Image input | up to 4 images per request; both image checks pass, answered in 1.3-1.6 s |
+| Cold prefill | 2K 3.9k, 32K 4.2k, 64K 4.1k tok/s |
+| Prefix-cache replay, 32K prompt | 7.62 s cold, 0.26 s warm |
+| Four concurrent 64K contexts | all admitted without preemption, peak KV use 31%, 12.3 tok/s per stream |
+| KV capacity | 575,304 tokens in 1.4 GiB per rank (4.4 full 131K contexts) |
+| Host memory headroom | dgx1 at least 6.2 GiB MemAvailable during startup (5 GiB guard), 5.6 GiB under load (3 GiB guard) |
 
 The quick default takes three or four samples per decode point, about ±4-9%
 at 95% confidence. Single boots of one configuration vary by about 3%.
-Reports: [decode](manifests/benchmarks/2026-09-25-karmic-kraken-r3.json),
-[prefill, prefix cache, and admission](manifests/benchmarks/2026-09-25-karmic-kraken-r3-capacity.json).
+Reports: [decode](manifests/benchmarks/2026-09-25-karmic-kraken-r3-vision.json),
+[prefill, prefix cache, and admission](manifests/benchmarks/2026-09-25-karmic-kraken-r3-vision-capacity.json).
 See [Benchmarking](#benchmarking) to reproduce them.
 
 ## Repository contract

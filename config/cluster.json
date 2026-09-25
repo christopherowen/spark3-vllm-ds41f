@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "promoted_baseline": "2026-09-25-karmic-kraken-r3",
+  "promoted_baseline": "2026-09-25-karmic-kraken-r3-vision",
   "container": {
     "name": "dsv41-karmic-kraken",
     "image": "vllm-ds41f-kkref:01f1b874c774-r3",
@@ -141,7 +141,7 @@
     "--enable-prefix-caching",
     "--enable-chunked-prefill",
     "--max-model-len",
-    "160000",
+    "131072",
     "--max-num-seqs",
     "8",
     "--max-parallel-prefills",
@@ -151,12 +151,11 @@
     "--max-num-batched-tokens",
     "4096",
     "--kv-cache-memory-bytes",
-    "2147483648",
+    "1503238553",
     "--max-cudagraph-capture-size",
     "32",
     "--generation-config",
     "vllm",
-    "--language-model-only",
     "--engram-config",
     "{\"table_memory\":\"disk\",\"disk_resident_scales\":false,\"projection_tp\":true}",
     "--attention-backend",
@@ -188,7 +187,11 @@
     "--nnodes",
     "3",
     "--no-scheduler-reserve-full-isl",
-    "--no-enable-flashinfer-autotune"
+    "--no-enable-flashinfer-autotune",
+    "--limit-mm-per-prompt",
+    "{\"image\":4}",
+    "--mm-processor-cache-gb",
+    "0"
   ],
   "distributed": {
     "master_addr": "10.0.1.71",

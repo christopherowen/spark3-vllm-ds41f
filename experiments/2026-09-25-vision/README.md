@@ -81,8 +81,26 @@ A failure leaves the cluster stopped; nothing rolls back automatically.
     `law-desire-reconciler` (a 20-second timer) coincided with a 1 GiB dip
     lasting 0.4 s at 10:07:58.
 
-- **Attempt 5** (KV 1.4 GiB, about 575K tokens, 4.4 contexts of 131,072):
-  needs `vm.watermark_boost_factor=0` on the nodes (an owner change), so
-  MemAvailable stops including the boost; the guards stay at 5 and 3 GiB.
-  `run.sh` refuses to start while dgx1 still has boosting on. Expected
-  dgx1 floor about 5.7 GiB, 0.7 GiB above the startup guard.
+- **Attempt 5** (KV 1.4 GiB, 575,304 tokens, 4.39 contexts of 131,072), after
+  the owner set `vm.watermark_boost_factor=0` on all three nodes (live and in
+  `/etc/sysctl.d/90-watermark-boost.conf`); the guards stayed at 5 and 3 GiB.
+  - The Normal zone boost read 0 in all 160 trace samples. dgx1's lowest
+    reading during startup was 6.21 GiB, 1.2 GiB above the startup guard
+    (predicted about 5.7).
+  - Both image checks passed (531 and 1,017 prompt tokens, 1.6 and 1.3 s).
+  - Quick bench against r3: equal at every decode point, quality 5/5;
+    single-stream steps 49.7/51.5 ms vs 50.7/51.2 ms. Lowest free memory
+    dgx1 5.65, dgx2 6.66, dgx3 6.80 GiB.
+  - Capacity suites against r3: prefill 2K 3,882 (+1.4%), 32K 4,174, 64K
+    4,072 tok/s (both within noise; the 128K point no longer fits the
+    131,072-token limit); 32K prefix replay 7.62 s cold, 0.26 s warm; four
+    64K contexts admitted, peak KV 31%, 12.3 tok/s per stream. Lowest free
+    memory dgx1 5.64 GiB. dgx3's GPU peaked at 79 C during prefill (10 C
+    below its limit), as in earlier runs; no thermal slowdown.
+
+## Decision
+
+Promoted as `2026-09-25-karmic-kraken-r3-vision`: the configuration above
+under the promoted container name, on the unchanged r3 image. Text
+performance is unchanged, images work, and dgx1 keeps a 1.2 GiB startup
+margin. Hosts now need `vm.watermark_boost_factor=0` (docs/replicate.md).
