@@ -349,6 +349,66 @@ def boot_order_problems(node_name: str, output: str) -> list[str]:
     ]
 
 
+HOST_FACTS_QUERY = """
+printf 'modeset=%s\\n' "$(sudo -n cat /sys/module/nvidia_drm/parameters/modeset 2>/dev/null)"
+printf 'kernel=%s\\n' "$(uname -r)"
+printf 'fan_dkms=%s\\n' "$(dkms status -m dgx-spark-fan-control -k "$(uname -r)" 2>/dev/null | head -1)"
+printf 'fan_module=%s\\n' "$(grep -c '^dgx_ec_fan_control ' /proc/modules)"
+printf 'fan_cooling_device=%s\\n' "$(grep -lx dgx_ec_fan_floor /sys/class/thermal/cooling_device*/type 2>/dev/null | wc -l)"
+printf 'fan_service=%s/%s\\n' "$(systemctl is-enabled dgx-fan-control.service 2>/dev/null)" \\
+  "$(systemctl is-active dgx-fan-control.service 2>/dev/null)"
+"""
+
+
+def host_facts(output: str) -> dict[str, str]:
+    facts = {}
+    for line in output.splitlines():
+        key, separator, value = line.partition("=")
+        if separator:
+            facts[key.strip()] = value.strip()
+    return facts
+
+
+def modeset_problems(node_name: str, facts: dict[str, str]) -> list[str]:
+    """Problems when nvidia-drm does not drive displays (kernel mode setting).
+
+    Without it only the firmware framebuffer shows a console, and only for a
+    display attached at boot: a monitor or KVM connected later stays dark.
+    """
+    value = facts.get("modeset", "")
+    if value == "Y":
+        return []
+    return [
+        f"{node_name}: nvidia-drm modeset is {value or 'unreadable'}, expected Y "
+        "(a display attached after boot stays dark; remove nvidia-drm-options-modeset0)"
+    ]
+
+
+def fan_control_problems(node_name: str, facts: dict[str, str]) -> list[str]:
+    """The first missing layer of the DGX Spark additive fan-floor control.
+
+    Each layer needs the one before it: the signed DKMS module for the running
+    kernel, the loaded module, its dgx_ec_fan_floor cooling device, and the
+    dgx-fan-control daemon, enabled and running.
+    """
+    kernel = facts.get("kernel") or "the running kernel"
+    if "installed" not in facts.get("fan_dkms", ""):
+        return [f"{node_name}: DKMS dgx-spark-fan-control is not installed for {kernel}"]
+    if facts.get("fan_module") != "1":
+        return [f"{node_name}: dgx_ec_fan_control is not loaded (is the fleet signing key enrolled?)"]
+    if facts.get("fan_cooling_device") != "1":
+        return [
+            f"{node_name}: dgx_ec_fan_control is loaded but its dgx_ec_fan_floor cooling device "
+            "is missing (the driver refused it at probe; see dmesg)"
+        ]
+    if facts.get("fan_service") != "enabled/active":
+        return [
+            f"{node_name}: dgx-fan-control.service is {facts.get('fan_service') or 'unknown'}, "
+            "expected enabled/active"
+        ]
+    return []
+
+
 def live_doctor(cluster: dict, nodes: dict) -> list[str]:
     problems: list[str] = []
     name = cluster["container"]["name"]
@@ -357,6 +417,9 @@ def live_doctor(cluster: dict, nodes: dict) -> list[str]:
         problems.extend(desktop_problems(node["name"], desktop.stdout))
         boot = run_ssh(nodes, node, "efibootmgr")
         problems.extend(boot_order_problems(node["name"], boot.stdout))
+        facts = host_facts(remote_shell(nodes, node, HOST_FACTS_QUERY).stdout)
+        problems.extend(modeset_problems(node["name"], facts))
+        problems.extend(fan_control_problems(node["name"], facts))
         result = run_ssh(nodes, node, "docker", "inspect", name)
         if result.returncode:
             problems.append(f"{node['name']}: cannot inspect {name}: {result.stderr.strip()}")

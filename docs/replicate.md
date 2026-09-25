@@ -18,7 +18,16 @@ direct-cabled dual ConnectX-7 ring, Local Inference Lab's
   (no desktop; `bin/spark3 doctor --live` reports a node that is not), with
   the installed OS first in the UEFI boot order. A network (PXE) entry first
   adds about a minute of DHCP timeouts to every boot; `doctor --live` reports
-  it, and `sudo efibootmgr -o <ubuntu>,<others>` fixes it. The deployment runs on kernel `7.0.0-1019-nvidia`, which needs
+  it, and `sudo efibootmgr -o <ubuntu>,<others>` fixes it.
+- NVIDIA kernel mode setting on (`nvidia-drm modeset=Y`), so a monitor or KVM
+  attached after boot gets a console. DGX OS ships
+  `nvidia-drm-options-modeset0`, which turns it off; purge it (`sudo apt-get
+  purge nvidia-drm-options-modeset0 && sudo update-initramfs -u -k all`) and
+  reboot. `doctor --live` checks it.
+- The DGX Spark additive fan-floor control on every node: the signed
+  `dgx-spark-fan-control` DKMS module with its `dgx_ec_fan_floor` cooling
+  device, and the `dgx-fan-control` daemon. Its source and signing key live
+  outside this repository; `doctor --live` reports the first missing layer. The deployment runs on kernel `7.0.0-1019-nvidia`, which needs
   the `kho=off` that 26.09.2 adds (see [recovery.md](recovery.md)); it also
   runs on `6.17.0-1032-nvidia`. The NVIDIA driver is 580.178.04.
 - `vm.watermark_boost_factor=0` on every node. With the kernel default (15000)
