@@ -108,6 +108,18 @@ eligible kernel. A future default not on the denylist remains eligible and the
 policy removes only its own override. There is no apt hold, package pin, kernel
 removal, or persistent `GRUB_DEFAULT` change.
 
+The fault in `7.0.0-1019-nvidia` is Kexec HandOver: that build enables it by
+default (`CONFIG_KEXEC_HANDOVER_ENABLE_DEFAULT=y`) with no CMA area
+(`CONFIG_CMA_SIZE_MBYTES=0`), so its scratch pages stay migrate-CMA without
+being counted, and long-term pins such as `ibv_reg_mr` fail with `ENOMEM` under
+memory pressure. DGX Spark 26.09.2 installs `nvidia-spark-grub-kho`, which adds
+`kho=off` to the kernel command line. With it, 7.0.0-1019 passed a one-shot
+boot on dgx3 and a full guarded service run
+([experiment](../experiments/2026-09-25-kernel-7.0/README.md)), so it left the
+denylist on 2026-09-25. The denylist and timer stay installed for future
+kernels. To return a node to 6.17, add the release back and run
+`scripts/host-recovery apply`: the next boot uses the newest eligible kernel.
+
 ## Recovery validation
 
 Recovery implementation commit `7f40db1` was installed on all three nodes on
