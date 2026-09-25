@@ -92,42 +92,33 @@ pair. It uses a 108 GiB container cap, a protected 10 GiB startup threshold
 sampled every 100 ms, an isolated content-addressed JIT cache namespace, and no
 CUDA graphs.
 
-## Kernel next-boot policy
+## Kernel
 
-The controlled dgx3 recovery reboot exposed a separate boot-consistency issue:
-`GRUB_DEFAULT=0` selected installed kernel `7.0.0-1019-nvidia`, while this
-cluster's RoCE path is qualified on `6.17.0-1032-nvidia`. The earlier one-shot
-selection of 6.17 had been consumed as designed.
+The nodes boot GRUB's default, the newest kernel the DGX OS
+`linux-nvidia-hwe-24.04` metapackage installs: `7.0.0-1019-nvidia` since
+2026-09-25. Kernel selection is manual; nothing on the hosts overrides it.
 
-Removing 7.0 through apt would also remove `linux-nvidia-hwe-24.04`, preventing
-the normal metapackage from delivering a future corrected kernel. Permanently
-saving 6.17 in GRUB would have the same practical update lock. The recovery
-policy therefore denies only exact release `7.0.0-1019-nvidia`: while that is
-the generated default, a timer maintains a one-shot entry for the running
-eligible kernel. A future default not on the denylist remains eligible and the
-policy removes only its own override. There is no apt hold, package pin, kernel
-removal, or persistent `GRUB_DEFAULT` change.
+That build enables Kexec HandOver by default
+(`CONFIG_KEXEC_HANDOVER_ENABLE_DEFAULT=y`) with no CMA area
+(`CONFIG_CMA_SIZE_MBYTES=0`). Its scratch pages stay migrate-CMA without being
+counted, so long-term pins such as `ibv_reg_mr` fail with `ENOMEM` under memory
+pressure and NCCL and RoCE break. DGX Spark 26.09.2 installs
+`nvidia-spark-grub-kho`, which adds `kho=off` to the kernel command line and
+removes the problem; the qualification is in
+[experiments/2026-09-25-kernel-7.0](../experiments/2026-09-25-kernel-7.0/README.md).
 
-The fault in `7.0.0-1019-nvidia` is Kexec HandOver: that build enables it by
-default (`CONFIG_KEXEC_HANDOVER_ENABLE_DEFAULT=y`) with no CMA area
-(`CONFIG_CMA_SIZE_MBYTES=0`), so its scratch pages stay migrate-CMA without
-being counted, and long-term pins such as `ibv_reg_mr` fail with `ENOMEM` under
-memory pressure. DGX Spark 26.09.2 installs `nvidia-spark-grub-kho`, which adds
-`kho=off` to the kernel command line. With it, 7.0.0-1019 passed a one-shot
-boot on dgx3 and a full guarded service run
-([experiment](../experiments/2026-09-25-kernel-7.0/README.md)), so it left the
-denylist on 2026-09-25. The denylist and timer stay installed for future
-kernels. To return a node to 6.17, add the release back and run
-`scripts/host-recovery apply`: the next boot uses the newest eligible kernel.
+Qualify a new kernel on one node with a one-shot boot before it becomes the
+default everywhere: `sudo grub-reboot '<submenu id>><entry id>' && sudo reboot`
+(ids from `/boot/grub/grub.cfg`), then check `kho=off`, the RoCE links, an
+`ib_write_bw` run and a guarded service start. Any later reboot returns to
+GRUB's default.
 
 ## Recovery validation
 
 Recovery implementation commit `7f40db1` was installed on all three nodes on
 2026-09-21. Each node passed `scripts/host-recovery check`, reported no failed
 systemd units, and retained working SSH and Tailscale listeners through their
-scheduled restarts. dgx3 then consumed the policy-generated GRUB entry, booted
-`6.17.0-1032-nvidia`, and automatically re-armed the same eligible next boot.
-It had zero swap use, no current-boot `NV_ERR_NO_MEMORY` events, and healthy
+scheduled restarts. dgx3 then rebooted into `6.17.0-1032-nvidia`. It had zero swap use, no current-boot `NV_ERR_NO_MEMORY` events, and healthy
 management and peer links after the reboot.
 
 The qualified candidate image is byte-identical on all three nodes as image ID

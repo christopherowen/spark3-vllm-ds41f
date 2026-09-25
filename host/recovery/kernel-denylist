@@ -1,2 +1,0 @@
-# Exact kernel releases that must not be the next boot target on this cluster.
-# Keep this list release-specific: future kernels remain eligible by default.

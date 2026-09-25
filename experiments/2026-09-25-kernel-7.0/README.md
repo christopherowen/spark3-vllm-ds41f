@@ -59,5 +59,7 @@ update on every node, so they are not attributed to the kernel.
 
 ## Decision
 
-Remove `7.0.0-1019-nvidia` from `host/recovery/kernel-denylist` and move dgx1
-and dgx2 to it. To roll back, add it back and run `scripts/host-recovery apply`.
+Run `7.0.0-1019-nvidia` on all three nodes. The next-boot policy and its
+denylist were removed from the repository and the hosts; GRUB's default
+(entry 0, the newest installed kernel) now decides. To roll a node back,
+`grub-reboot` into the 6.17 entry for one boot, or remove 7.0 in GRUB by hand.
