@@ -49,7 +49,24 @@ A failure leaves the cluster stopped; nothing rolls back automatically.
     intervals; single-stream steps 50.3/52.1 ms vs 50.7/51.2 ms) and passed
     quality 5/5. Minimum free memory: dgx1 5.01, dgx2 6.44, dgx3 7.19 GiB
     (r3: 6.28, 7.11, 7.84).
-- **Attempt 4** (same configuration, `run.sh --idle 600`): traces every
-  meminfo field and the worker's CUDA allocation through startup and ten
-  idle minutes, to find the memory that is gone at the end of startup and
-  when it comes back.
+- **Attempt 4** (same configuration, `run.sh --idle 600`, every meminfo
+  field and the worker's CUDA allocation traced): started; lowest dgx1
+  reading 5.29 GiB, during `doctor` right after the switch to the steady
+  guard. The worker's CUDA allocation settled at 104,695-104,733 MiB. That
+  is r3's with KV 2.0 to within the measurement: the tower's 0.9 GiB cost
+  what the smaller cache saved.
+  - Most of the startup dip is not memory use. MemAvailable swung between
+    two levels while free memory, file pages and reclaimable slab stayed
+    put: at 10:06:04-06 it fell 1,649 MiB while free fell 774 MiB and no
+    other field moved more than 30 MiB. MemAvailable minus (free + file LRU
+    + KReclaimable) alternated between -1,114 MiB and about -1,990 MiB.
+  - The cause is the kernel's watermark boost. `vm.watermark_boost_factor`
+    is the default 15000, so after a fragmentation event (the nodes show
+    2.8M compaction stalls) the Normal zone's low watermark rises by up to
+    1.5 x its 291 MiB high watermark, 437 MiB. MemAvailable subtracts the low
+    watermark once from page cache and once from reclaimable slab, so a full
+    boost hides 875 MiB, matching the 876 MiB swing. kswapd then reclaims and
+    the boost clears. Under steady load (8-way decode, a 23K-token prefill,
+    both image checks) the residual held at -1,114 MiB with no boost.
+  - Excluding the boost, dgx1's lowest reading was about 6.1 GiB, so the
+    real margin above the 5 GiB guard is about 1.1 GiB with KV 1.0.
