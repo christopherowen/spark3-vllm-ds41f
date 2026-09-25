@@ -34,15 +34,60 @@ The active baseline was promoted on 2026-09-25
 
 One content-addressed image runs on all three nodes. It passes the LRU
 coherence gate 5/5 and is faster than the 2026-09-20 image at every point of
-the serving matrix; see
-[the qualifying experiment](experiments/2026-09-23-karmic-kraken-reference/README.md)
-and its [decision](experiments/2026-09-23-karmic-kraken-reference/decision.md).
+the serving matrix (see [Performance](#performance)).
 
 The machine-readable desired configuration is [config/cluster.json](config/cluster.json).
 To reproduce the deployment on your own three Sparks, follow
 [docs/replicate.md](docs/replicate.md).
 The previous baseline's live evidence is
 [manifests/baselines/2026-09-20-live.json](manifests/baselines/2026-09-20-live.json).
+
+## Performance
+
+Decode throughput in tokens per second, aggregated over all streams. Every
+column uses the same client on dgx1, the same prose and code prompts,
+temperature 0, reasoning on, and 256 output tokens:
+
+| Prompt | Streams | 2026-09-20 image | r2 (2026-09-24) | r3 (current) | r3 vs 2026-09-20 |
+|---|---:|---:|---:|---:|---:|
+| prose | 1 | 34.6 | 41.4 | **41.6** | +20% |
+| prose | 2 | 57.6 | 66.4 | **70.5** | +22% |
+| prose | 4 | 76.0 | 101.5 | **102.4** | +35% |
+| prose | 8 | 83.1 | 147.9 | **150.4** | +81% |
+| code | 1 | 44.0 | 51.5 | **50.6** | +15% |
+| code | 2 | 65.4 | 80.9 | **83.6** | +28% |
+| code | 4 | 96.0 | 119.0 | **120.9** | +26% |
+| code | 8 | 71.9 | 161.6 | **173.0** | +141% |
+
+Sources:
+
+- 2026-09-20 image: one pass, measured 2026-09-23
+  ([experiment](experiments/2026-09-23-karmic-kraken-reference/README.md)).
+- r2: `bin/spark3 bench --full`, each point to a 95% confidence interval of
+  ±2% ([report](manifests/benchmarks/2026-09-24-karmic-kraken-r2.json)).
+- r3: the quick bench, 3-4 samples per point, ±3-9%
+  ([report](manifests/benchmarks/2026-09-25-karmic-kraken-r3.json)).
+- r3's change was measured precisely against two fresh r2 boots in
+  [the three-leads experiment](experiments/2026-09-24-three-leads/README.md):
+  single-stream decode steps are 1.96 ms shorter at equal verified drafts, and
+  throughput is 3-9% higher at higher concurrency.
+- Single boots of one configuration vary by about 3%.
+
+Also measured on this stack:
+
+| | |
+|---|---|
+| Quality gate (fixed LRU task, 5 repeats) | 2026-09-20 image 1/5; r2 and r3 5/5 |
+| First token, one stream | about 0.25 s |
+| Single-stream decode step (r3) | 51 ms, accepting about 1.2 drafts per step on prose and 1.7-1.9 on code |
+| Cold prefill (r2) | 2K 3.7k, 32K 4.1k, 64K 4.0k, 128K 3.8k tok/s |
+| Prefix-cache replay, 32K prompt (r2) | 7.8 s cold, 0.27 s warm |
+| Four concurrent 64K contexts (r2) | all admitted, peak KV use 22%, 12.8 tok/s per stream |
+| KV capacity | 933,168 tokens in 2 GiB per rank (5.8 full 160K contexts) |
+| Host memory headroom under load | dgx1 at least 5.8 GiB MemAvailable (3 GiB guard) |
+
+Reproduce these with `bin/spark3 bench` (quick) or `bin/spark3 bench --full`;
+see [Benchmarking](#benchmarking).
 
 ## Repository contract
 
