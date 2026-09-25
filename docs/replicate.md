@@ -15,7 +15,7 @@ direct-cabled dual ConnectX-7 ring, Local Inference Lab's
 - About 480 GiB of free disk per node for the model (the Engram tables are read
   from disk) plus caches, and 64 GiB of free memory on the build host.
 - DGX Spark 26.09.2 or later on every node, booted to `multi-user.target`
-  (no desktop). The deployment runs on kernel `7.0.0-1019-nvidia`, which needs
+  (no desktop; `bin/spark3 doctor --live` reports a node that is not). The deployment runs on kernel `7.0.0-1019-nvidia`, which needs
   the `kho=off` that 26.09.2 adds (see [recovery.md](recovery.md)); it also
   runs on `6.17.0-1032-nvidia`. The NVIDIA driver is 580.178.04.
 - `vm.watermark_boost_factor=0` on every node. With the kernel default (15000)

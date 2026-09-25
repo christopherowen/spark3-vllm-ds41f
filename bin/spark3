@@ -303,10 +303,33 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
     return problems
 
 
+DESKTOP_QUERY = "systemctl get-default; systemctl is-active display-manager.service"
+
+
+def desktop_problems(node_name: str, output: str) -> list[str]:
+    """Problems when a node boots to a desktop or runs its display manager.
+
+    The display stack's processes and GPU buffers come out of the same unified
+    memory as the model, and dgx1 has little to spare above its startup guard.
+    """
+    default_target, manager = (output.split() + ["", ""])[:2]
+    problems = []
+    if default_target != "multi-user.target":
+        problems.append(
+            f"{node_name}: boots to {default_target or 'an unknown target'}, "
+            "expected multi-user.target (no desktop)"
+        )
+    if manager in ("active", "activating", "reloading"):
+        problems.append(f"{node_name}: display manager is {manager}")
+    return problems
+
+
 def live_doctor(cluster: dict, nodes: dict) -> list[str]:
     problems: list[str] = []
     name = cluster["container"]["name"]
     for node in nodes["nodes"]:
+        desktop = remote_shell(nodes, node, DESKTOP_QUERY)
+        problems.extend(desktop_problems(node["name"], desktop.stdout))
         result = run_ssh(nodes, node, "docker", "inspect", name)
         if result.returncode:
             problems.append(f"{node['name']}: cannot inspect {name}: {result.stderr.strip()}")
