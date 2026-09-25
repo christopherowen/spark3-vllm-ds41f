@@ -71,8 +71,8 @@ A failure leaves the cluster stopped; nothing rolls back automatically.
   - A boost does not always clear quickly. At 10:11:58, with the service
     idle, the residual moved to -1,989 MiB and stayed. /proc/zoneinfo then
     showed the Normal zone boost at 111,946 pages (437 MiB, the maximum) with
-    MemAvailable at 5.08 GiB. Free memory stayed above the boosted
-    watermark, so kswapd had no reason to run and reset it.
+    MemAvailable at 5.08 GiB. Either kswapd did not run to reset it or new
+    fragmentation events kept raising it again; the trace cannot tell which.
   - Excluding the boost, dgx1's lowest reading was about 6.1 GiB, so the
     real margin above the 5 GiB guard is about 1.1 GiB with KV 1.0. With
     the boost, a start can land anywhere from that margin down to about
@@ -81,7 +81,8 @@ A failure leaves the cluster stopped; nothing rolls back automatically.
     `law-desire-reconciler` (a 20-second timer) coincided with a 1 GiB dip
     lasting 0.4 s at 10:07:58.
 
-Next: with `vm.watermark_boost_factor=0` on the nodes (an owner change),
-MemAvailable stops including the boost and the guards stay at 5 and 3 GiB.
-Then KV 1.4 GiB (about 575K tokens, 4.4 contexts of 131,072) should leave
-dgx1 about 0.7 GiB above the startup guard.
+- **Attempt 5** (KV 1.4 GiB, about 575K tokens, 4.4 contexts of 131,072):
+  needs `vm.watermark_boost_factor=0` on the nodes (an owner change), so
+  MemAvailable stops including the boost; the guards stay at 5 and 3 GiB.
+  `run.sh` refuses to start while dgx1 still has boosting on. Expected
+  dgx1 floor about 5.7 GiB, 0.7 GiB above the startup guard.

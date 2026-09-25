@@ -9,6 +9,11 @@ IDLE=0
 [ "${1:-}" = --idle ] && IDLE=$2
 cd ~/projects/spark3-vllm-ds41f
 E=experiments/2026-09-25-vision
+# A watermark boost hides up to 0.87 GiB from MemAvailable on dgx1 (README).
+if [ "$(cat /proc/sys/vm/watermark_boost_factor)" != 0 ]; then
+  echo "refusing: vm.watermark_boost_factor is not 0 on $(hostname)" >&2
+  exit 1
+fi
 TRACE=/tmp/vision-memtrace-$(date -u +%H%M%S).txt
 bin/spark3 cluster stop --remove --apply >/dev/null 2>&1
 bin/spark3 --cluster-config $E/cluster-vision.json cluster stop --remove --apply >/dev/null 2>&1
