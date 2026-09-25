@@ -151,7 +151,7 @@
     "--max-num-batched-tokens",
     "4096",
     "--kv-cache-memory-bytes",
-    "1610612736",
+    "1073741824",
     "--max-cudagraph-capture-size",
     "32",
     "--generation-config",
