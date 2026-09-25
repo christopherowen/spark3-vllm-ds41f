@@ -324,12 +324,39 @@ def desktop_problems(node_name: str, output: str) -> list[str]:
     return problems
 
 
+def boot_order_problems(node_name: str, output: str) -> list[str]:
+    """Problems when UEFI tries another boot entry before the installed OS.
+
+    A network (PXE) entry first costs about a minute of DHCP timeouts on every
+    boot; a firmware update left dgx3 that way.
+    """
+    order: list[str] = []
+    entries: dict[str, str] = {}
+    for line in output.splitlines():
+        if line.startswith("BootOrder:"):
+            order = [item.strip().upper() for item in line.split(":", 1)[1].split(",") if item.strip()]
+        elif match := re.match(r"Boot([0-9A-Fa-f]{4})\*?\s+(.*)", line):
+            entries[match.group(1).upper()] = match.group(2)
+    if not order:
+        return [f"{node_name}: cannot read the UEFI boot order"]
+    first = entries.get(order[0], "")
+    label = first.split("\t")[0].strip()
+    if label.lower() == "ubuntu" or "\\efi\\ubuntu\\" in first.lower():
+        return []
+    return [
+        f"{node_name}: UEFI boots {label or 'entry ' + order[0]!r} before the installed OS "
+        f"(BootOrder {','.join(order)})"
+    ]
+
+
 def live_doctor(cluster: dict, nodes: dict) -> list[str]:
     problems: list[str] = []
     name = cluster["container"]["name"]
     for node in nodes["nodes"]:
         desktop = remote_shell(nodes, node, DESKTOP_QUERY)
         problems.extend(desktop_problems(node["name"], desktop.stdout))
+        boot = run_ssh(nodes, node, "efibootmgr")
+        problems.extend(boot_order_problems(node["name"], boot.stdout))
         result = run_ssh(nodes, node, "docker", "inspect", name)
         if result.returncode:
             problems.append(f"{node['name']}: cannot inspect {name}: {result.stderr.strip()}")
