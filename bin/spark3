@@ -380,7 +380,7 @@ def modeset_problems(node_name: str, facts: dict[str, str]) -> list[str]:
         return []
     return [
         f"{node_name}: nvidia-drm modeset is {value or 'unreadable'}, expected Y "
-        "(a display attached after boot stays dark; remove nvidia-drm-options-modeset0)"
+        "(a display attached after boot stays dark; purge nvidia-drm-options-modeset0)"
     ]
 
 
