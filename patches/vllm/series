@@ -1,2 +1,3 @@
 # Applied after the pinned local-inference-lab/vllm integration/karmic-kraken-beta revision.
 0001-engram-projection-tp-padding.patch
+0002-engram-async-disk-rows.patch

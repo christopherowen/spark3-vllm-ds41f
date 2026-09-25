@@ -1,0 +1,418 @@
+From 5904466eaa5fa96715e1657734c4e8275fe77854 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 01:30:00 +0200
+Subject: [PATCH] perf(deepseek-v4.1): read disk Engram rows beside the forward
+ launch
+
+With disk-resident Engram tables the host read both Engram layers' rows
+before launching the forward: it waited for the hash IDs, read the rows
+with io_uring, decoded them, and only then launched the graph, so the GPU
+idled through both reads and the graph launch (about 1.85 ms of a 40-52 ms
+single-stream step on three DGX Sparks).
+
+SPARK3_ENGRAM_ASYNC=1 splits the preparation. The main thread hashes,
+resets a per-layer ready flag, copies the row IDs to the host, and queues
+the row decode on a side stream behind a host gate (cuStreamWaitValue32 on a
+mapped word), then returns so the forward launches at once. A reader thread
+does host work only: it waits for the IDs, reads the rows, and releases the
+gate, also on failure. Each Engram layer waits on its flag, captured into
+the CUDA graph, before reading the staged rows. All kernel launches and
+stream operations stay on the main thread. The reader's ID wait and the next
+step's join have deadlines, so a stalled device fails the step instead of
+hanging.
+
+Off by default. Disk tables always carry the flag and the forward always
+waits on it, so traced and captured graphs are identical with the path on
+or off (the compile cache does not key on the environment); with it off the
+flag stays 1. The rows and their decode are unchanged, only their timing.
+---
+ vllm/models/deepseek_v4_1/common/engram.py | 248 +++++++++++++++++++++
+ vllm/models/deepseek_v4_1/nvidia/model.py  |  52 +++++
+ 2 files changed, 300 insertions(+)
+
+diff --git a/vllm/models/deepseek_v4_1/common/engram.py b/vllm/models/deepseek_v4_1/common/engram.py
+index b1373cbbe..f38c96cde 100644
+--- a/vllm/models/deepseek_v4_1/common/engram.py
++++ b/vllm/models/deepseek_v4_1/common/engram.py
+@@ -2,6 +2,9 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ """Native Engram with readonly accepted history and global ceil-row TP shards."""
+ 
++import ctypes
++import os
++import time
+ from functools import lru_cache
+ 
+ import torch
+@@ -29,6 +32,7 @@ from vllm.utils.b12x import (
+     set_b12x_preparation_provider,
+ )
+ from vllm.v1.worker.workspace import retain_cuda_graph_capture_resource
++from vllm.utils.torch_utils import direct_register_custom_op
+ 
+ 
+ _FP8_BLOCK_ROWS = 32
+@@ -69,6 +73,124 @@ class _PaddedColumnParallelLinear(ColumnParallelLinear):
+ logger = init_logger(__name__)
+ DEAD_ID = -1
+ 
++# SPARK3_ENGRAM_ASYNC=1: read disk Engram rows on a reader thread while the
++# forward graph launches, and gate each Engram layer on a device-visible flag
++# instead of finishing every read before the launch.
++ENGRAM_ASYNC = os.environ.get("SPARK3_ENGRAM_ASYNC") == "1"
++# Debug only: delay each reader-thread read, to show the graph really waits.
++ENGRAM_ASYNC_DELAY = float(os.environ.get("SPARK3_ENGRAM_ASYNC_DELAY_MS", "0")) / 1000
++# Debug only: log every stage, read, and wait of the asynchronous path.
++ENGRAM_ASYNC_TRACE = os.environ.get("SPARK3_ENGRAM_ASYNC_TRACE") == "1"
++# A reader that cannot see its row IDs within this long raises instead of
++# spinning forever: the device is blocked upstream of the Engram staging.
++ENGRAM_ASYNC_TIMEOUT_S = float(os.environ.get("SPARK3_ENGRAM_ASYNC_TIMEOUT_S", "20"))
++
++
++def wait_for_event(event, what: str) -> None:
++    """Poll a CUDA event with a deadline instead of spinning in synchronize."""
++    deadline = time.monotonic() + ENGRAM_ASYNC_TIMEOUT_S
++    while not event.query():
++        if time.monotonic() > deadline:
++            raise RuntimeError(
++                f"asynchronous Engram rows: {what} not reached within "
++                f"{ENGRAM_ASYNC_TIMEOUT_S:g} s; the device is blocked upstream of "
++                "the Engram staging"
++            )
++        time.sleep(50e-6)
++
++
++def _cuda_check(result):
++    status, *values = result
++    from cuda.bindings import driver
++
++    if status != driver.CUresult.CUDA_SUCCESS:
++        raise RuntimeError(f"Engram row flag: CUDA driver call failed: {status}")
++    return values[0] if values else None
++
++
++class RowsReadyFlag:
++    """A 32-bit flag in mapped host memory that device streams wait on.
++
++    The staging stream writes 0, the side stream writes 1 after the row
++    decode, and the forward waits for 1 before reading the rows. Starts at 1 so
++    profiling and warmup forwards never wait.
++    """
++
++    def __init__(self):
++        from cuda.bindings import driver
++
++        self.driver = driver
++        self.pointer = _cuda_check(driver.cuMemHostAlloc(4, driver.CU_MEMHOSTALLOC_DEVICEMAP))
++        self.device_pointer = _cuda_check(driver.cuMemHostGetDevicePointer(self.pointer, 0))
++        self.host = ctypes.c_uint32.from_address(int(self.pointer))
++        self.host.value = 1
++
++    def write(self, stream, value: int) -> None:
++        _cuda_check(self.driver.cuStreamWriteValue32(stream.cuda_stream, self.device_pointer, value, 0))
++
++    def wait(self, stream) -> None:
++        _cuda_check(self.driver.cuStreamWaitValue32(
++            stream.cuda_stream, self.device_pointer, 1,
++            int(self.driver.CUstreamWaitValue_flags.CU_STREAM_WAIT_VALUE_GEQ),
++        ))
++
++
++class HostGate:
++    """Device streams wait until the host has written a sequence number.
++
++    The reader thread releases each step's gate after its disk read, so the
++    decode kernel, queued earlier by the main thread, runs only on complete
++    rows. Only the main thread launches kernels.
++    """
++
++    def __init__(self):
++        from cuda.bindings import driver
++
++        self.driver = driver
++        self.pointer = _cuda_check(driver.cuMemHostAlloc(4, driver.CU_MEMHOSTALLOC_DEVICEMAP))
++        self.device_pointer = _cuda_check(driver.cuMemHostGetDevicePointer(self.pointer, 0))
++        self.host = ctypes.c_uint32.from_address(int(self.pointer))
++        self.host.value = 0
++        self.sequence = 0
++
++    def next(self) -> int:
++        self.sequence = (self.sequence + 1) & 0xFFFFFFFF
++        return self.sequence
++
++    def wait(self, stream, sequence: int) -> None:
++        _cuda_check(self.driver.cuStreamWaitValue32(
++            stream.cuda_stream, self.device_pointer, sequence,
++            int(self.driver.CUstreamWaitValue_flags.CU_STREAM_WAIT_VALUE_GEQ),
++        ))
++
++    def release(self, sequence: int) -> None:
++        self.host.value = sequence
++
++
++_ROWS_READY_FLAGS: dict[int, RowsReadyFlag] = {}
++
++
++def _engram_wait_rows(rows: torch.Tensor, key: int) -> None:
++    stream = torch.cuda.current_stream(rows.device)
++    if ENGRAM_ASYNC_TRACE:
++        logger.info(
++            "engram-async wait key=%x capturing=%s flag=%d",
++            key, torch.cuda.is_current_stream_capturing(), _ROWS_READY_FLAGS[key].host.value,
++        )
++    _ROWS_READY_FLAGS[key].wait(stream)
++
++
++def _engram_wait_rows_fake(rows: torch.Tensor, key: int) -> None:
++    return None
++
++
++direct_register_custom_op(
++    op_name="spark3_engram_wait_rows",
++    op_func=_engram_wait_rows,
++    mutates_args=["rows"],
++    fake_impl=_engram_wait_rows_fake,
++)
++
+ 
+ @lru_cache(maxsize=2)
+ def _token_map(path, revision, trust_remote_code):
+@@ -625,6 +747,97 @@ class ParallelEngramEmbedding(nn.Module):
+         )
+         self._disk_prepared_rows = indices.shape[0]
+ 
++    def stage_disk(self, indices, out, num_tokens, flag, side_stream):
++        """Main thread: stage the IDs and queue the gated decode; no disk I/O."""
++        from b12x.sequence.engram._kernels import lookup_op
++
++        if self.table_memory != "disk":
++            raise RuntimeError("Engram table is not disk-backed")
++        self._ensure_disk_table()
++        if torch.compiler.is_compiling() or torch.cuda.is_current_stream_capturing():
++            raise RuntimeError(
++                "Disk Engram preparation must run outside compile/capture"
++            )
++        cache = self.disk_table._cache
++        if cache._gds is not None:
++            raise RuntimeError("asynchronous Engram rows need the io_uring backend")
++        if getattr(self, "_read_gate", None) is None:
++            self._read_gate = HostGate()
++        stream = torch.cuda.current_stream(out.device)
++        flag.write(stream, 0)
++        self.hashes[: indices.shape[0]].copy_(indices)
++        self.num_tokens.copy_(num_tokens)
++        if self._disk_binding is None or self._disk_binding.out is not out:
++            self._disk_binding = native.bind_lookup(
++                self.plan,
++                weight=None,
++                scales=None,
++                hash_ids=self.hashes,
++                num_tokens=self.num_tokens,
++                out=out,
++                disk_table=self.disk_table,
++            )
++            out.zero_()
++            self._disk_prepared_rows = 0
++        if indices.shape[0] < self._disk_prepared_rows:
++            out[indices.shape[0] : self._disk_prepared_rows].zero_()
++        # The previous decode must be done with the mapped rows before the
++        # reader overwrites them; the ID copy below is ordered after it.
++        if cache._cache_used:
++            stream.wait_event(cache._cache_done)
++        count = indices.shape[0] * 24
++        cache.ids_host[:count].copy_(self.hashes.view(-1)[:count], non_blocking=True)
++        cache._ids_ready.record(stream)
++        # The decode waits on the side stream for the host read, then marks
++        # the rows ready for the forward's Engram layer.
++        sequence = self._read_gate.next()
++        side_stream.wait_event(cache._ids_ready)
++        self._read_gate.wait(side_stream, sequence)
++        binding = self._disk_binding
++        with torch.cuda.stream(side_stream):
++            lookup_op(
++                binding.plan.handle,
++                binding.weight,
++                binding.scale_bytes,
++                binding.hash_ids,
++                binding.num_tokens,
++                binding.out,
++                indices.shape[0],
++                False,
++            )
++            cache._cache_done.record(side_stream)
++            cache._cache_used = True
++            flag.write(side_stream, 1)
++        self._disk_prepared_rows = indices.shape[0]
++        if ENGRAM_ASYNC_TRACE:
++            logger.info(
++                "engram-async stage table=%x tokens=%d lookups=%d sequence=%d",
++                id(self), indices.shape[0], count, sequence,
++            )
++        return indices.shape[0], count, sequence
++
++    def finish_disk(self, job):
++        """Reader thread, host work only: wait for the IDs, read the rows."""
++        tokens, count, sequence = job
++        cache = self.disk_table._cache
++        try:
++            wait_for_event(cache._ids_ready, f"row IDs for table {id(self):x} ({tokens} tokens)")
++            if ENGRAM_ASYNC_DELAY:
++                time.sleep(ENGRAM_ASYNC_DELAY)
++            cache._native.ple_reader_run(
++                cache._reader,
++                cache._ids_buffer,
++                cache._weight_buffer,
++                cache._scale_buffer,
++                count,
++            )
++        finally:
++            # Release even on failure so no stream waits forever; the caller
++            # re-raises the failure before the next step.
++            self._read_gate.release(sequence)
++        if ENGRAM_ASYNC_TRACE:
++            logger.info("engram-async rows read table=%x sequence=%d", id(self), sequence)
++
+     def lookup_native(self, indices, out):
+         if self.plan.prepared is None:
+             raise PreparationResourceUnavailableError(
+@@ -866,6 +1079,35 @@ class Engram(nn.Module):
+         self.norm_weights.copy_(
+             (self.q_weight.float() * self.k_weight.float()).flatten()
+         )
++        # Disk tables always carry the flag, and the forward always waits on
++        # it, so the traced and captured graphs are the same with the
++        # asynchronous path on or off (the compile cache does not key on the
++        # environment). With the path off the flag stays 1 and never blocks.
++        self._rows_flag = None
++        self._async_rows = False
++        if self.embed_tokens.table_memory == "disk":
++            self._rows_flag = RowsReadyFlag()
++            self._rows_flag_key = id(self)
++            _ROWS_READY_FLAGS[self._rows_flag_key] = self._rows_flag
++            self._async_rows = ENGRAM_ASYNC
++            if ENGRAM_ASYNC:
++                logger.info_once("asynchronous disk Engram rows enabled")
++
++    @property
++    def async_rows(self) -> bool:
++        return getattr(self, "_async_rows", False)
++
++    def stage_disk(self, hash_ids, num_tokens, side_stream):
++        self.invalidate_disk_output()
++        job = self.embed_tokens.stage_disk(
++            hash_ids, self.staged_rows, num_tokens, self._rows_flag, side_stream
++        )
++        self._disk_prepared_tokens = hash_ids.shape[0]
++        self._disk_prepared = True
++        return job
++
++    def finish_disk(self, job):
++        self.embed_tokens.finish_disk(job)
+ 
+     def prepare_embeddings(self, hash_ids):
+         self.embed_tokens.lookup(hash_ids, self.staged_rows)
+@@ -890,6 +1132,10 @@ class Engram(nn.Module):
+         self.invalidate_disk_output(clear=True)
+         self._disk_prepared_tokens = num_tokens
+         self._disk_prepared = True
++        if self.async_rows:
++            self._rows_flag.write(torch.cuda.current_stream(self.staged_rows.device), 1)
++            if ENGRAM_ASYNC_TRACE:
++                logger.info("engram-async dummy tokens=%d", num_tokens)
+ 
+     def forward(self, hidden_states, hash_ids, token_mask=None):
+         if (
+@@ -901,6 +1147,8 @@ class Engram(nn.Module):
+             )
+         ):
+             raise RuntimeError("Disk Engram output is not prepared")
++        if getattr(self, "_rows_flag", None) is not None:
++            torch.ops.vllm.spark3_engram_wait_rows(self.staged_rows, self._rows_flag_key)
+         rows = tensor_model_parallel_all_reduce(self.staged_rows[: hash_ids.shape[0]])
+         kv = self.wkv(rows)
+         state = hidden_states.flatten(1)
+diff --git a/vllm/models/deepseek_v4_1/nvidia/model.py b/vllm/models/deepseek_v4_1/nvidia/model.py
+index a1b59941a..7fefeb403 100644
+--- a/vllm/models/deepseek_v4_1/nvidia/model.py
++++ b/vllm/models/deepseek_v4_1/nvidia/model.py
+@@ -410,11 +410,45 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+         else:
+             self._mtp_hidden_buffer = None
+ 
++    def _engram_reader(self):
++        """One reader thread and side stream for asynchronous disk Engram rows."""
++        if getattr(self, "_engram_executor", None) is None:
++            import concurrent.futures
++
++            device = torch.cuda.current_device()
++            self._engram_side_stream = torch.cuda.Stream(device=device)
++            self._engram_executor = concurrent.futures.ThreadPoolExecutor(
++                1,
++                thread_name_prefix="engram-rows",
++                initializer=torch.cuda.set_device,
++                initargs=(device,),
++            )
++        return self._engram_executor
++
++    def _read_engram_rows(self, jobs):
++        """Reader thread: host work only (no kernel launches, no CUDA waits)."""
++        failure = None
++        for engram, job in jobs:
++            try:
++                engram.finish_disk(job)
++            except BaseException as error:  # every gate is released regardless
++                failure = failure or error
++        if failure is not None:
++            raise failure
++
++    def join_engram_reader(self):
++        future = getattr(self, "_engram_reader_future", None)
++        self._engram_reader_future = None
++        if future is not None:
++            # The reader itself times out on its row IDs; this bounds the rest.
++            future.result(timeout=60)
++
+     def prepare_disk_engram(self, input_ids, query_start_loc, lookback_token_ids):
+         if torch.compiler.is_compiling() or torch.cuda.is_current_stream_capturing():
+             raise RuntimeError(
+                 "Disk Engram preparation must run outside compile/capture"
+             )
++        self.join_engram_reader()
+         engrams = tuple(
+             layer.engram
+             for layer in islice(self.layers, self.start_layer, self.end_layer)
+@@ -433,6 +467,23 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                 lookback_token_ids,
+                 hashes,
+             )
++            if engrams and all(engram.async_rows for engram in engrams):
++                self._engram_reader()
++                jobs = [
++                    (
++                        engram,
++                        engram.stage_disk(
++                            hashes[:, engram.layer_hash_index],
++                            self.engram_hash.num_tokens,
++                            self._engram_side_stream,
++                        ),
++                    )
++                    for engram in engrams
++                ]
++                self._engram_reader_future = self._engram_reader().submit(
++                    self._read_engram_rows, jobs
++                )
++                return
+             for engram in engrams:
+                 engram.prepare_disk(
+                     hashes[:, engram.layer_hash_index], self.engram_hash.num_tokens
+@@ -450,6 +501,7 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+             raise RuntimeError(
+                 "Disk Engram preparation must run outside compile/capture"
+             )
++        self.join_engram_reader()
+         self.prepared_engram_hashes.fill_(-1)
+         for layer in islice(self.layers, self.start_layer, self.end_layer):
+             if getattr(layer, "engram", None) is not None:
+-- 
+2.54.0 (Apple Git-157)
+
