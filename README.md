@@ -10,10 +10,8 @@ state, or an experiment.
 
 ## Current baseline
 
-The active baseline was promoted on 2026-09-25
-([manifests/baselines/2026-09-25-karmic-kraken-r3.json](manifests/baselines/2026-09-25-karmic-kraken-r3.json);
-[speed tuning](experiments/2026-09-24-kk-speed-tuning/decision.md),
-[three leads](experiments/2026-09-24-three-leads/decision.md)):
+The active baseline is recorded in
+[manifests/baselines/2026-09-25-karmic-kraken-r3.json](manifests/baselines/2026-09-25-karmic-kraken-r3.json):
 
 - three DGX Spark nodes using tensor parallelism 3;
 - direct dual ConnectX-7 paths between every pair of nodes;
@@ -32,62 +30,44 @@ The active baseline was promoted on 2026-09-25
 - FlashInfer autotune disabled (`--no-enable-flashinfer-autotune`): only the
   sampler uses FlashInfer, and the pass saved no configs.
 
-One content-addressed image runs on all three nodes. It passes the LRU
-coherence gate 5/5 and is faster than the 2026-09-20 image at every point of
-the serving matrix (see [Performance](#performance)).
+One content-addressed image runs on all three nodes and passes the LRU
+coherence gate 5/5; see [Performance](#performance).
 
 The machine-readable desired configuration is [config/cluster.json](config/cluster.json).
 To reproduce the deployment on your own three Sparks, follow
 [docs/replicate.md](docs/replicate.md).
-The previous baseline's live evidence is
-[manifests/baselines/2026-09-20-live.json](manifests/baselines/2026-09-20-live.json).
 
 ## Performance
 
-Decode throughput in tokens per second, aggregated over all streams. Every
-column uses the same client on dgx1, the same prose and code prompts,
-temperature 0, reasoning on, and 256 output tokens:
+Current baseline, measured with `bin/spark3 bench` from dgx1: prose and code
+prompts, temperature 0, reasoning on, 256 output tokens.
 
-| Prompt | Streams | 2026-09-20 image | r2 (2026-09-24) | r3 (current) | r3 vs 2026-09-20 |
-|---|---:|---:|---:|---:|---:|
-| prose | 1 | 34.6 | 41.4 | **41.6** | +20% |
-| prose | 2 | 57.6 | 66.4 | **70.5** | +22% |
-| prose | 4 | 76.0 | 101.5 | **102.4** | +35% |
-| prose | 8 | 83.1 | 147.9 | **150.4** | +81% |
-| code | 1 | 44.0 | 51.5 | **50.6** | +15% |
-| code | 2 | 65.4 | 80.9 | **83.6** | +28% |
-| code | 4 | 96.0 | 119.0 | **120.9** | +26% |
-| code | 8 | 71.9 | 161.6 | **173.0** | +141% |
+| Prompt | Streams | Aggregate tok/s | Per-stream decode tok/s | First token |
+|---|---:|---:|---:|---:|
+| prose | 1 | 41.6 | 43.2 | 0.25 s |
+| prose | 2 | 70.5 | 37.6 | 0.37 s |
+| prose | 4 | 102.4 | 28.4 | 0.48 s |
+| prose | 8 | 150.4 | 20.6 | 0.56 s |
+| code | 1 | 50.6 | 52.9 | 0.24 s |
+| code | 2 | 83.6 | 44.7 | 0.34 s |
+| code | 4 | 120.9 | 33.3 | 0.50 s |
+| code | 8 | 173.0 | 24.3 | 0.58 s |
 
-Sources:
-
-- 2026-09-20 image: one pass, measured 2026-09-23
-  ([experiment](experiments/2026-09-23-karmic-kraken-reference/README.md)).
-- r2: `bin/spark3 bench --full`, each point to a 95% confidence interval of
-  ±2% ([report](manifests/benchmarks/2026-09-24-karmic-kraken-r2.json)).
-- r3: the quick bench, 3-4 samples per point, ±3-9%
-  ([report](manifests/benchmarks/2026-09-25-karmic-kraken-r3.json)).
-- r3's change was measured precisely against two fresh r2 boots in
-  [the three-leads experiment](experiments/2026-09-24-three-leads/README.md):
-  single-stream decode steps are 1.96 ms shorter at equal verified drafts, and
-  throughput is 3-9% higher at higher concurrency.
-- Single boots of one configuration vary by about 3%.
-
-Also measured on this stack:
-
-| | |
+| Other measurements | |
 |---|---|
-| Quality gate (fixed LRU task, 5 repeats) | 2026-09-20 image 1/5; r2 and r3 5/5 |
-| First token, one stream | about 0.25 s |
-| Single-stream decode step (r3) | 51 ms, accepting about 1.2 drafts per step on prose and 1.7-1.9 on code |
-| Cold prefill (r2) | 2K 3.7k, 32K 4.1k, 64K 4.0k, 128K 3.8k tok/s |
-| Prefix-cache replay, 32K prompt (r2) | 7.8 s cold, 0.27 s warm |
-| Four concurrent 64K contexts (r2) | all admitted, peak KV use 22%, 12.8 tok/s per stream |
+| Quality gate (fixed LRU task, 5 repeats) | 5/5 |
+| Single-stream decode step | about 51 ms; 1.2 accepted drafts per step on prose, 1.7 on code |
+| Cold prefill | 2K 3.8k, 32K 4.1k, 64K 4.0k, 128K 3.8k tok/s |
+| Prefix-cache replay, 32K prompt | 7.75 s cold, 0.26 s warm |
+| Four concurrent 64K contexts | all admitted without preemption, peak KV use 22%, 12.1 tok/s per stream |
 | KV capacity | 933,168 tokens in 2 GiB per rank (5.8 full 160K contexts) |
 | Host memory headroom under load | dgx1 at least 5.8 GiB MemAvailable (3 GiB guard) |
 
-Reproduce these with `bin/spark3 bench` (quick) or `bin/spark3 bench --full`;
-see [Benchmarking](#benchmarking).
+The quick default takes three or four samples per decode point, about ±4-9%
+at 95% confidence. Single boots of one configuration vary by about 3%.
+Reports: [decode](manifests/benchmarks/2026-09-25-karmic-kraken-r3.json),
+[prefill, prefix cache, and admission](manifests/benchmarks/2026-09-25-karmic-kraken-r3-capacity.json).
+See [Benchmarking](#benchmarking) to reproduce them.
 
 ## Repository contract
 
@@ -147,9 +127,8 @@ node to the lower steady-state guard. Mutating operations require an explicit
 service additionally requires `--replace`, and an experiment with
 `deployment.launch_enabled=false` refuses mutation locally.
 
-The promoted configuration is launch-enabled on `main` since the 2026-09-24
-karmic-kraken promotion (owner decision). Experiment configurations set
-`launch_enabled` for themselves.
+The promoted configuration is launch-enabled on `main`. Experiment
+configurations set `launch_enabled` for themselves.
 
 `scripts/` holds the memory guard that `cluster start` installs on each node
 and host recovery, which has not yet moved into `bin/spark3`. Experiments keep
@@ -230,11 +209,8 @@ but are not build inputs are kept separately in
 
 `bin/spark3 build` builds the promoted image from the pinned sources in
 `upstreams.lock.json` and the patch series ([docker/README.md](docker/README.md)),
-and one content digest runs on all three nodes. The running r2 image came from
-the same recipe in
-[experiments/2026-09-23-karmic-kraken-reference](experiments/2026-09-23-karmic-kraken-reference/decision.md).
+and one content digest runs on all three nodes.
 
-Canonical vLLM main is parked. The
-[upstream-main rebase](experiments/2026-09-20-upstream-main-rebase/README.md)
-and [canonical-minimal](experiments/2026-09-23-canonical-minimal/README.md)
-experiments record that work; both shared the tiny-decode defect found later.
+Canonical vLLM main is parked; the serving sources are Local Inference Lab's
+`integration/karmic-kraken-beta` vLLM and B12X with the local patch series
+([docs/upstreams.md](docs/upstreams.md)).
