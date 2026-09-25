@@ -68,5 +68,20 @@ A failure leaves the cluster stopped; nothing rolls back automatically.
     boost hides 875 MiB, matching the 876 MiB swing. kswapd then reclaims and
     the boost clears. Under steady load (8-way decode, a 23K-token prefill,
     both image checks) the residual held at -1,114 MiB with no boost.
+  - A boost does not always clear quickly. At 10:11:58, with the service
+    idle, the residual moved to -1,989 MiB and stayed. /proc/zoneinfo then
+    showed the Normal zone boost at 111,946 pages (437 MiB, the maximum) with
+    MemAvailable at 5.08 GiB. Free memory stayed above the boosted
+    watermark, so kswapd had no reason to run and reset it.
   - Excluding the boost, dgx1's lowest reading was about 6.1 GiB, so the
-    real margin above the 5 GiB guard is about 1.1 GiB with KV 1.0.
+    real margin above the 5 GiB guard is about 1.1 GiB with KV 1.0. With
+    the boost, a start can land anywhere from that margin down to about
+    0.2 GiB, which is why attempts 1 and 2 were stopped.
+  - One real transient came from outside the stack: dgx1's user-level
+    `law-desire-reconciler` (a 20-second timer) coincided with a 1 GiB dip
+    lasting 0.4 s at 10:07:58.
+
+Next: with `vm.watermark_boost_factor=0` on the nodes (an owner change),
+MemAvailable stops including the boost and the guards stay at 5 and 3 GiB.
+Then KV 1.4 GiB (about 575K tokens, 4.4 contexts of 131,072) should leave
+dgx1 about 0.7 GiB above the startup guard.
