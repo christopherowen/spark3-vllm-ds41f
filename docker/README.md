@@ -4,10 +4,9 @@
 karmic-kraken-beta vLLM and B12X with the local patch series, on the canonical
 vLLM ARM64 nightly `af1c0149`. Only vLLM's `_C_stable_libtorch` and
 `_moe_C_stable_libtorch` are rebuilt, for SM121. FlashInfer 0.6.18.post1 comes
-from the base image. The recipe produced the running r2 image
-(`vllm-ds41f-kkref:01f1b874c774-r2`) from
-`experiments/2026-09-23-karmic-kraken-reference/`, and moved here unchanged
-apart from the build contexts described below.
+from the base image. The r1 and r2 images came from the same recipe in
+`experiments/2026-09-23-karmic-kraken-reference/`; the running r3 image
+(`vllm-ds41f-kkref:01f1b874c774-r3`) is the first built by `bin/spark3 build`.
 
 ```sh
 bin/spark3 build prepare        # create or repair the build directory

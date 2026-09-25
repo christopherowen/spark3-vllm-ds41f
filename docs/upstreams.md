@@ -5,9 +5,10 @@
 ```text
 local-inference-lab/vllm integration/karmic-kraken-beta @ 01f1b874
         (canonical base vllm-project/vllm @ 0f8fa53a)
-        + patches/vllm/series (Engram projection TP padding)
+        + patches/vllm/series (Engram projection TP padding,
+                               asynchronous Engram rows)
                     \
-                     vllm-ds41f-kkref:01f1b874c774-r2 (sha256:a95eb867…)
+                     vllm-ds41f-kkref:01f1b874c774-r3 (sha256:9c9ca541…)
                     /
 local-inference-lab/b12x integration/karmic-kraken-beta @ 0f846212
         + patches/b12x/series (switchless RoCEnante routing)

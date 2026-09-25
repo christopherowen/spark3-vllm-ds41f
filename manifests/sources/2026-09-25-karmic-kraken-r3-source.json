@@ -26,7 +26,8 @@
     "cutlass_release_tag": "v4.7.1",
     "cutlass_dsl_version": "4.6.2",
     "cutlass_dsl_lockfile": "requirements/cutlass-dsl-aarch64.txt",
-    "build_recipe": "bin/spark3 build (docker/Dockerfile)"
+    "build_recipe": "bin/spark3 build (docker/Dockerfile)",
+    "build_deployment_commit": "91335a310371b52e8bdc7373e4afbeb951b99533"
   },
   "deployment_artifacts": {}
 }

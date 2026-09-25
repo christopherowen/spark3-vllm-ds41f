@@ -1,13 +1,13 @@
 # Current state
 
-Promoted 2026-09-24 as
-[`2026-09-24-karmic-kraken-r2`](../manifests/baselines/2026-09-24-karmic-kraken-r2.json)
+Promoted 2026-09-25 as
+[`2026-09-25-karmic-kraken-r3`](../manifests/baselines/2026-09-25-karmic-kraken-r3.json)
 and running on all three nodes from `config/cluster.json`.
 
 | Setting | Active value |
 |---|---:|
-| Sources | Local Inference Lab `integration/karmic-kraken-beta` vLLM `01f1b874` + Engram projection TP patch, B12X `0f846212` + switchless RoCEnante patch |
-| Image | `vllm-ds41f-kkref:01f1b874c774-r2`, one digest on all ranks |
+| Sources | Local Inference Lab `integration/karmic-kraken-beta` vLLM `01f1b874` + Engram projection TP and asynchronous Engram row patches, B12X `0f846212` + switchless RoCEnante patch |
+| Image | `vllm-ds41f-kkref:01f1b874c774-r3`, one digest on all ranks, built by `bin/spark3 build` |
 | Tensor parallel ranks | 3 |
 | Maximum model length | 160,000 tokens |
 | Maximum sequences | 8 |
@@ -19,6 +19,7 @@ and running on all three nodes from `config/cluster.json`.
 | CUDA graphs | full, capture sizes 1-32 |
 | B12X W4A8 tiny decode | disabled (`B12X_W4A8_TINY_DECODE=0`) |
 | Engram projection | sharded across ranks (`projection_tp`) |
+| Engram rows | read beside the forward launch (`SPARK3_ENGRAM_ASYNC=1`) |
 | B12X autotune | disabled |
 | FlashInfer autotune | disabled (`--no-enable-flashinfer-autotune`) |
 | Memory guards | 5 GiB startup (0.25 s), 3 GiB steady (2 s) |

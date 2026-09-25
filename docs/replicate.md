@@ -1,6 +1,6 @@
 # Replicating the promoted baseline
 
-This reproduces `manifests/baselines/2026-09-24-karmic-kraken-r2.json`:
+This reproduces `manifests/baselines/2026-09-25-karmic-kraken-r3.json`:
 DeepSeek V4.1 Flash on three DGX Spark (GB10) nodes, tensor parallelism 3,
 direct-cabled dual ConnectX-7 ring, Local Inference Lab's
 `integration/karmic-kraken-beta` vLLM and B12X.
@@ -73,10 +73,10 @@ Copy the image to the other two nodes and confirm all three report the same ID:
 
 ```sh
 for host in dgx2 dgx3; do
-  docker save vllm-ds41f-kkref:01f1b874c774-r2 | ssh "$host" docker load
+  docker save vllm-ds41f-kkref:01f1b874c774-r3 | ssh "$host" docker load
 done
 for host in dgx1 dgx2 dgx3; do
-  ssh "$host" docker image inspect vllm-ds41f-kkref:01f1b874c774-r2 --format '{{.Id}}'
+  ssh "$host" docker image inspect vllm-ds41f-kkref:01f1b874c774-r3 --format '{{.Id}}'
 done
 ```
 
@@ -88,7 +88,7 @@ of the memory-guarded startup, prebuild it on each node first:
 
 ```sh
 experiments/2026-09-23-canonical-minimal/prebuild_flashinfer.sh \
-  vllm-ds41f-kkref:01f1b874c774-r2 kkref/flashinfer
+  vllm-ds41f-kkref:01f1b874c774-r3 kkref/flashinfer
 ```
 
 Then, from the head node with a clean checkout of the published `main` commit:

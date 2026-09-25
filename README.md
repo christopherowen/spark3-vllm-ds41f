@@ -10,14 +10,15 @@ state, or an experiment.
 
 ## Current baseline
 
-The active baseline was promoted on 2026-09-24
-([manifests/baselines/2026-09-24-karmic-kraken-r2.json](manifests/baselines/2026-09-24-karmic-kraken-r2.json);
-[speed tuning](experiments/2026-09-24-kk-speed-tuning/decision.md)):
+The active baseline was promoted on 2026-09-25
+([manifests/baselines/2026-09-25-karmic-kraken-r3.json](manifests/baselines/2026-09-25-karmic-kraken-r3.json);
+[speed tuning](experiments/2026-09-24-kk-speed-tuning/decision.md),
+[three leads](experiments/2026-09-24-three-leads/decision.md)):
 
 - three DGX Spark nodes using tensor parallelism 3;
 - direct dual ConnectX-7 paths between every pair of nodes;
-- Local Inference Lab's `integration/karmic-kraken-beta` vLLM (plus an Engram
-  projection sharding patch) and B12X (plus the switchless RoCEnante patch),
+- Local Inference Lab's `integration/karmic-kraken-beta` vLLM (plus Engram
+  projection sharding and asynchronous Engram row patches) and B12X (plus the switchless RoCEnante patch),
   with B12X attention, linear, MoE, and mHC kernels;
 - DeepSeek V4.1 Flash native FP8/FP4 weights, unchanged;
 - DSpark speculative decoding with three draft tokens and block rejection,

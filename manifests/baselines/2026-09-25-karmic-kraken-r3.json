@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "status": "promoted-baseline",
+  "captured_at": "2026-09-25T04:30:00Z",
+  "container_name": "dsv41-karmic-kraken",
+  "image_tag": "vllm-ds41f-kkref:01f1b874c774-r3",
+  "image_id": "sha256:9c9ca541440819b6b79bc0be4e0b3c44174d1bc2fdb5ed172240746c324b3d73",
+  "nodes": {
+    "dgx1": {
+      "image_id": "sha256:9c9ca541440819b6b79bc0be4e0b3c44174d1bc2fdb5ed172240746c324b3d73",
+      "role": "api-head-rank-0"
+    },
+    "dgx2": {
+      "image_id": "sha256:9c9ca541440819b6b79bc0be4e0b3c44174d1bc2fdb5ed172240746c324b3d73",
+      "role": "headless-rank-1"
+    },
+    "dgx3": {
+      "image_id": "sha256:9c9ca541440819b6b79bc0be4e0b3c44174d1bc2fdb5ed172240746c324b3d73",
+      "role": "headless-rank-2"
+    }
+  },
+  "source_identity": {
+    "vllm_repository": "https://github.com/local-inference-lab/vllm",
+    "vllm_ref": "integration/karmic-kraken-beta",
+    "vllm_revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+    "vllm_tree": "033fd0cc34c7dd5e3a68c1c7eca746146fe23990",
+    "b12x_repository": "https://github.com/local-inference-lab/b12x",
+    "b12x_ref": "integration/karmic-kraken-beta",
+    "b12x_revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+    "b12x_patch_head": "3d2439944021c3dc41aa7a597aefc67232e9f563",
+    "b12x_tree": "d661de3161ff474a92646974584d6f5eb1958f75",
+    "runtime_base_image": "docker.io/vllm/vllm-openai@sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "image_build_deployment_commit": "91335a310371b52e8bdc7373e4afbeb951b99533",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+    "vllm_patch_head": "5904466eaa5fa96715e1657734c4e8275fe77854",
+    "image_build_recipe": "bin/spark3 build (docker/Dockerfile), build directory .work/build/vllm-01f1b874c774-b12x-0f84621264a1-6737b14f"
+  },
+  "runtime_choices": {
+    "B12X_W4A8_TINY_DECODE": "0 (tiny decode omits swiglu_limit; see experiment README)",
+    "B12X_AUTOTUNE": "0 (autotune race budget is free memory // 2 on unified memory)",
+    "speculative": "DSpark, 3 tokens, draft TP 3, adaptive verification cost scale 2, block rejection",
+    "cudagraph": "FULL_AND_PIECEWISE, capture sizes 1-32 (adds 28 and 32)",
+    "max_num_batched_tokens": 4096,
+    "memguards_gib": {
+      "startup": 5,
+      "steady": 3
+    },
+    "flashinfer_autotune": "disabled (--no-enable-flashinfer-autotune): it saved 0 configs, and only the sampler uses FlashInfer",
+    "engram_projection": "sharded across ranks (projection_tp, padded to 25632 rows by vLLM patch 0001)",
+    "engram_rows": "read beside the forward launch (SPARK3_ENGRAM_ASYNC=1, vLLM patch 0002); graphs identical with it off",
+    "compile_cache": "/cache/kkref/jit/vllm-r3"
+  },
+  "capacity": {
+    "kv_cache_bytes_per_rank": 2147483648,
+    "kv_cache_tokens": 933168,
+    "kv_bytes_per_token_per_rank": 2301,
+    "max_model_len": 160000,
+    "max_num_seqs": 8,
+    "reported_full_context_concurrency": 5.83,
+    "graph_capture_gib": 1.47
+  },
+  "change_from_previous": "vLLM patch 0002 (asynchronous disk Engram rows) enabled; image rebuilt by bin/spark3 build without .git in the source contexts",
+  "evidence": {
+    "experiment": "experiments/2026-09-24-three-leads/",
+    "summary": "async Engram overlay vs opening and closing baselines: faster at 13 of 16 decode points, slower at none; +3-9% at higher concurrency; single-stream code step 53.22 -> 51.26 ms at equal verified rows; 20 ms injected read delay lengthened steps 27 ms with quality unchanged",
+    "ab_confirmation": "experiments/2026-09-25-engram-async-ab/ (four-boot A/B stopped after the first boot at the owner's request; promoted on the three-leads evidence plus a quick confirmation run of the promoted service)"
+  },
+  "build": {
+    "elapsed_seconds": 484,
+    "compile_jobs": 8,
+    "min_available_gib": 79.8,
+    "gpu_import_smoke": "passed"
+  },
+  "benchmark_reference": "manifests/benchmarks/2026-09-25-karmic-kraken-r3.json",
+  "previous_baseline": "2026-09-24-karmic-kraken-r2"
+}

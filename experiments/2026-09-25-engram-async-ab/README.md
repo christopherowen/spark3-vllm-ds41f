@@ -17,4 +17,10 @@ before promotion:
 
 ## Results
 
-Pending.
+The image built in 484 s (lowest MemAvailable 79.8 GiB), passed the GPU import
+smoke, and reached all three nodes with one ID (`sha256:9c9ca541…`). The owner
+stopped the four-boot A/B during the first boot: the three-leads arms had
+already measured the change, and a routine promotion should not need
+hours of benchmarking. r3 was promoted with the asynchronous path on, and a
+short confirmation run of the promoted service became the r3 reference
+(`manifests/benchmarks/2026-09-25-karmic-kraken-r3.json`).
