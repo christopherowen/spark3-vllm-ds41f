@@ -1,13 +1,14 @@
 # Current state
 
 Promoted 2026-09-25 as
-[`2026-09-25-karmic-kraken-r3-vision`](../manifests/baselines/2026-09-25-karmic-kraken-r3-vision.json)
+[`2026-09-25-karmic-kraken-r3-vision-kernel70`](../manifests/baselines/2026-09-25-karmic-kraken-r3-vision-kernel70.json)
 and running on all three nodes from `config/cluster.json`.
 
 | Setting | Active value |
 |---|---:|
 | Sources | Local Inference Lab `integration/karmic-kraken-beta` vLLM `01f1b874` + Engram projection TP and asynchronous Engram row patches, B12X `0f846212` + switchless RoCEnante patch |
 | Image | `vllm-ds41f-kkref:01f1b874c774-r3`, one digest on all ranks, built by `bin/spark3 build` |
+| Hosts | DGX Spark 26.09.2, kernel `7.0.0-1019-nvidia` with `kho=off`, driver 580.178.04, no desktop |
 | Tensor parallel ranks | 3 |
 | Maximum model length | 131,072 tokens |
 | Maximum sequences | 8 |
@@ -28,9 +29,9 @@ and running on all three nodes from `config/cluster.json`.
 | Reasoning | enabled by default |
 
 Measured on this configuration: LRU coherence gate 5/5; both image checks
-pass; code at eight streams 176 tok/s and single-stream prose/code about 41/53
-tok/s; cold prefill about 4,100 tok/s; dgx1 minimum MemAvailable 6.2 GiB during
-startup and 5.6 GiB under load. The previous state
+pass; code at eight streams 179 tok/s and single-stream prose/code about 44/54
+tok/s; cold prefill about 4,100 tok/s; dgx1 minimum MemAvailable 6.9 GiB during
+startup and 6.3 GiB under load. The previous state
 (2026-09-20, 498,145 KV tokens in 3 GiB, incoherent code output) is retained in
 [`2026-09-20-live`](../manifests/baselines/2026-09-20-live.json).
 

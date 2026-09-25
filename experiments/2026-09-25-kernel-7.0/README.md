@@ -57,6 +57,27 @@ dgx1 and dgx2 on 6.17, dgx3 on 7.0; promoted configuration
 The memory and speed gains also include the desktop being off and the OS
 update on every node, so they are not attributed to the kernel.
 
+## All three nodes on 7.0
+
+After the policy was removed and dgx1 and dgx2 rebooted into GRUB's default
+(`7.0.0-1019-nvidia`), at commit `7af1ad8`:
+
+- `kho=off` on all three; no failed units, no kernel errors; all RoCE links
+  active; `scripts/host-recovery check` passes.
+- dgx1's lowest MemAvailable during startup was 6.90 GiB (6.21 GiB before the
+  host changes), with no watermark boost.
+- No RDMA registration errors; `doctor --live` and both image checks passed;
+  quality 5/5.
+- Quick bench against the previous baseline: faster at prose c8 (+6.0%) and
+  code c2 (+7.0%), equal elsewhere; single-stream steps 48.48/49.56 ms against
+  49.68/51.50 ms. Lowest MemAvailable dgx1 6.56, dgx2 7.58, dgx3 7.65 GiB.
+- Capacity suites: prefill 3,856 / 4,189 / 4,090 tok/s (2K/32K/64K, equal);
+  32K prefix replay 7.59 s cold, 0.27 s warm; four 64K contexts admitted,
+  peak KV 31%, 12.7 tok/s per stream; dgx1 lowest 6.31 GiB. dgx3's GPU peaked
+  at 79 C during prefill; no thermal slowdown.
+
+Recorded as baseline `2026-09-25-karmic-kraken-r3-vision-kernel70`.
+
 ## Decision
 
 Run `7.0.0-1019-nvidia` on all three nodes. The next-boot policy and its

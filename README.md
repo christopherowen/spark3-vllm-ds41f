@@ -11,9 +11,11 @@ state, or an experiment.
 ## Current baseline
 
 The active baseline is recorded in
-[manifests/baselines/2026-09-25-karmic-kraken-r3-vision.json](manifests/baselines/2026-09-25-karmic-kraken-r3-vision.json):
+[manifests/baselines/2026-09-25-karmic-kraken-r3-vision-kernel70.json](manifests/baselines/2026-09-25-karmic-kraken-r3-vision-kernel70.json):
 
-- three DGX Spark nodes using tensor parallelism 3;
+- three DGX Spark nodes using tensor parallelism 3, on DGX Spark 26.09.2 with
+  kernel `7.0.0-1019-nvidia` (`kho=off`), no desktop, and
+  `vm.watermark_boost_factor=0`;
 - direct dual ConnectX-7 paths between every pair of nodes;
 - Local Inference Lab's `integration/karmic-kraken-beta` vLLM (plus Engram
   projection sharding and asynchronous Engram row patches) and B12X (plus the switchless RoCEnante patch),
@@ -27,7 +29,7 @@ The active baseline is recorded in
 - 131,072-token per-request limit, eight admitted sequences, and 575,304 KV
   tokens in a 1.4 GiB-per-rank cache;
 - one concurrent prefill, 4,096 batched tokens, and fail-closed 5 GiB startup
-  and 3 GiB steady memory guards, on hosts with `vm.watermark_boost_factor=0`;
+  and 3 GiB steady memory guards;
 - FlashInfer autotune disabled (`--no-enable-flashinfer-autotune`): only the
   sampler uses FlashInfer, and the pass saved no configs.
 
@@ -45,30 +47,30 @@ prompts, temperature 0, reasoning on, 256 output tokens.
 
 | Prompt | Streams | Aggregate tok/s | Per-stream decode tok/s | First token |
 |---|---:|---:|---:|---:|
-| prose | 1 | 40.8 | 42.3 | 0.25 s |
-| prose | 2 | 70.2 | 37.7 | 0.37 s |
-| prose | 4 | 102.3 | 28.1 | 0.49 s |
-| prose | 8 | 151.8 | 20.6 | 0.58 s |
-| code | 1 | 53.4 | 56.2 | 0.26 s |
-| code | 2 | 80.6 | 44.8 | 0.37 s |
-| code | 4 | 121.3 | 33.7 | 0.51 s |
-| code | 8 | 175.6 | 24.3 | 0.62 s |
+| prose | 1 | 43.9 | 45.6 | 0.24 s |
+| prose | 2 | 71.8 | 38.4 | 0.36 s |
+| prose | 4 | 106.4 | 28.9 | 0.47 s |
+| prose | 8 | 161.0 | 22.1 | 0.59 s |
+| code | 1 | 54.0 | 56.9 | 0.26 s |
+| code | 2 | 86.3 | 47.3 | 0.37 s |
+| code | 4 | 126.2 | 34.6 | 0.48 s |
+| code | 8 | 179.3 | 25.2 | 0.57 s |
 
 | Other measurements | |
 |---|---|
 | Quality gate (fixed LRU task, 5 repeats) | 5/5 |
-| Single-stream decode step | about 50 ms; 1.1 accepted drafts per step on prose, 1.9 on code |
+| Single-stream decode step | about 49 ms; 1.2 accepted drafts per step on prose, 1.8 on code |
 | Image input | up to 4 images per request; both image checks pass, answered in 1.3-1.6 s |
 | Cold prefill | 2K 3.9k, 32K 4.2k, 64K 4.1k tok/s |
-| Prefix-cache replay, 32K prompt | 7.62 s cold, 0.26 s warm |
-| Four concurrent 64K contexts | all admitted without preemption, peak KV use 31%, 12.3 tok/s per stream |
+| Prefix-cache replay, 32K prompt | 7.59 s cold, 0.27 s warm |
+| Four concurrent 64K contexts | all admitted without preemption, peak KV use 31%, 12.7 tok/s per stream |
 | KV capacity | 575,304 tokens in 1.4 GiB per rank (4.4 full 131K contexts) |
-| Host memory headroom | dgx1 at least 6.2 GiB MemAvailable during startup (5 GiB guard), 5.6 GiB under load (3 GiB guard) |
+| Host memory headroom | dgx1 at least 6.9 GiB MemAvailable during startup (5 GiB guard), 6.3 GiB under load (3 GiB guard) |
 
 The quick default takes three or four samples per decode point, about ±4-9%
 at 95% confidence. Single boots of one configuration vary by about 3%.
-Reports: [decode](manifests/benchmarks/2026-09-25-karmic-kraken-r3-vision.json),
-[prefill, prefix cache, and admission](manifests/benchmarks/2026-09-25-karmic-kraken-r3-vision-capacity.json).
+Reports: [decode](manifests/benchmarks/2026-09-25-karmic-kraken-r3-vision-kernel70.json),
+[prefill, prefix cache, and admission](manifests/benchmarks/2026-09-25-karmic-kraken-r3-vision-kernel70-capacity.json).
 See [Benchmarking](#benchmarking) to reproduce them.
 
 ## Repository contract

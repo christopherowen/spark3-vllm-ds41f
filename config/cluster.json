@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "promoted_baseline": "2026-09-25-karmic-kraken-r3-vision",
+  "promoted_baseline": "2026-09-25-karmic-kraken-r3-vision-kernel70",
   "container": {
     "name": "dsv41-karmic-kraken",
     "image": "vllm-ds41f-kkref:01f1b874c774-r3",

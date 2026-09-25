@@ -1,6 +1,6 @@
 # Replicating the promoted baseline
 
-This reproduces `manifests/baselines/2026-09-25-karmic-kraken-r3-vision.json`:
+This reproduces `manifests/baselines/2026-09-25-karmic-kraken-r3-vision-kernel70.json`:
 DeepSeek V4.1 Flash on three DGX Spark (GB10) nodes, tensor parallelism 3,
 direct-cabled dual ConnectX-7 ring, Local Inference Lab's
 `integration/karmic-kraken-beta` vLLM and B12X.
