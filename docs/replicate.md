@@ -118,7 +118,8 @@ bin/spark3 bench
 ```
 
 It checks that the live cluster matches `config/cluster.json`, runs the quality
-gate and every benchmark suite (about 35 minutes), and compares the result with
-the promoted reference run in `manifests/benchmarks/`. It exits non-zero if the
+gate and the decode matrix (about six minutes), and compares the result with
+the promoted reference run in `manifests/benchmarks/`. `--full` runs every
+suite to tighter intervals (about 35 minutes). It exits non-zero if the
 quality gate fails, any request fails, or a point is significantly slower than
 the reference by more than 3%. See the README's Benchmarking section.

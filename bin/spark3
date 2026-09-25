@@ -2584,6 +2584,12 @@ def bench_rows(report: dict, reference: dict | None, tolerance: float) -> tuple[
 def command_bench(args: argparse.Namespace) -> int:
     cluster, nodes, _ = configuration(args)
     config_path, config_name = cluster_config_path(args)
+    if args.suites is None:
+        args.suites = ",".join(BENCH_SUITES) if args.full else "quality,decode"
+    if args.min_samples is None:
+        args.min_samples = 6 if args.full else 3
+    if args.max_samples is None:
+        args.max_samples = 40 if args.full else 4
     suites = [suite.strip() for suite in args.suites.split(",") if suite.strip()]
     unknown = sorted(set(suites) - set(BENCH_SUITES))
     if unknown:
@@ -2810,8 +2816,13 @@ def parser() -> argparse.ArgumentParser:
         "bench", help="benchmark the live service and compare it with a reference run"
     )
     bench.add_argument(
+        "--full",
+        action="store_true",
+        help="every suite, each decode point sampled to --precision (about 35 minutes); "
+        "the default is the quality gate and decode with 3-4 samples (about 6 minutes)",
+    )
+    bench.add_argument(
         "--suites",
-        default=",".join(BENCH_SUITES),
         help="comma-separated subset of: " + ", ".join(BENCH_SUITES),
     )
     bench.add_argument("--url", help="API base URL (default: head node management IP)")
@@ -2830,8 +2841,8 @@ def parser() -> argparse.ArgumentParser:
         default=2.0,
         help="sample each decode point until its 95%% CI is within this percent of the mean",
     )
-    bench.add_argument("--min-samples", type=int, default=6)
-    bench.add_argument("--max-samples", type=int, default=40)
+    bench.add_argument("--min-samples", type=int, help="default 3, or 6 with --full")
+    bench.add_argument("--max-samples", type=int, help="default 4, or 40 with --full")
     bench.add_argument("--concurrency", type=int_list, default=[1, 2, 4, 8])
     bench.add_argument("--sampled-requests", type=int, default=32)
     bench.add_argument("--prefill-sizes", type=int_list, default=[2048, 32768, 65536, 131072])

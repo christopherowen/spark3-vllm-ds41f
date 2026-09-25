@@ -119,12 +119,16 @@ policy boundary are documented in [docs/recovery.md](docs/recovery.md).
 
 `bin/spark3 bench` measures the live service from the head node and writes one
 self-contained report to `results/private/bench/<UTC time>/bench.json`
-(`--output` to change). Before sending anything it runs the `doctor --live`
+(`--output` to change). By default it is a quick check of about six minutes:
+the quality gate and every decode point with three or four samples each.
+`bin/spark3 bench --full` runs every suite below and samples each decode
+point to its precision target, about 35 minutes; use it for experiments that
+need to resolve small differences. Before sending anything it runs the `doctor --live`
 comparison and refuses a cluster that differs from its configuration. It also
 records the configuration hash, each node's image ID and checkout, and the
 client commit.
 
-Suites, in order (`--suites` selects a subset):
+Suites of the full run, in order (`--suites` selects a subset):
 
 - `quality`: the fixed LRU request five times at temperature 0; all five must
   pass, or the run stops before measuring anything.
@@ -132,10 +136,13 @@ Suites, in order (`--suites` selects a subset):
   tokens, reasoning on, temperature 0, and the same prompts and metric
   (aggregate completion tokens per wall second) as every published baseline.
   Output text still differs from run to run, so each point is a random
-  draw. Points are sampled in shuffled rounds after a discarded warmup round,
-  and each point keeps sampling until its 95% confidence interval is within
-  `--precision` (2%) of the mean, between `--min-samples` (6) and
-  `--max-samples` (40) samples.
+  draw. Points are sampled in shuffled rounds after a discarded warmup round.
+  With `--full`, each point keeps sampling until its 95% confidence interval
+  is within `--precision` (2%) of the mean, between `--min-samples` (6) and
+  `--max-samples` (40) samples; the quick default takes 3-4.
+  Single boots of one configuration differ by about 3%, because adaptive
+  verification profiles its costs at startup, so effects smaller than that
+  need several boots per arm.
 - `sampled`: DSpark accepted drafts per step at temperature 1.0 from the
   engine counters, 32 requests per case at concurrency 1 and 4.
 - `prefill`: cold prefill at 2K, 32K, 64K, and 128K tokens, three unique
