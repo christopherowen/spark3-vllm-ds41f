@@ -109,6 +109,13 @@
       "added_to_watchlist": "2026-09-20",
       "role": "four-Spark native-weight SGLang TP4 performance, long-context, Engram, prefill, transport, and quality reference; not a vLLM TP3 deployment input"
     },
+    "dgpp_spark_inference": {
+      "kind": "git-watch",
+      "url": "https://github.com/HawkBearPig/dgpp",
+      "observed_revision": "7c3d2e1301429c765e4f959f62f592ed7fd1afbb",
+      "added_to_watchlist": "2026-09-26",
+      "role": "independent C++/CUDA DGX Spark inference engine with DeepSeek V4.1 four-node kernels, collectives, rank-consistency checks, and benchmark methodology; not a vLLM TP3 deployment input"
+    },
     "jspark3_deepseek": {
       "kind": "git-watch",
       "url": "https://github.com/jakejharris/jspark3-deepseek",
