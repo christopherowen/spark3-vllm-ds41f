@@ -78,6 +78,18 @@ class ParsingTest(unittest.TestCase):
         self.assertIsNone(missing["gpu_c"])
         self.assertIsNone(missing["system_c"])
 
+    def test_novel_text_is_reproducible_and_does_not_repeat(self) -> None:
+        text = spark3.novel_text(4000, 7)
+        self.assertEqual(text, spark3.novel_text(4000, 7))
+        words = text.split()[2:]
+        trigrams = list(zip(words, words[1:], words[2:]))
+        self.assertGreater(len(set(trigrams)), 0.99 * len(trigrams))
+
+    def test_decode_cases_keep_the_reference_prompts(self) -> None:
+        for case, prompt in spark3.DECODE_PROMPTS.items():
+            self.assertEqual(spark3.DECODE_CASES[case], (prompt, None))
+        self.assertEqual(spark3.DECODE_CASES["code-nothink"][1], {"thinking": False})
+
     def test_assess_lru(self) -> None:
         good = "```python\nclass LRU:\n    def get(self, key):\n        pass\n    def put(self, key, value):\n        pass\n```"
         self.assertEqual(spark3.assess_lru(good), "pass")
@@ -122,6 +134,9 @@ class StreamTest(unittest.TestCase):
         self.assertEqual(result["content"], "hello")
         self.assertEqual(result["completion_tokens"], 3)
         self.assertEqual(result["prompt_tokens"], 5)
+        self.assertEqual(result["reasoning_chars"], 6)
+        self.assertEqual(result["content_chars"], 5)
+        self.assertEqual(spark3.reasoning_share([result]), 0.545)
 
     def test_completion_stream_counts_an_empty_first_token(self) -> None:
         url = self.serve(

@@ -1903,6 +1903,23 @@ DECODE_PROMPTS = {
         "complexity after the code."
     ),
 }
+# Extra decode cases, selected with --decode-cases. The server reasons by
+# default, so most of what "prose" and "code" measure is reasoning text; the
+# -nothink cases turn reasoning off to measure the answer itself, where draft
+# acceptance differs most.
+DECODE_CASES = {
+    "prose-nothink": (DECODE_PROMPTS["prose"], {"thinking": False}),
+    "code-nothink": (DECODE_PROMPTS["code"], {"thinking": False}),
+    "json-nothink": (
+        "Return only a JSON array of twelve objects describing fictional "
+        "library books, with no prose and no code fence. Each object has "
+        "the keys title, author, year, genres (an array of two strings), "
+        "isbn, pages, available (a boolean), and rating (a number from 1 "
+        "to 5).",
+        {"thinking": False},
+    ),
+}
+DECODE_CASES.update((case, (prompt, None)) for case, prompt in DECODE_PROMPTS.items())
 SAMPLED_PROMPTS = {
     "prose": (
         "Write a short essay about how rivers shape the land and the people "
@@ -1917,6 +1934,7 @@ LRU_PROMPT = (
     "Write a short Python LRU cache class with get and put methods using "
     "OrderedDict. Give code and one sentence on complexity."
 )
+NOVEL_LETTERS = "abcdefghijklmnopqrstuvwxyz"
 FILLER_WORDS = (
     "river stone lantern orchard meadow harbor canyon glacier prairie "
     "summit valley forest desert island marsh delta ridge basin"
@@ -2028,6 +2046,8 @@ def stream_request(
     status: int | None = None
     usage: dict = {}
     content: list[str] = []
+    reasoning_chars = 0
+    content_chars = 0
     digest = hashlib.sha256()
     error: str | None = None
     try:
@@ -2060,7 +2080,11 @@ def stream_request(
                     if not emitted:
                         continue
                     digest.update(emitted.encode())
+                    for key in ("reasoning_content", "reasoning"):
+                        if isinstance(delta.get(key), str):
+                            reasoning_chars += len(delta[key])
                     if isinstance(delta.get("content"), str):
+                        content_chars += len(delta["content"])
                         content.append(delta["content"])
     except Exception as exception:
         error = f"{type(exception).__name__}: {exception}"
@@ -2077,6 +2101,8 @@ def stream_request(
         "completion_tokens": tokens,
         "decode_tps": None if decode is None else round(decode, 2),
         "output_sha256": digest.hexdigest()[:16],
+        "reasoning_chars": reasoning_chars,
+        "content_chars": content_chars,
         "error": error,
     }
     if keep_content:
@@ -2129,13 +2155,17 @@ def parse_thermal(text: str) -> dict:
 
 
 class MemoryWatch:
-    """Per-node memory each second and GPU/board temperatures every five."""
+    """Per-node memory each second and GPU/board temperatures every fifteen.
+
+    Temperatures change slowly; polling nvidia-smi less often keeps its GPU
+    queries out of more of the timed steps.
+    """
 
     SCRIPT = (
         "i=0; while :; do "
         "awk '/^(MemAvailable|SwapTotal|SwapFree):/{v[$1]=$2} "
         'END{print "M", v["MemAvailable:"], v["SwapTotal:"]-v["SwapFree:"]}\' /proc/meminfo; '
-        'if [ $((i % 5)) -eq 0 ]; then echo "T $(nvidia-smi --query-gpu='
+        'if [ $((i % 15)) -eq 0 ]; then echo "T $(nvidia-smi --query-gpu='
         + ",".join(THERMAL_FIELDS)
         + " --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' '),"
         + '$(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | sort -n | tail -1)"; fi; '
@@ -2402,6 +2432,21 @@ def filler(tokens: int, seed: int) -> str:
     return f"Document {seed}:\n{body}"
 
 
+def novel_text(tokens: int, seed: int) -> str:
+    """Random pseudo-words: n-grams the Engram tables have not cached.
+
+    The filler repeats 18 words, so its Engram rows stay in the page cache
+    and "cold" prefill never reads the tables from disk. Words of two to
+    four random letters average a little over one token each.
+    """
+    rng = random.Random(seed)
+    words = (
+        "".join(rng.choice(NOVEL_LETTERS) for _ in range(rng.randint(2, 4)))
+        for _ in range(int(tokens * 0.8))
+    )
+    return f"Document {seed}:\n" + " ".join(words)
+
+
 def acceptance(metrics: dict) -> float | None:
     drafts = metrics["spec_decode_num_drafts"]
     return round(metrics["spec_decode_num_accepted_tokens"] / drafts, 4) if drafts else None
@@ -2428,8 +2473,9 @@ def step_times_ms(samples: list[dict]) -> list[float]:
 
 
 def compact(results: list[dict]) -> list[dict]:
-    keys = ("ok", "ttft_s", "prompt_tokens", "completion_tokens", "decode_tps", "output_sha256", "error")
-    return [{key: result[key] for key in keys} for result in results]
+    keys = ("ok", "ttft_s", "prompt_tokens", "completion_tokens", "decode_tps", "output_sha256",
+            "reasoning_chars", "content_chars", "error")
+    return [{key: result[key] for key in keys if key in result} for result in results]
 
 
 def assess_lru(content: str) -> str:
@@ -2472,11 +2518,13 @@ def suite_quality(bench: Bench, options: argparse.Namespace, rng: random.Random)
 
 def suite_decode(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
     """Temperature-0 serving matrix, sampled until every point is precise."""
-    points = [f"{case}-c{concurrency}" for case in DECODE_PROMPTS for concurrency in options.concurrency]
+    points = [f"{case}-c{concurrency}" for case in options.decode_cases for concurrency in options.concurrency]
 
     def sample(point: str) -> dict:
         case, concurrency = point.rsplit("-c", 1)
-        payload = chat_payload(options.model, DECODE_PROMPTS[case], 256, temperature=0, seed=42)
+        prompt, template_kwargs = DECODE_CASES[case]
+        extra = {"chat_template_kwargs": template_kwargs} if template_kwargs else {}
+        payload = chat_payload(options.model, prompt, 256, temperature=0, seed=42, **extra)
         return bench.run(point, [payload] * int(concurrency))
 
     print("  warmup: one discarded sample per point", flush=True)
@@ -2529,8 +2577,16 @@ def suite_decode(bench: Bench, options: argparse.Namespace, rng: random.Random) 
             "verified_per_draft": describe([entry["verified_per_draft"] for entry in entries if entry.get("verified_per_draft") is not None]),
             "failed_requests": len(requests) - len(ok),
             "distinct_outputs": len({request["output_sha256"] for request in ok}),
+            "reasoning_share": reasoning_share(ok),
         }
     return {"points": summary, "samples": samples}
+
+
+def reasoning_share(requests: list[dict]) -> float | None:
+    """Fraction of streamed characters that were reasoning, not answer."""
+    reasoning = sum(request.get("reasoning_chars") or 0 for request in requests)
+    total = reasoning + sum(request.get("content_chars") or 0 for request in requests)
+    return round(reasoning / total, 3) if total else None
 
 
 def suite_sampled(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
@@ -2563,13 +2619,14 @@ def suite_sampled(bench: Bench, options: argparse.Namespace, rng: random.Random)
 
 def suite_prefill(bench: Bench, options: argparse.Namespace, rng: random.Random) -> dict:
     """Cold prefill: unique uncached prompts, one output token."""
+    prefill_text = novel_text if options.prefill_text == "novel" else filler
     sizes = [size for size in options.prefill_sizes if size < options.max_model_len - 64]
     samples: dict[str, list[dict]] = {str(size): [] for size in sizes}
     for _ in range(options.prefill_repeats):
         for size in rng.sample(sizes, len(sizes)):
             payload = {
                 "model": options.model,
-                "prompt": filler(int(size * 0.97), rng.randrange(1 << 30)) + "\n\nReply with the word ok.",
+                "prompt": prefill_text(int(size * 0.97), rng.randrange(1 << 30)) + "\n\nReply with the word ok.",
                 "max_tokens": 1,
                 "temperature": 0,
                 "cache_salt": uuid.uuid4().hex,
@@ -2812,6 +2869,9 @@ def command_bench(args: argparse.Namespace) -> int:
     max_seqs = int(serve_arg(cluster, "--max-num-seqs") or 1)
     if not args.concurrency or max(args.concurrency) > max_seqs or min(args.concurrency) < 1:
         raise SystemExit(f"--concurrency values must be between 1 and --max-num-seqs ({max_seqs})")
+    unknown_cases = sorted(set(args.decode_cases) - set(DECODE_CASES))
+    if unknown_cases:
+        raise SystemExit(f"unknown decode cases: {', '.join(unknown_cases)}")
     if args.min_samples < 2 or args.max_samples < args.min_samples:
         raise SystemExit("--min-samples must be at least 2 and no more than --max-samples")
     floor_gib = float(cluster["host"]["memguard_gib"]) + 1
@@ -2860,6 +2920,8 @@ def command_bench(args: argparse.Namespace) -> int:
             "min_samples": args.min_samples,
             "max_samples": args.max_samples,
             "concurrency": args.concurrency,
+            "decode_cases": args.decode_cases,
+            "prefill_text": args.prefill_text,
             "sampled_requests": args.sampled_requests,
             "prefill_sizes": args.prefill_sizes,
             "prefill_repeats": args.prefill_repeats,
@@ -3055,6 +3117,19 @@ def parser() -> argparse.ArgumentParser:
     bench.add_argument("--min-samples", type=int, help="default 3, or 6 with --full")
     bench.add_argument("--max-samples", type=int, help="default 4, or 40 with --full")
     bench.add_argument("--concurrency", type=int_list, default=[1, 2, 4, 8])
+    bench.add_argument(
+        "--decode-cases",
+        type=lambda value: [case.strip() for case in value.split(",") if case.strip()],
+        default=["prose", "code"],
+        help=f"comma-separated decode cases (default prose,code): {', '.join(DECODE_CASES)}",
+    )
+    bench.add_argument(
+        "--prefill-text",
+        choices=("filler", "novel"),
+        default="filler",
+        help="cold-prefill prompt text: the repeating filler (default) or random "
+        "pseudo-words whose Engram rows are not cached",
+    )
     bench.add_argument("--sampled-requests", type=int, default=32)
     bench.add_argument("--prefill-sizes", type=int_list, default=[2048, 32768, 65536, 131072])
     bench.add_argument("--prefill-repeats", type=int, default=3)
