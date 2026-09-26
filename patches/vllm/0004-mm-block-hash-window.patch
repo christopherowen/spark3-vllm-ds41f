@@ -1,0 +1,101 @@
+From edf89a240da69d63fb9783c2a70150612f06f932 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 23:01:04 +0200
+Subject: [PATCH] fix(v1): hash every image in a block completed by generated
+ tokens
+
+When a prompt ends in a partial block holding two or more multimodal
+items and generated tokens later complete that block, the incremental
+block hasher started at the last item only, so earlier items were left
+out of the block hash. The hash then differed from a fresh hash of the
+same tokens (a lost prefix-cache hit on the next turn), and two
+conversations differing only in an earlier image of that block could
+share its KV. DeepSeek V4.1 images can be shorter than the 256-token
+block, so several can share one block. Start from the first item that
+overlaps the block instead.
+
+Port of vllm-project/vllm#51694 (merged as e6c07ea5).
+---
+ tests/v1/core/test_kv_cache_utils.py | 31 ++++++++++++++++++++++++++++
+ vllm/v1/core/kv_cache_utils.py       | 16 ++++++++------
+ 2 files changed, 41 insertions(+), 6 deletions(-)
+
+diff --git a/tests/v1/core/test_kv_cache_utils.py b/tests/v1/core/test_kv_cache_utils.py
+index 36316cbeb5..b5071160b9 100644
+--- a/tests/v1/core/test_kv_cache_utils.py
++++ b/tests/v1/core/test_kv_cache_utils.py
+@@ -981,6 +981,37 @@ def test_request_block_hasher(hash_fn):
+     assert block_hashes[1] == hash_fn((block_hashes[0], (3, 4, 5), (("hash2", 0),)))
+ 
+ 
++@pytest.mark.parametrize("hash_fn", [sha256, sha256_cbor])
++def test_request_block_hasher_incremental_append_with_multiple_mm_features(hash_fn):
++    mm_positions = [
++        PlaceholderRange(offset=4, length=2),
++        PlaceholderRange(offset=6, length=1),
++    ]
++    incremental = make_request(
++        request_id="incremental",
++        prompt_token_ids=list(range(7)),
++        block_size=4,
++        hash_fn=hash_fn,
++        mm_positions=mm_positions,
++        mm_hashes=["A", "B"],
++    )
++    incremental.append_output_token_ids(7)
++    fresh = make_request(
++        request_id="fresh",
++        prompt_token_ids=list(range(8)),
++        block_size=4,
++        hash_fn=hash_fn,
++        mm_positions=mm_positions,
++        mm_hashes=["A", "B"],
++    )
++
++    expected_second_hash = hash_fn(
++        (incremental.block_hashes[0], (4, 5, 6, 7), (("A", 0), ("B", 2)))
++    )
++    assert incremental.block_hashes[1] == expected_second_hash
++    assert incremental.block_hashes == fresh.block_hashes
++
++
+ @pytest.mark.parametrize("hash_fn", [sha256, sha256_cbor])
+ def test_hash_tokens_different_mm_input(hash_fn):
+     request1 = make_request(
+diff --git a/vllm/v1/core/kv_cache_utils.py b/vllm/v1/core/kv_cache_utils.py
+index 078033fc55..7ddf6e7d96 100644
+--- a/vllm/v1/core/kv_cache_utils.py
++++ b/vllm/v1/core/kv_cache_utils.py
+@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, NewType, TypeAlias, cast, ove
+ from vllm import envs
+ from vllm.config import VllmConfig
+ from vllm.logger import init_logger
++from vllm.multimodal.utils import get_mm_features_in_window
+ from vllm.utils.hashing import xxhash, xxhash_cbor
+ from vllm.utils.math_utils import cdiv, round_up
+ from vllm.utils.mem_utils import format_gib
+@@ -836,12 +837,15 @@ def get_request_block_hasher(
+             return []
+ 
+         curr_mm_idx = 0
+-        if start_token_idx > 0:
+-            # Set curr_mm_idx = -1 to indicate the last mm input.
+-            # Note that since we reach to this branch only when the block is
+-            # completed with generated tokens, we only need to consider the
+-            # last mm input.
+-            curr_mm_idx = -1
++        mm_features = request.mm_features
++        if start_token_idx > 0 and mm_features:
++            last_mm_pos = mm_features[-1].mm_position
++            if last_mm_pos.offset + last_mm_pos.length > start_token_idx:
++                curr_mm_idx, _ = get_mm_features_in_window(
++                    mm_features,
++                    start_token_idx,
++                    start_token_idx + hash_block_size,
++                )
+ 
+         prev_block_hash_value = (
+             request.block_hashes[-1] if request.block_hashes else None
+-- 
+2.43.0
+

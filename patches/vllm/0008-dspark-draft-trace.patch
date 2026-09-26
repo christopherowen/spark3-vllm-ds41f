@@ -1,0 +1,191 @@
+From 1937c57d3c85ddef1fbb6d3e3817a644e50af941 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 23:12:12 +0200
+Subject: [PATCH] feat(spec-decode): DSpark draft trace for offline policy
+ replay
+
+Choosing a DSpark draft count, verification rule or confidence
+calibration takes one boot per arm, and boot-to-boot noise hides small
+differences. At temperature 0 the committed stream is the target's greedy
+output, so a draft token is correct exactly when it equals the committed
+token at its position, whether or not it was verified. A run that records
+every draft and its confidence therefore prices every verification cap
+and rule offline against the profiled cost tables.
+
+With SPARK3_DSPARK_TRACE=<path>, TP rank 0 appends one JSON line per
+request per step: tokens sampled, drafts verified from the previous step,
+and the drafts and raw confidences proposed for the next step. It copies
+GPU tensors to the host each step, so it is for replay runs only, never
+for timing. Off unless the variable is set; output is unchanged.
+---
+ tests/v1/spec_decode/test_dspark_trace.py     | 29 ++++++++
+ vllm/v1/worker/gpu/model_runner.py            | 16 +++++
+ .../v1/worker/gpu/spec_decode/dspark/trace.py | 72 +++++++++++++++++++
+ 3 files changed, 117 insertions(+)
+ create mode 100644 tests/v1/spec_decode/test_dspark_trace.py
+ create mode 100644 vllm/v1/worker/gpu/spec_decode/dspark/trace.py
+
+diff --git a/tests/v1/spec_decode/test_dspark_trace.py b/tests/v1/spec_decode/test_dspark_trace.py
+new file mode 100644
+index 0000000000..10b7e4ebd0
+--- /dev/null
++++ b/tests/v1/spec_decode/test_dspark_trace.py
+@@ -0,0 +1,29 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++import json
++
++import torch
++
++from vllm.v1.worker.gpu.spec_decode.dspark.trace import DSparkTrace
++
++
++def test_trace_records_sampled_drafts_and_confidences(tmp_path):
++    path = tmp_path / "trace.jsonl"
++    trace = DSparkTrace(str(path))
++    trace.record(
++        ["a", "b"],
++        torch.tensor([[5, 6, -1, -1], [7, -1, -1, -1], [0, 0, 0, 0]]),
++        torch.tensor([2, 1, 0]),
++        torch.tensor([1, 0, 0]),
++        torch.tensor([[1, 2, 3], [4, 5, 6], [0, 0, 0]]),
++        torch.tensor([[0.9, 0.5, 0.25], [0.1, 0.2, 0.3], [0, 0, 0]]),
++    )
++    trace._file.flush()
++    rows = [json.loads(line) for line in path.read_text().splitlines()]
++    assert rows == [
++        {"t": 0, "b": 2, "r": "a", "s": [5, 6], "d": [1, 2, 3], "v": 1,
++         "c": [0.9, 0.5, 0.25]},
++        {"t": 0, "b": 2, "r": "b", "s": [7], "d": [4, 5, 6], "v": 0,
++         "c": [0.1, 0.2, 0.3]},
++    ]
+diff --git a/vllm/v1/worker/gpu/model_runner.py b/vllm/v1/worker/gpu/model_runner.py
+index 4a47849405..995719cd56 100644
+--- a/vllm/v1/worker/gpu/model_runner.py
++++ b/vllm/v1/worker/gpu/model_runner.py
+@@ -164,6 +164,10 @@ from vllm.v1.worker.gpu.spec_decode.adaptive_verification import (
+     resolve_adaptive_cudagraph_mode,
+ )
+ from vllm.v1.worker.gpu.spec_decode.dflash.speculator import DFlashSpeculator
++from vllm.v1.worker.gpu.spec_decode.dspark.trace import (
++    DSparkTrace,
++    maybe_create_dspark_trace,
++)
+ from vllm.v1.worker.gpu.spec_decode.eagle.eagle3_utils import (
+     set_eagle3_aux_hidden_state_layers,
+     verify_supports_aux_hidden_states_over_pp,
+@@ -328,6 +332,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+             num_prefill_lookahead=num_prefill_lookahead,
+         )
+         self.adaptive_verification: AdaptiveVerificationManager | None = None
++        self._dspark_trace: DSparkTrace | None = None
+         self.input_buffers = InputBuffers(
+             max_num_reqs=self.max_num_reqs,
+             max_num_tokens=self.max_num_tokens,
+@@ -698,6 +703,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+             target_layer_names=target_attn_layer_names,
+             additional_attn_cg_support=additional_attn_cg_support,
+         )
++        if self.speculator is not None:
++            self._dspark_trace = maybe_create_dspark_trace()
+ 
+         self.block_tables = BlockTables(
+             block_sizes=block_sizes,
+@@ -2538,6 +2545,15 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+                 self.adaptive_verification.record_confidences(
+                     self.speculator.draft_token_confidence_probs, input_batch
+                 )
++            if self._dspark_trace is not None:
++                self._dspark_trace.record(
++                    input_batch.req_ids,
++                    sampler_output.sampled_token_ids,
++                    num_sampled,
++                    num_verified_draft_tokens,
++                    draft_tokens,
++                    getattr(self.speculator, "draft_token_confidence_probs", None),
++                )
+         elif self.speculator is not None:
+             draft_tokens_for_next_step = self.req_states.draft_tokens[
+                 input_batch.idx_mapping, :0
+diff --git a/vllm/v1/worker/gpu/spec_decode/dspark/trace.py b/vllm/v1/worker/gpu/spec_decode/dspark/trace.py
+new file mode 100644
+index 0000000000..3fe50fc47f
+--- /dev/null
++++ b/vllm/v1/worker/gpu/spec_decode/dspark/trace.py
+@@ -0,0 +1,72 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Per-step DSpark draft trace for offline verification-policy replay.
++
++With ``SPARK3_DSPARK_TRACE=<path>``, TP rank 0 appends one JSON line per
++request per step: the tokens sampled this step, how many of the previous
++step's drafts were verified, and the drafts and raw confidences proposed
++for the next step. At temperature 0 the committed stream is the target's
++greedy output, so a draft token is correct exactly when it equals the
++committed token at its position, whether or not it was verified. One traced
++run therefore prices every verification cap and rule offline.
++
++Tracing copies GPU tensors to the host every step; use it only for replay
++runs, never for timing.
++"""
++
++import json
++import os
++
++import torch
++
++from vllm.distributed.parallel_state import get_tp_group
++
++_TRACE_PATH = os.environ.get("SPARK3_DSPARK_TRACE") or None
++
++
++class DSparkTrace:
++    def __init__(self, path: str) -> None:
++        self._file = open(path, "a", buffering=1 << 20)  # noqa: SIM115
++        self._step = 0
++
++    def record(
++        self,
++        req_ids: list[str],
++        sampled_token_ids: torch.Tensor,
++        num_sampled: torch.Tensor,
++        num_verified: torch.Tensor | None,
++        draft_tokens: torch.Tensor,
++        confidences: torch.Tensor | None,
++    ) -> None:
++        num_reqs = len(req_ids)
++        sampled = sampled_token_ids[:num_reqs].tolist()
++        counts = num_sampled[:num_reqs].tolist()
++        verified = (
++            num_verified[:num_reqs].tolist() if num_verified is not None else None
++        )
++        drafts = draft_tokens[:num_reqs].tolist()
++        confs = (
++            confidences[:num_reqs].float().tolist() if confidences is not None else None
++        )
++        for i, req_id in enumerate(req_ids):
++            record = {
++                "t": self._step,
++                "b": num_reqs,
++                "r": req_id,
++                "s": sampled[i][: counts[i]],
++                "d": drafts[i],
++            }
++            if verified is not None:
++                record["v"] = verified[i]
++            if confs is not None:
++                record["c"] = [round(c, 5) for c in confs[i]]
++            self._file.write(json.dumps(record, separators=(",", ":")) + "\n")
++        self._step += 1
++        if self._step % 256 == 0:
++            self._file.flush()
++
++
++def maybe_create_dspark_trace() -> DSparkTrace | None:
++    if _TRACE_PATH is None or get_tp_group().rank_in_group != 0:
++        return None
++    return DSparkTrace(_TRACE_PATH)
+-- 
+2.43.0
+

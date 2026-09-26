@@ -1,0 +1,215 @@
+From 8ecc6b000438b7e284fe04c7e1b415d2f0f5ba09 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 22:55:35 +0200
+Subject: [PATCH] fix(deepseek-v4): keep DSML tool parameters without a string
+ attribute
+
+The model sometimes emits a DSML parameter without string="true|false".
+The V4 and V4.1 parameter regexes required the attribute, so such a
+parameter was silently dropped: from name="query">value plus limit, the
+client received only limit. Make the attribute optional and treat a
+missing value like string="false" (JSON, falling back to the literal).
+
+Port of vllm-project/vllm#56271 (merged as 39e33db7), Python parts only;
+the Rust parser is not used by this server.
+---
+ tests/parser/engine/test_deepseek_v4.py  | 70 ++++++++++++++++++++++++
+ tests/parser/engine/test_deepseek_v41.py |  2 +
+ vllm/parser/deepseek_v4.py               | 32 +++++++----
+ vllm/parser/deepseek_v41.py              | 15 +----
+ 4 files changed, 94 insertions(+), 25 deletions(-)
+
+diff --git a/tests/parser/engine/test_deepseek_v4.py b/tests/parser/engine/test_deepseek_v4.py
+index 5eb369cee9..fcd15f9dce 100644
+--- a/tests/parser/engine/test_deepseek_v4.py
++++ b/tests/parser/engine/test_deepseek_v4.py
+@@ -212,6 +212,35 @@ class TestArgConverter:
+         result = json.loads(_dsml_arg_converter("", partial=False))
+         assert result == {}
+ 
++    def _bare(self, name: str, value: str) -> str:
++        return f'<｜DSML｜parameter name="{name}">{value}{_PARAM_CLOSE}'
++
++    def test_missing_string_attribute_keeps_literal(self):
++        """The model sometimes omits ``string``; the parameter must survive."""
++        raw = self._bare("name", "alpha")
++        assert json.loads(_dsml_arg_converter(raw, partial=False)) == {"name": "alpha"}
++
++    def test_missing_string_attribute_parses_json(self):
++        raw = self._bare("count", "7") + self._bare("opts", '{"k": [1]}')
++        assert json.loads(_dsml_arg_converter(raw, partial=False)) == {
++            "count": 7,
++            "opts": {"k": [1]},
++        }
++
++    def test_missing_string_attribute_alongside_annotated(self):
++        raw = self._bare("a", "x") + _param("b", "true", "42")
++        assert json.loads(_dsml_arg_converter(raw, partial=False)) == {
++            "a": "x",
++            "b": "42",
++        }
++
++    def test_missing_string_attribute_partial_value(self):
++        raw = _param("a", "true", "x") + '<｜DSML｜parameter name="n">12'
++        assert json.loads(_dsml_arg_converter(raw, partial=True)) == {
++            "a": "x",
++            "n": 12,
++        }
++
+     def test_invalid_json_fallback(self):
+         raw = self._raw(("data", "false", "[broken"))
+         result = json.loads(_dsml_arg_converter(raw, partial=False))
+@@ -327,6 +356,47 @@ class TestImplicitParameterClose:
+         }
+ 
+ 
++class TestMissingStringAttribute:
++    def test_non_streaming_keeps_parameter(self, mock_tokenizer, mock_request):
++        text = (
++            f"{DSML_TOOL_START}"
++            f"{DSML_INVOKE_PREFIX}get_weather{DSML_INVOKE_NAME_END}\n"
++            f'<｜DSML｜parameter name="location">Paris{_PARAM_CLOSE}\n'
++            f"{_param('date', 'true', 'tomorrow')}\n"
++            f"{DSML_INVOKE_END}{DSML_TOOL_END}"
++        )
++
++        result = DeepSeekV4Parser(mock_tokenizer).extract_tool_calls(text, mock_request)
++
++        assert result.tools_called is True
++        assert json.loads(result.tool_calls[0].function.arguments) == {
++            "location": "Paris",
++            "date": "tomorrow",
++        }
++
++    def test_streaming_keeps_parameter(self, mock_tokenizer, mock_request):
++        chunks = [
++            DSML_TOOL_START,
++            f"{DSML_INVOKE_PREFIX}get_weather{DSML_INVOKE_NAME_END}\n",
++            '<｜DSML｜parameter name="loc',
++            'ation">Par',
++            "is",
++            _PARAM_CLOSE,
++            f"\n{_param('date', 'true', 'tomorrow')}\n",
++            DSML_INVOKE_END,
++            DSML_TOOL_END,
++        ]
++
++        results = simulate_tool_streaming(
++            DeepSeekV4Parser(mock_tokenizer), mock_request, chunks
++        )
++
++        assert json.loads(collect_tool_arguments(results)) == {
++            "location": "Paris",
++            "date": "tomorrow",
++        }
++
++
+ # ── Bare </think> absorption and duplicate <think> absorption ─────────
+ 
+ 
+diff --git a/tests/parser/engine/test_deepseek_v41.py b/tests/parser/engine/test_deepseek_v41.py
+index cc7d6e0aed..d99ca6b2a1 100644
+--- a/tests/parser/engine/test_deepseek_v41.py
++++ b/tests/parser/engine/test_deepseek_v41.py
+@@ -137,10 +137,12 @@ def test_python_argument_conversion_and_partial_values():
+         '<｜DSML｜ parameter name="object" string="false">'
+         '{"a": [true, null]}</｜DSML｜ parameter>'
+         '<｜DSML｜ parameter name="bad" string="false">[broken</｜DSML｜ parameter>'
++        '<｜DSML｜ parameter name="bare">7</｜DSML｜ parameter>'
+         '<｜DSML｜ parameter name="text" string="true">  a<b'
+     )
+     assert json.loads(converter(raw, True)) == {
+         "object": {"a": [True, None]},
+         "bad": "[broken",
++        "bare": 7,
+         "text": "  a<b",
+     }
+diff --git a/vllm/parser/deepseek_v4.py b/vllm/parser/deepseek_v4.py
+index 79ddd93f6b..49ef637365 100644
+--- a/vllm/parser/deepseek_v4.py
++++ b/vllm/parser/deepseek_v4.py
+@@ -56,18 +56,24 @@ DSML_TOOL_START_VARIANTS: tuple[str, ...] = (
+     f"<{_DSML}tool>",
+ )
+ 
+-_ESCAPED_DSML = re.escape(_DSML)
+-_PARAM_RE = re.compile(
+-    rf'<{_ESCAPED_DSML}parameter\s+name="([^"]+)"\s+string="(true|false)">'
+-    rf"(.*?)"
+-    rf"(?:</{_ESCAPED_DSML}parameter>|(?=<{_ESCAPED_DSML}parameter\s+name=))",
+-    re.DOTALL,
+-)
+-_PARTIAL_PARAM_RE = re.compile(
+-    rf'<{_ESCAPED_DSML}parameter\s+name="([^"]+)"\s+string="(true|false)">'
+-    rf"(.*)$",
+-    re.DOTALL,
+-)
++
++def _param_patterns(
++    param_start: str, param_close: str
++) -> tuple[re.Pattern, re.Pattern]:
++    """Complete and trailing-partial parameter regexes for one DSML dialect.
++
++    The ``string`` attribute is optional: the model sometimes omits it, and
++    dropping such a parameter hands the client a tool call with no arguments.
++    """
++    start, close = re.escape(param_start), re.escape(param_close)
++    head = rf'{start}\s+name="([^"]+)"(?:\s+string="([^"]*)")?\s*>'
++    return (
++        re.compile(rf"{head}(.*?)(?:{close}|(?={start}\s+name=))", re.DOTALL),
++        re.compile(rf"{head}(.*)$", re.DOTALL),
++    )
++
++
++_PARAM_RE, _PARTIAL_PARAM_RE = _param_patterns(DSML_PARAM_START, DSML_PARAM_CLOSE)
+ 
+ 
+ def _dsml_arg_converter(
+@@ -80,6 +86,8 @@ def _dsml_arg_converter(
+     params: dict[str, object] = {}
+ 
+     last_end = 0
++    # A missing ``string`` attribute is treated like ``string="false"``: try
++    # JSON, fall back to the literal text.
+     for m in param_re.finditer(raw_args):
+         name, is_str, value = m.group(1), m.group(2), m.group(3)
+         if is_str == "true":
+diff --git a/vllm/parser/deepseek_v41.py b/vllm/parser/deepseek_v41.py
+index 668bdd4a6b..8421600510 100644
+--- a/vllm/parser/deepseek_v41.py
++++ b/vllm/parser/deepseek_v41.py
+@@ -5,11 +5,10 @@
+ import functools
+ from dataclasses import replace
+ 
+-import regex as re
+-
+ from vllm.parser.deepseek_v4 import (
+     DeepSeekV4Parser,
+     _dsml_arg_converter,
++    _param_patterns,
+     deepseek_v4_config,
+ )
+ from vllm.parser.engine.parser_engine_config import ParserEngineConfig
+@@ -21,17 +20,7 @@ DSML_INVOKE_END = "</｜DSML｜ invoke>"
+ DSML_PARAM_START = "<｜DSML｜ parameter"
+ DSML_PARAM_CLOSE = "</｜DSML｜ parameter>"
+ 
+-_PARAM_RE = re.compile(
+-    r'<｜DSML｜ parameter\s+name="([^"]+)"\s+string="(true|false)">'
+-    r"(.*?)"
+-    r"(?:</｜DSML｜ parameter>|(?=<｜DSML｜ parameter\s+name=))",
+-    re.DOTALL,
+-)
+-_PARTIAL_PARAM_RE = re.compile(
+-    r'<｜DSML｜ parameter\s+name="([^"]+)"\s+string="(true|false)">'
+-    r"(.*)$",
+-    re.DOTALL,
+-)
++_PARAM_RE, _PARTIAL_PARAM_RE = _param_patterns(DSML_PARAM_START, DSML_PARAM_CLOSE)
+ 
+ 
+ @functools.cache
+-- 
+2.43.0
+

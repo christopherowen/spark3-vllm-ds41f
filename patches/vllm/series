@@ -1,3 +1,9 @@
 # Applied after the pinned local-inference-lab/vllm integration/karmic-kraken-beta revision.
 0001-engram-projection-tp-padding.patch
 0002-engram-async-disk-rows.patch
+0003-dsml-optional-string-attribute.patch
+0004-mm-block-hash-window.patch
+0005-dspark-pinned-cost-curves.patch
+0006-dspark-marginal-verification-rule.patch
+0007-dspark-v41-gathered-markov-bias.patch
+0008-dspark-draft-trace.patch

@@ -1,0 +1,144 @@
+From 615a4799ac11c9c8b4e1e3ab7484519eaab2eeef Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 23:11:28 +0200
+Subject: [PATCH] perf(deepseek-v4.1): allow the gathered DSpark Markov bias
+
+At every draft position the DeepSeek V4.1 drafter adds a Markov bias
+computed as a dense projection of the previous draft token's 256-wide
+embedding onto the whole 129,280-token vocabulary: it reads the replicated
+BF16 markov_w2 (about 66 MB) once per draft position, about 200 MB per
+step at three drafts. Qwen3 DSpark already has a gathered path
+(dspark_draft_topk): select the top-k base-logit candidates once, then add
+the bias only to those rows. Its config check admitted only Qwen3 drafters.
+
+Admit DSparkV41DraftModel and give the V4.1 drafter
+apply_markov_bias_gathered (gather k rows of markov_w2 per request, one
+batched matvec, scatter into the -inf-filled logits). Only drafts can
+change: a draft whose biased argmax falls outside the top-k base
+candidates is replaced by the best candidate, which can lower acceptance
+but not change the output, because the target verifies every draft. Off
+unless dspark_draft_topk is set in the speculative config.
+---
+ .../test_dspark_v41_gathered_markov.py        | 48 +++++++++++++++++++
+ vllm/config/speculative.py                    | 14 +++---
+ vllm/models/deepseek_v4_1/nvidia/dspark.py    | 22 +++++++++
+ 3 files changed, 77 insertions(+), 7 deletions(-)
+ create mode 100644 tests/v1/spec_decode/test_dspark_v41_gathered_markov.py
+
+diff --git a/tests/v1/spec_decode/test_dspark_v41_gathered_markov.py b/tests/v1/spec_decode/test_dspark_v41_gathered_markov.py
+new file mode 100644
+index 0000000000..c714af4e43
+--- /dev/null
++++ b/tests/v1/spec_decode/test_dspark_v41_gathered_markov.py
+@@ -0,0 +1,48 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from types import SimpleNamespace
++
++import pytest
++import torch
++
++from vllm.models.deepseek_v4_1.nvidia.dspark import DSparkDeepseekV4ForCausalLM
++
++
++def _draft(weight: torch.Tensor, scale: float = 1.0) -> DSparkDeepseekV4ForCausalLM:
++    draft = DSparkDeepseekV4ForCausalLM.__new__(DSparkDeepseekV4ForCausalLM)
++    head = SimpleNamespace(markov_w2=SimpleNamespace(weight=weight))
++    object.__setattr__(draft, "model", SimpleNamespace(markov_head=head))
++    object.__setattr__(draft, "logits_processor", SimpleNamespace(scale=scale))
++    return draft
++
++
++@pytest.mark.parametrize("scale", [1.0, 0.5])
++def test_gathered_markov_bias_matches_dense_bias_on_candidates(scale):
++    torch.manual_seed(0)
++    vocab, rank, reqs, k = 512, 16, 3, 64
++    weight = torch.randn(vocab, rank, dtype=torch.float32)
++    embed = torch.randn(reqs, rank, dtype=torch.float32)
++    base = torch.randn(reqs, vocab, dtype=torch.float32)
++    values, index = base.topk(k, dim=-1)
++    logits = torch.full_like(base, float("-inf"))
++
++    out = _draft(weight, scale).apply_markov_bias_gathered(embed, logits, values, index)
++
++    dense = base + scale * (embed @ weight.T)
++    torch.testing.assert_close(out.gather(1, index), dense.gather(1, index))
++    mask = torch.ones_like(out, dtype=torch.bool).scatter_(1, index, False)
++    assert torch.isneginf(out[mask]).all()
++
++
++def test_gathered_markov_bias_with_full_vocab_keeps_greedy_argmax():
++    torch.manual_seed(1)
++    vocab, rank, reqs = 256, 8, 4
++    weight = torch.randn(vocab, rank)
++    embed = torch.randn(reqs, rank)
++    base = torch.randn(reqs, vocab)
++    values, index = base.topk(vocab, dim=-1)
++    out = _draft(weight).apply_markov_bias_gathered(
++        embed, torch.full_like(base, float("-inf")), values, index
++    )
++    assert torch.equal(out.argmax(-1), (base + embed @ weight.T).argmax(-1))
+diff --git a/vllm/config/speculative.py b/vllm/config/speculative.py
+index 1b827e7cf5..739adfb7a2 100644
+--- a/vllm/config/speculative.py
++++ b/vllm/config/speculative.py
+@@ -1651,15 +1651,15 @@ class SpeculativeConfig:
+                                 "dspark_draft_topk must be between 1 and the "
+                                 f"draft vocabulary size ({draft_vocab_size})"
+                             )
+-                        if (
+-                            "Qwen3DSparkModel"
+-                            not in self.draft_model_config.architectures
+-                            and _QWEN3_OMNI_DSPARK_ARCHITECTURE
+-                            not in self.draft_model_config.architectures
+-                        ):
++                        if not {
++                            "Qwen3DSparkModel",
++                            _QWEN3_OMNI_DSPARK_ARCHITECTURE,
++                            "DSparkV41DraftModel",
++                        } & set(self.draft_model_config.architectures):
+                             raise ValueError(
+                                 "dspark_draft_topk is only supported by "
+-                                "Qwen3DSparkModel and Qwen3OmniDSparkModel"
++                                "Qwen3DSparkModel, Qwen3OmniDSparkModel and "
++                                "DSparkV41DraftModel"
+                             )
+                         hf_config.dspark_draft_topk = dspark_draft_topk
+ 
+diff --git a/vllm/models/deepseek_v4_1/nvidia/dspark.py b/vllm/models/deepseek_v4_1/nvidia/dspark.py
+index 61ba555c05..1f6414f48d 100644
+--- a/vllm/models/deepseek_v4_1/nvidia/dspark.py
++++ b/vllm/models/deepseek_v4_1/nvidia/dspark.py
+@@ -580,6 +580,28 @@ class DSparkDeepseekV4ForCausalLM(nn.Module):
+     def markov_bias(self, markov_embed: torch.Tensor) -> torch.Tensor:
+         return self.model.markov_head.bias(markov_embed, self.logits_processor)
+ 
++    def apply_markov_bias_gathered(
++        self,
++        markov_embed: torch.Tensor,
++        logits: torch.Tensor,
++        values: torch.Tensor,
++        index: torch.Tensor,
++    ) -> torch.Tensor:
++        """Add the Markov bias to the top-k base-logit candidates only.
++
++        Reads k rows of the replicated ``markov_w2`` per request instead of
++        the whole vocabulary projection at every draft position. ``logits``
++        is the caller's ``-inf``-filled buffer; the corrected candidates are
++        scattered into it. The target still verifies every draft, so this
++        can change acceptance but not the output.
++        """
++        weight = self.model.markov_head.markov_w2.weight[index]
++        bias = torch.bmm(weight, markov_embed.to(weight.dtype).unsqueeze(-1))
++        bias = bias.squeeze(-1).to(values.dtype)
++        if self.logits_processor.scale != 1.0:
++            bias = bias * self.logits_processor.scale
++        return logits.scatter_(1, index, (values + bias).to(logits.dtype))
++
+     def compute_confidence(
+         self, head_hidden: torch.Tensor, markov_embed: torch.Tensor
+     ) -> torch.Tensor:
+-- 
+2.43.0
+

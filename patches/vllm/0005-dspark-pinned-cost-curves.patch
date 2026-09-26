@@ -1,0 +1,206 @@
+From 6365f1301191eb1e829d48c99907b2e87c6415c6 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Sat, 26 Sep 2026 23:09:28 +0200
+Subject: [PATCH] feat(spec-decode): pin DSpark adaptive verification cost
+ curves
+
+Adaptive verification prices every draft budget from cost curves profiled
+at startup (the median of five replays of each shape). Those curves move
+from boot to boot, and with them the verified draft counts, so otherwise
+identical boots differ by about 3% in throughput and A/B comparisons need
+many boots.
+
+With SPARK3_DSPARK_COST_DIR set, TP rank 0 saves its first profile of a
+shape set (TP size, draft count, request and token limits, capture limit,
+profile context length and every profiled shape) and later boots with the
+same shapes reuse it; set_cost_curves already broadcasts rank 0 curves.
+Every rank still runs the profile, so collectives stay matched.
+SPARK3_DSPARK_PROFILE_REPLAYS raises the replay count for the pinned
+profile. Unset, behavior is unchanged.
+---
+ .../spec_decode/test_adaptive_verification.py | 42 ++++++++
+ .../gpu/spec_decode/adaptive_verification.py  | 98 ++++++++++++++++++-
+ 2 files changed, 139 insertions(+), 1 deletion(-)
+
+diff --git a/tests/v1/spec_decode/test_adaptive_verification.py b/tests/v1/spec_decode/test_adaptive_verification.py
+index a9578a1b13..bc5d1fb0e5 100644
+--- a/tests/v1/spec_decode/test_adaptive_verification.py
++++ b/tests/v1/spec_decode/test_adaptive_verification.py
+@@ -656,3 +656,45 @@ def test_tp_confidence_publication_keeps_graph_and_request_budgets_consistent():
+     torch.multiprocessing.spawn(
+         _run_tp_confidence_consistency, args=(get_open_port(),), nprocs=2, join=True
+     )
++
++
++def _pinning_manager() -> AdaptiveVerificationManager:
++    manager = AdaptiveVerificationManager.__new__(AdaptiveVerificationManager)
++    manager.num_speculative_steps = 3
++    manager.req_states = SimpleNamespace(max_num_reqs=8, max_num_batched_tokens=4096)
++    manager._cudagraph_limit = 32
++    return manager
++
++
++def test_pinned_cost_curves_are_saved_then_reused(monkeypatch, tmp_path):
++    monkeypatch.setattr(adaptive_module, "_COST_DIR", str(tmp_path))
++    monkeypatch.setattr(
++        adaptive_module,
++        "get_tp_group",
++        lambda: SimpleNamespace(rank_in_group=0, world_size=3),
++    )
++    manager = _pinning_manager()
++    first = ([(1, 2.0), (8, 3.0)], [(4, 40.0), (32, 45.0)], {1: [(4, 40.0)]})
++    assert manager._pin_cost_curves(*first) == first
++    assert len(list(tmp_path.glob("dspark-costs-*.json"))) == 1
++
++    # A later boot with the same shapes reuses the first profile.
++    second = ([(1, 9.0), (8, 9.0)], [(4, 99.0), (32, 99.0)], {1: [(4, 99.0)]})
++    assert manager._pin_cost_curves(*second) == first
++
++    # Other shapes get their own file.
++    other = ([(1, 2.0), (8, 3.0)], [(4, 40.0), (48, 50.0)], {1: [(4, 40.0)]})
++    assert manager._pin_cost_curves(*other) == other
++    assert len(list(tmp_path.glob("dspark-costs-*.json"))) == 2
++
++
++def test_pinned_cost_curves_only_from_rank_zero(monkeypatch, tmp_path):
++    monkeypatch.setattr(adaptive_module, "_COST_DIR", str(tmp_path))
++    monkeypatch.setattr(
++        adaptive_module,
++        "get_tp_group",
++        lambda: SimpleNamespace(rank_in_group=1, world_size=3),
++    )
++    curves = ([(1, 2.0)], [(4, 40.0)], {1: [(4, 40.0)]})
++    assert _pinning_manager()._pin_cost_curves(*curves) == curves
++    assert not list(tmp_path.iterdir())
+diff --git a/vllm/v1/worker/gpu/spec_decode/adaptive_verification.py b/vllm/v1/worker/gpu/spec_decode/adaptive_verification.py
+index bc2c35cc09..8e7b94c22e 100644
+--- a/vllm/v1/worker/gpu/spec_decode/adaptive_verification.py
++++ b/vllm/v1/worker/gpu/spec_decode/adaptive_verification.py
+@@ -2,6 +2,9 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ """Adaptive verification for DSpark speculative decoding."""
+ 
++import hashlib
++import json
++import os
+ from collections import defaultdict
+ from collections.abc import Callable, Iterable, Iterator, Mapping
+ from typing import TYPE_CHECKING
+@@ -24,7 +27,11 @@ from vllm.v1.worker.gpu.attn_utils import (
+ )
+ 
+ logger = init_logger(__name__)
+-_PROFILE_REPLAYS = 5
++_PROFILE_REPLAYS = int(os.environ.get("SPARK3_DSPARK_PROFILE_REPLAYS", "5"))
++# Directory of pinned cost curves: rank 0 saves the first profile of a shape
++# set and every later boot with the same shapes reuses it, so the draft
++# budget no longer depends on one boot's startup timing noise.
++_COST_DIR = os.environ.get("SPARK3_DSPARK_COST_DIR") or None
+ 
+ if TYPE_CHECKING:
+     from vllm.config import VllmConfig
+@@ -283,12 +290,101 @@ class AdaptiveVerificationManager:
+             )
+             for num_reqs in sorted({s.num_reqs for s in samples if s.full_cudagraph})
+         }
++        draft_curve, verify_curve, verify_curves_by_num_reqs = self._pin_cost_curves(
++            draft_curve, verify_curve, verify_curves_by_num_reqs
++        )
+         self.set_cost_curves(
+             draft_curve,
+             verify_curve,
+             verify_curves_by_num_reqs=verify_curves_by_num_reqs,
+         )
+ 
++    def _pin_cost_curves(
++        self,
++        draft_curve: list[tuple[int, float]],
++        verify_curve: list[tuple[int, float]],
++        verify_curves_by_num_reqs: dict[int, list[tuple[int, float]]],
++    ) -> tuple[
++        list[tuple[int, float]],
++        list[tuple[int, float]],
++        dict[int, list[tuple[int, float]]],
++    ]:
++        """Reuse (or save) rank 0's curves for this shape set.
++
++        Only rank 0's curves matter: set_cost_curves broadcasts them. Other
++        ranks still profile, so every rank issues the same collectives.
++        """
++        if _COST_DIR is None:
++            return draft_curve, verify_curve, verify_curves_by_num_reqs
++        tp_group = get_tp_group()
++        if tp_group.rank_in_group != 0:
++            return draft_curve, verify_curve, verify_curves_by_num_reqs
++
++        def plain(curve: list[tuple[int, float]]) -> list[list[int | float]]:
++            return [[int(x), float(y)] for x, y in curve]
++
++        draft_curve = plain(draft_curve)
++        verify_curve = plain(verify_curve)
++        verify_curves_by_num_reqs = {
++            int(n): plain(curve) for n, curve in verify_curves_by_num_reqs.items()
++        }
++        key = {
++            "tp": tp_group.world_size,
++            "num_speculative_steps": self.num_speculative_steps,
++            "max_num_reqs": self.req_states.max_num_reqs,
++            "max_num_batched_tokens": self.req_states.max_num_batched_tokens,
++            "cudagraph_limit": self._cudagraph_limit,
++            "profile_context_len": envs.VLLM_ADAPTIVE_VERIFICATION_PROFILE_CONTEXT_LEN,
++            "draft_sizes": [x for x, _ in draft_curve],
++            "verify_sizes": [x for x, _ in verify_curve],
++            "full_shapes": {
++                str(n): [x for x, _ in curve]
++                for n, curve in sorted(verify_curves_by_num_reqs.items())
++            },
++        }
++        digest = hashlib.sha256(
++            json.dumps(key, sort_keys=True).encode()
++        ).hexdigest()[:16]
++        path = os.path.join(_COST_DIR, f"dspark-costs-{digest}.json")
++        if os.path.exists(path):
++            with open(path) as f:
++                pinned = json.load(f)
++            if pinned.get("key") == key:
++                logger.info("Using pinned DSpark cost curves from %s", path)
++                return (
++                    [tuple(p) for p in pinned["draft_curve"]],
++                    [tuple(p) for p in pinned["verify_curve"]],
++                    {
++                        int(n): [tuple(p) for p in curve]
++                        for n, curve in pinned["verify_curves_by_num_reqs"].items()
++                    },
++                )
++            logger.warning("Ignoring pinned DSpark cost curves with another key: %s", path)
++            return draft_curve, verify_curve, verify_curves_by_num_reqs
++        os.makedirs(_COST_DIR, exist_ok=True)
++        tmp = f"{path}.{os.getpid()}.tmp"
++        with open(tmp, "w") as f:
++            json.dump(
++                {
++                    "key": key,
++                    "profile_replays": _PROFILE_REPLAYS,
++                    "draft_curve": draft_curve,
++                    "verify_curve": verify_curve,
++                    "verify_curves_by_num_reqs": {
++                        str(n): curve for n, curve in verify_curves_by_num_reqs.items()
++                    },
++                },
++                f,
++                indent=1,
++            )
++        os.replace(tmp, path)
++        logger.info("Pinned DSpark cost curves to %s", path)
++        return (
++            [tuple(p) for p in draft_curve],
++            [tuple(p) for p in verify_curve],
++            {n: [tuple(p) for p in curve] for n, curve in verify_curves_by_num_reqs.items()},
++        )
++
+     def set_cost_curves(
+         self,
+         draft_curve: list[tuple[int, float]],
+-- 
+2.43.0
+

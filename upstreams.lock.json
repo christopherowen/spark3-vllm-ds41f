@@ -213,5 +213,5 @@
       "role": "GLM-5.3-Flash on 4x Ampere CMP 170HX with a vLLM fork; TP vs PP on limited links, determinism and release methods only"
     }
   },
-  "source_manifest": "manifests/sources/2026-09-25-karmic-kraken-r3-source.json"
+  "source_manifest": "manifests/sources/2026-09-26-r4-candidate-source.json"
 }

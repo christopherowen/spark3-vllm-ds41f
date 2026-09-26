@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-26",
+  "vllm": {
+    "base_revision": "01f1b874c774b4fade087d5f311970ee53745e01",
+    "patch_series": "patches/vllm/series",
+    "patchset_sha256": "3f617ec6823e3b694743a865877d7a48b65c408fc619d25f5d07c86bb906f3d7",
+    "expected_tree": "0debe8533c8855a08432abfbfb4c95ec908afa22",
+    "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.vllm.tree matches",
+    "patch_head": "0ccd0f62525cb5e867aa323d8023ca226e0ea16c"
+  },
+  "b12x": {
+    "base_revision": "0f84621264a1eef19e5bcb195fd3fa4f168c2976",
+    "patch_series": "patches/b12x/series",
+    "patchset_sha256": "c1d1d1906d912a36bc131e3a3079a98ab66a59036b197ba0cd5e673c6466900a",
+    "patch_head": "3d2439944021c3dc41aa7a597aefc67232e9f563",
+    "expected_tree": "d661de3161ff474a92646974584d6f5eb1958f75",
+    "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.b12x.tree matches"
+  },
+  "runtime_foundation": {
+    "vllm_base_image_digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "vllm_base_source_revision": "af1c01499b289be555c475669ba50a88e96d846e",
+    "flashinfer_version": "0.6.18.post1",
+    "flashinfer_evidence": "installed in the runtime base image; not rebuilt",
+    "cutlass_revision": "cb4247394dd82148787aed73e5dc7cef33cbf862",
+    "cutlass_release_tag": "v4.7.1",
+    "cutlass_dsl_version": "4.6.2",
+    "cutlass_dsl_lockfile": "requirements/cutlass-dsl-aarch64.txt",
+    "build_recipe": "bin/spark3 build (docker/Dockerfile)",
+    "build_deployment_commit": null
+  },
+  "deployment_artifacts": {}
+}
