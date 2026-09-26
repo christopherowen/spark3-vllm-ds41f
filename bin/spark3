@@ -409,6 +409,68 @@ def fan_control_problems(node_name: str, facts: dict[str, str]) -> list[str]:
     return []
 
 
+def roce_gid_setting(cluster: dict, node: dict) -> tuple[int, list[str]]:
+    """The GID index B12X and NCCL are configured to use, and the node's HCAs."""
+    env = expected_environment(cluster, node)
+    index = int(env.get("B12X_ROCE_GID_INDEX") or env.get("NCCL_IB_GID_INDEX") or 3)
+    hcas = sorted({hca for peers in node["roce_peer_hcas"].values() for hca in peers})
+    return index, hcas
+
+
+def roce_gid_query(hcas: list[str]) -> str:
+    """Every populated GID slot of each HCA as `hca index type gid ndev`."""
+    return (
+        f"for d in {' '.join(shlex.quote(hca) for hca in hcas)}; do "
+        'p=/sys/class/infiniband/$d/ports/1; '
+        '[ -d $p ] || { echo "$d missing"; continue; }; '
+        'for g in $p/gids/*; do i=${g##*/}; '
+        't=$(cat $p/gid_attrs/types/$i 2>/dev/null | tr -d " "); [ -n "$t" ] || continue; '
+        'echo "$d $i $t $(cat $g) $(cat $p/gid_attrs/ndevs/$i 2>/dev/null)"; done; done'
+    )
+
+
+def roce_gid_problems(node_name: str, index: int, hcas: list[str], output: str) -> list[str]:
+    """Problems when an HCA's configured GID slot is not its IPv4 RoCE v2 address.
+
+    B12X and NCCL both use one fixed GID index. The kernel files a re-added
+    address in the lowest free slot, so a link flap while RDMA resources still
+    hold the old entry moves the IPv4 RoCE v2 GID (dgx3 moved from 3 to 4 when
+    its peers rebooted under a starting service), and NCCL then fails with an
+    unhandled system error.
+    """
+    slots: dict[str, dict[int, tuple[str, str, str]]] = {hca: {} for hca in hcas}
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) == 2 and fields[1] == "missing" and fields[0] in slots:
+            slots.pop(fields[0])
+        elif len(fields) >= 4 and fields[0] in slots and fields[1].isdigit():
+            ndev = fields[4] if len(fields) > 4 else ""
+            slots[fields[0]][int(fields[1])] = (fields[2], fields[3], ndev)
+    problems = []
+    for hca in hcas:
+        if hca not in slots:
+            problems.append(f"{node_name}: RDMA device {hca} is missing")
+            continue
+        entries = slots[hca]
+        kind, gid, _ = entries.get(index, ("", "", ""))
+        if kind == "RoCEv2" and gid.startswith("0000:0000:0000:0000:0000:ffff:"):
+            continue
+        found = [
+            (slot, ndev) for slot, (slot_kind, slot_gid, ndev) in sorted(entries.items())
+            if slot_kind == "RoCEv2" and slot_gid.startswith("0000:0000:0000:0000:0000:ffff:")
+        ]
+        where = (
+            f"its IPv4 RoCE v2 GID is at index {found[0][0]}; re-activate {found[0][1]} "
+            "with nmcli while nothing uses RDMA"
+            if found else "it has no IPv4 RoCE v2 GID"
+        )
+        problems.append(
+            f"{node_name}: {hca} GID index {index} is "
+            f"{kind + ' ' + gid if kind else 'empty'}; {where}"
+        )
+    return problems
+
+
 def live_doctor(cluster: dict, nodes: dict) -> list[str]:
     problems: list[str] = []
     name = cluster["container"]["name"]
@@ -420,6 +482,9 @@ def live_doctor(cluster: dict, nodes: dict) -> list[str]:
         facts = host_facts(remote_shell(nodes, node, HOST_FACTS_QUERY).stdout)
         problems.extend(modeset_problems(node["name"], facts))
         problems.extend(fan_control_problems(node["name"], facts))
+        gid_index, hcas = roce_gid_setting(cluster, node)
+        gids = remote_shell(nodes, node, roce_gid_query(hcas))
+        problems.extend(roce_gid_problems(node["name"], gid_index, hcas, gids.stdout))
         result = run_ssh(nodes, node, "docker", "inspect", name)
         if result.returncode:
             problems.append(f"{node['name']}: cannot inspect {name}: {result.stderr.strip()}")
@@ -596,6 +661,9 @@ def remote_runtime_problems(
             )
         if dirty:
             problems.append(f"{node['name']}: checkout has uncommitted files")
+        gid_index, hcas = roce_gid_setting(cluster, node)
+        gids = remote_shell(nodes, node, roce_gid_query(hcas))
+        problems.extend(roce_gid_problems(node["name"], gid_index, hcas, gids.stdout))
         doctor = run_ssh(
             nodes,
             node,

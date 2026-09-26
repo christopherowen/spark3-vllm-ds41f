@@ -134,5 +134,46 @@ class FanControlTest(unittest.TestCase):
         )
 
 
+HEALTHY_GIDS = """rocep1s0f0 0 IB/RoCEv1 fe80:0000:0000:0000:4ebb:47ff:fee9:7f2b enp1s0f0np0
+rocep1s0f0 1 RoCEv2 fe80:0000:0000:0000:4ebb:47ff:fee9:7f2b enp1s0f0np0
+rocep1s0f0 2 IB/RoCEv1 0000:0000:0000:0000:0000:ffff:c0a8:0202 enp1s0f0np0
+rocep1s0f0 3 RoCEv2 0000:0000:0000:0000:0000:ffff:c0a8:0202 enp1s0f0np0
+"""
+
+# dgx3 after its peers rebooted while a starting service held RDMA resources.
+SHIFTED_GIDS = """rocep1s0f0 0 IB/RoCEv1 fe80:0000:0000:0000:4ebb:47ff:fee9:7f2b enp1s0f0np0
+rocep1s0f0 1 RoCEv2 fe80:0000:0000:0000:4ebb:47ff:fee9:7f2b enp1s0f0np0
+rocep1s0f0 2 IB/RoCEv1 0000:0000:0000:0000:0000:ffff:c0a8:0202 enp1s0f0np0
+rocep1s0f0 4 RoCEv2 0000:0000:0000:0000:0000:ffff:c0a8:0202 enp1s0f0np0
+"""
+
+
+class RoceGidTest(unittest.TestCase):
+    def test_ipv4_roce_v2_at_the_configured_index_passes(self) -> None:
+        self.assertEqual(spark3.roce_gid_problems("dgx1", 3, ["rocep1s0f0"], HEALTHY_GIDS), [])
+
+    def test_shifted_gid_names_the_slot_and_interface(self) -> None:
+        problems = spark3.roce_gid_problems("dgx3", 3, ["rocep1s0f0"], SHIFTED_GIDS)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("rocep1s0f0 GID index 3 is empty", problems[0])
+        self.assertIn("index 4; re-activate enp1s0f0np0", problems[0])
+
+    def test_ipv6_roce_v2_at_the_index_is_reported(self) -> None:
+        problems = spark3.roce_gid_problems("dgx1", 1, ["rocep1s0f0"], HEALTHY_GIDS)
+        self.assertIn("GID index 1 is RoCEv2 fe80", problems[0])
+        self.assertIn("at index 3", problems[0])
+
+    def test_missing_device_and_missing_ipv4_are_reported(self) -> None:
+        output = "rocep1s0f1 missing\nrocep1s0f0 1 RoCEv2 fe80:0000:0000:0000:4ebb:47ff:fee9:7f2b enp1s0f0np0\n"
+        problems = spark3.roce_gid_problems("dgx2", 3, ["rocep1s0f0", "rocep1s0f1"], output)
+        self.assertEqual(
+            problems,
+            [
+                "dgx2: rocep1s0f0 GID index 3 is empty; it has no IPv4 RoCE v2 GID",
+                "dgx2: RDMA device rocep1s0f1 is missing",
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
