@@ -197,6 +197,13 @@
       "observed_revision": "7c3d2e1301429c765e4f959f62f592ed7fd1afbb",
       "added_to_watchlist": "2026-09-26",
       "role": "DGX Spark C++/CUDA inference engine serving native DS4.1 Flash at TP4 over RoCE; mechanisms only"
+    },
+    "tensorfold": {
+      "kind": "git-watch",
+      "url": "https://github.com/ashhart/TensorFold",
+      "observed_revision": "3283e59b0e205a579b4554d15d4107b9577fe685",
+      "added_to_watchlist": "2026-09-26",
+      "role": "exact-decoding engine (MLX/Metal, and CUDA on 1-2 DGX Sparks since 0.3.0); speculative-decoding exactness gate and draft selection only"
     }
   },
   "source_manifest": "manifests/sources/2026-09-25-karmic-kraken-r3-source.json"
