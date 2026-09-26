@@ -204,6 +204,13 @@
       "observed_revision": "3283e59b0e205a579b4554d15d4107b9577fe685",
       "added_to_watchlist": "2026-09-26",
       "role": "exact-decoding engine (MLX/Metal, and CUDA on 1-2 DGX Sparks since 0.3.0); speculative-decoding exactness gate and draft selection only"
+    },
+    "morrowmake_glm53_cmp170hx": {
+      "kind": "git-watch",
+      "url": "https://github.com/Morrowmake/glm53-flash-cmp170hx-recipe",
+      "observed_revision": "d319e5239980d8c76d8211e0d156a05cd51d50cb",
+      "added_to_watchlist": "2026-09-26",
+      "role": "GLM-5.3-Flash on 4x Ampere CMP 170HX with a vLLM fork; TP vs PP on limited links, determinism and release methods only"
     }
   },
   "source_manifest": "manifests/sources/2026-09-25-karmic-kraken-r3-source.json"
