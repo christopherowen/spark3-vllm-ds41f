@@ -113,6 +113,41 @@ default everywhere: `sudo grub-reboot '<submenu id>><entry id>' && sudo reboot`
 `ib_write_bw` run and a guarded service start. Any later reboot returns to
 GRUB's default.
 
+## GB10 GPU clock latch
+
+A GB10 GPU can latch far below its normal clock: it stays in P0 at about
+500-720 MHz and 10-14 W with no clock-event reason and no driver errors, and a
+three-node TP3 cluster with one latched node runs about 45% slower. Neither a
+warm reboot nor `nvidia-smi -lgc` clears it; removing AC power for one to five
+minutes does. It is widely reported on DGX Spark and other GB10 systems
+(NVIDIA developer forum threads 361294, 361296, 376039 and 376239), and is
+attributed to the embedded or USB-C power-delivery controller.
+
+dgx3 latched on 2026-09-26 across a warm reboot and ran at 520-565 MHz and
+about 10 W under load while dgx1 and dgx2 ran at about 2,400 MHz. Tests on the
+latched node isolate the ceiling below the driver:
+
+| Change on dgx3 | SM clock under 8-stream load |
+|---|---:|
+| none (display already disconnected, DPMS off) | 553-559 MHz |
+| framebuffer blanked | 556 MHz |
+| HDMI connector forced off, display inactive | 554 MHz |
+| `nvidia-smi -lgc 2400,3003` | 554 MHz (ignored) |
+
+It was not a power cap either: dgx3 had logged 3 s of software power capping
+against about four hours on dgx1. Firmware was identical on all three nodes
+(SMBIOS firmware inventory BIOS 5.36_0ACUM027, SoC 0x02009b0b, EC 0x03000508,
+PD 0x00000516). The latch appeared on the boot that first enabled nvidia-drm
+kernel mode setting, but it persists with the display off, so mode setting is
+not the cause. The reboot that preceded it was also the first on dgx3 after the
+fan-floor driver had been active, and on the latched boot the EC reported a
+fan lower floor of 0 instead of unset; dgx1 and dgx2 run the same driver and
+restore it on every reboot without latching, so that correlation is unproven.
+
+`bin/spark3 doctor --live` reports a serving node whose GPU clock is below
+1,000 MHz. To recover: stop the service (so the peers' RoCE GIDs cannot move),
+power the node off, remove AC power for at least a minute, and power it on.
+
 ## Recovery validation
 
 Recovery implementation commit `7f40db1` was installed on all three nodes on

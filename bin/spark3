@@ -357,6 +357,7 @@ printf 'fan_module=%s\\n' "$(grep -c '^dgx_ec_fan_control ' /proc/modules)"
 printf 'fan_cooling_device=%s\\n' "$(grep -lx dgx_ec_fan_floor /sys/class/thermal/cooling_device*/type 2>/dev/null | wc -l)"
 printf 'fan_service=%s/%s\\n' "$(systemctl is-enabled dgx-fan-control.service 2>/dev/null)" \\
   "$(systemctl is-active dgx-fan-control.service 2>/dev/null)"
+printf 'gpu=%s\\n' "$(nvidia-smi --query-gpu=clocks.sm,power.draw --format=csv,noheader,nounits 2>/dev/null | head -1)"
 """
 
 
@@ -471,6 +472,32 @@ def roce_gid_problems(node_name: str, index: int, hcas: list[str], output: str) 
     return problems
 
 
+LATCHED_CLOCK_MHZ = 1000
+
+
+def clock_latch_problems(node_name: str, facts: dict[str, str], serving: bool) -> list[str]:
+    """Problems when a serving GB10 GPU is held far below its normal clock.
+
+    With the service running, a healthy GB10 stays in P0 at about 2,400 MHz
+    even between requests. The known GB10 clock latch holds it at about
+    500-720 MHz and 10-14 W with no throttle reason; nvidia-smi -lgc and a warm
+    reboot do not clear it, removing AC power does (docs/recovery.md).
+    """
+    if not serving:
+        return []
+    clock, _, power = facts.get("gpu", "").partition(",")
+    try:
+        clock_mhz = float(clock)
+    except ValueError:
+        return [f"{node_name}: cannot read the GPU clock"]
+    if clock_mhz >= LATCHED_CLOCK_MHZ:
+        return []
+    return [
+        f"{node_name}: GPU clock is {clock_mhz:.0f} MHz at {power.strip() or '?'} W while serving; "
+        "the GB10 clock latch holds it there until AC power is removed (docs/recovery.md)"
+    ]
+
+
 def live_doctor(cluster: dict, nodes: dict) -> list[str]:
     problems: list[str] = []
     name = cluster["container"]["name"]
@@ -492,6 +519,9 @@ def live_doctor(cluster: dict, nodes: dict) -> list[str]:
         inspection = json.loads(result.stdout)[0]
         if not inspection["State"]["Running"]:
             problems.append(f"{node['name']}: container is not running")
+        problems.extend(
+            clock_latch_problems(node["name"], facts, bool(inspection["State"]["Running"]))
+        )
         if inspection["Config"]["Image"] != cluster["container"]["image"]:
             problems.append(
                 f"{node['name']}: image tag {inspection['Config']['Image']!r} differs"

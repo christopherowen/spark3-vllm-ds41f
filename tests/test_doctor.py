@@ -175,5 +175,25 @@ class RoceGidTest(unittest.TestCase):
         )
 
 
+class ClockLatchTest(unittest.TestCase):
+    def test_serving_node_at_full_clock_passes(self) -> None:
+        self.assertEqual(spark3.clock_latch_problems("dgx1", facts(gpu="2411, 11.47"), True), [])
+
+    def test_latched_serving_node_is_reported(self) -> None:
+        # dgx3 on 2026-09-26: 520-565 MHz at about 10 W, ignoring nvidia-smi -lgc.
+        problems = spark3.clock_latch_problems("dgx3", facts(gpu="559, 9.90"), True)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("GPU clock is 559 MHz at 9.90 W while serving", problems[0])
+
+    def test_idle_node_without_the_service_is_not_judged(self) -> None:
+        self.assertEqual(spark3.clock_latch_problems("dgx2", facts(gpu="208, 4.1"), False), [])
+
+    def test_unreadable_clock_is_reported(self) -> None:
+        self.assertEqual(
+            spark3.clock_latch_problems("dgx2", facts(gpu=""), True),
+            ["dgx2: cannot read the GPU clock"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
