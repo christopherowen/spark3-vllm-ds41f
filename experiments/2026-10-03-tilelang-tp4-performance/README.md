@@ -113,7 +113,7 @@ Every interval crosses zero; TileLang prefill is level with B12X, nominally
 
 ## Window
 
-Hold `tilelang-tp4-performance` on dgx1, 18:04–18:25 UTC, with a heartbeat.
+Hold `tilelang-tp4-performance` on dgx1, 18:09–18:25 UTC, with a heartbeat.
 Entry and exit inventories (`docker ps -a` on every node, and each shared
 checkout's commit) match: no serving container before or after, the unrelated
 stopped containers untouched, and the `spark3-ring4-qualification` checkouts
