@@ -12,6 +12,7 @@
     "-q",
     "-p",
     "no:cacheprovider",
+    "--noconftest",
     "tests/kernels/attention/test_deepseek_v41_tilelang.py",
     "tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py",
     "tests/kernels/moe/test_deepseek_v41_tilelang_moe.py"
