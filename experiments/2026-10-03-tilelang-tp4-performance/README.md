@@ -1,10 +1,12 @@
 # TileLang versus B12X at TP4
 
-**Status:** measured 2026-10-03 18:09–18:25 UTC. TileLang passes the quality
-gate and matches B12X on prefill, but decodes 5–10% slower: its single-stream
-step is 4.5–8.8% longer. A profile attributes the whole gap to the dense
-projection GEMMs at decode row counts; attention, the indexer and the routed
-experts are at parity or faster. B12X stays the faster backend at TP4 for now.
+**Status:** round 2 (2026-10-03 20:09–20:24 UTC): with the decode projections
+fixed, TileLang is level with or ahead of B12X at TP4: decode +1.4% to +4.2%
+except code at eight streams (−1.7%), single-stream steps 1.5–4.5% shorter,
+prefill +2.4% to +4.3% (all within noise), and 5.3 ms less main-stream kernel
+time per profiled decode step. Both arms ran with the DSpark heads at native
+BF16. Round 1 (18:09–18:25 UTC, NVFP4 drafter heads) found TileLang 5–10%
+slower and attributed the gap to the dense projections.
 
 A same-window performance screen of the TileLang kernel backend against its
 B12X twin on the four-node ring. Each arm is the matching tuning profile,
@@ -172,3 +174,46 @@ dgx2 and dgx3 with their logs. That was an error in the run script: it now
 inventories with `docker ps -a` and refuses to start over any existing serving
 container. The containers' definitions are reproducible from the promoted
 configuration.
+
+## Round 2: fixed projections, native drafter heads
+
+The decode projections were fixed in the [TileLang candidate](../2026-10-03-tilelang-kernels/README.md)
+(image `-r5o-roce-contract-tilelang-v4`). The audit of load-time weight
+quantization found that the DSpark draft head and Markov transition head
+re-quantize the checkpoint's BF16 tensors to NVFP4
+(`VLLM_DS41_DRAFT_NVFP4_HEAD`, `VLLM_DS41_MARKOV_NVFP4`), which the owner did
+not intend; both arms of round 2 run them at native BF16
+([round2-b12x.json](round2-b12x.json), [round2-tilelang.json](round2-tilelang.json)),
+each with fresh pinned cost curves. Every other weight is native or repacked
+losslessly. Summary: [round2-results.json](round2-results.json).
+
+| Case | B12X | TileLang | Change |
+| --- | ---: | ---: | ---: |
+| prose, 1 stream | 62.3 ± 25.3% | 63.1 ± 0.5% | +1.4% [−23.9, +26.6] |
+| prose, 8 streams | 213.3 ± 3.8% | 219.7 ± 0.2% | +3.0% [−0.8, +6.8] |
+| code, 1 stream | 78.1 ± 11.6% | 81.4 ± 0.3% | +4.2% [−7.4, +15.8] |
+| code, 8 streams | 246.0 ± 2.5% | 241.7 ± 0.6% | −1.7% [−4.3, +0.9] |
+
+Single-stream step: prose 33.66 → 33.15 ms, code 38.17 → 36.44 ms. Prefill:
+32K +4.3%, 64K +4.0%, 256K +2.4%. Quality 5/5 in both arms; no thermal
+slowdown; at least 30.0 GiB host memory available. TileLang's intervals are
+tight because its output is bit-reproducible run to run.
+
+Median kernel time per six-row decode step (rank 0 main stream):
+
+| Category | B12X | TileLang | Change |
+| --- | ---: | ---: | ---: |
+| Routed experts | 21.99 | 17.38 | −4.61 |
+| Dense projections | 2.27 | 2.44 | +0.17 (round 1: +3.39) |
+| Sparse MLA and indexer | 1.48 | 1.71 | +0.23 |
+| Collectives, shared kernels, quantization and norms | 10.91 | 9.83 | −1.08 |
+| Main stream total | 36.65 | 31.35 | −5.30 |
+
+Native drafter heads on B12X (round 2 against round 1, different windows):
+decode tok/s −3.5% to −3.8% at eight streams and level at one; accepted drafts
+per verified draft rise 2–10% in every case, within the three-sample noise.
+
+The step-end tail also showed the DSpark transition head on BF16 cuBLAS under
+TileLang (about 1.4 ms per step, against 0.42 ms with B12X's vocabulary row
+kernel): the logits processor enabled B12X's vocabulary projection only for
+the `b12x` linear backend. That is fixed in image v5; round 3 measures it.
