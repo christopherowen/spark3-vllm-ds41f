@@ -22,8 +22,8 @@ for a site node map. The generated configuration starts with launch disabled.
 
 The model compute kernels run on B12X. A [kernel backend policy](docs/kernel-backends.md)
 (`kernel_backend` in a cluster profile) lets a candidate select TileLang
-instead; the [TileLang candidate](experiments/2026-10-03-tilelang-kernels/README.md)
-is prepared but not yet built. Collectives and the checkpoint loader stay on
+instead; the [TileLang candidate](experiments/2026-10-03-tilelang-kernels/README.md),
+with TP3 and TP4 profiles that mirror the B12X ones, is prepared but not yet built. Collectives and the checkpoint loader stay on
 RoCEnante, NCCL and B12X under either backend.
 
 This repository is being promoted from a forensic capture of the running cluster

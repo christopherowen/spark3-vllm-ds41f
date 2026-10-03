@@ -3,30 +3,39 @@
   "captured_at": "2026-10-03",
   "vllm": {
     "base_revision": "04c30fa98e7917fee0a24c739ea503ce1e22538d",
-    "patch_series": "experiments/2026-10-03-tilelang-kernels/vllm/series",
-    "patchset_sha256": "d02c2080e8107e7cc0318e57766c057863be878521d5202fbe6d9c6fef4436c7",
-    "patch_head": "6b35216385cbc40c361970c3d0489e58e28cb628",
-    "expected_tree": "edbb8598c1ae84cbf7d82dafe49d35df5e3b86a9",
+    "patch_series": "experiments/2026-10-03-tilelang-kernels/tp4/vllm/series",
+    "patchset_sha256": "02f49962eb78ddc9dd6ddc41a97e532dca23d63b2ee4d22a55a2d3421aff7979",
+    "expected_tree": "151600709e4a2c1ddf038851dcf2fb4a81f11bab",
     "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.vllm.tree matches",
+    "patch_head": "bd188b66aca1fa7e10ded394698deeae5190b47b",
     "capabilities": [
       "tilelang-kernels"
     ]
   },
   "b12x": {
     "base_revision": "f8069b2c0be1311df3b112591c6b8876a843f8be",
-    "patch_series": "patches/b12x/series",
-    "patchset_sha256": "af9b4e3a09887bb9912a63b3450f2b797891bafda382df014c5187875413d3db",
-    "patch_head": "bb40849faeede0330ed0ee4f52188a58177121cb",
-    "expected_tree": "1a8b9401584ada0372939df49e658c3dbeae7658",
-    "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.b12x.tree matches"
+    "patch_series": "experiments/2026-10-03-balanced-policy/b12x/series",
+    "patchset_sha256": "a87ed7966b4e1b6ee2c61a207f05013d5ac81ca10028daa10164c8bea483cacf",
+    "patch_head": "abe4b2afd7b60e2699bf4a62ac8543ed63d1d937",
+    "expected_tree": "cd615bd69ed1a99d6b59217329a3ff429b5277fe",
+    "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.b12x.tree matches",
+    "capabilities": [
+      "rocenante-ring4",
+      "rocenante-mesh4",
+      "rocenante-mesh4-fourpaths",
+      "rocenante-ring4-bidirectional"
+    ]
   },
   "nccl": {
     "base_revision": "73cf112295c33aee2b895f329f592f2a9b4b0f97",
-    "patch_series": "patches/nccl/series",
-    "patchset_sha256": "d567a3da7ce225471fcbc3e7f64c58ac28a24bbc34ac43bf3e560277c5edba68",
-    "patch_head": "7522cb27e30c4370ebc62b20f45826c7f0962588",
-    "expected_tree": "47687d2a75b06fdff1b752dbf08bb87f12ca98bb",
-    "verification": "bin/spark3 build prepare applies the series to the pinned tag and checks this patch head and tree; image label local.spark3.nccl.tree matches, and the image build checks the installed libnccl.so.2 against the built one"
+    "patch_series": "experiments/2026-10-03-balanced-policy/nccl-adaptive/series",
+    "patchset_sha256": "06f133b1709622d64b0ab87fc32f29d167f4617ca9386117596008d400a8d40c",
+    "patch_head": "eeacf1c6343f0499e4e7ab20ec7eecfb6f62eda6",
+    "expected_tree": "6af10aa730a64fcee8781d62340a9c9184e79469",
+    "verification": "bin/spark3 build prepare applies the series to the pinned tag and checks this patch head and tree; image label local.spark3.nccl.tree matches, and the image build checks the installed libnccl.so.2 against the built one",
+    "capabilities": [
+      "switchless-bidirectional-ring"
+    ]
   },
   "tilelang": {
     "base_revision": "b95ee4ffb52ae26e15619cad38c6f41e7e0a2b46",

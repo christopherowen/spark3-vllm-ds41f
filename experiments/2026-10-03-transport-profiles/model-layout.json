@@ -20,6 +20,14 @@
     {
       "vllm": "eddc36748f26903f27fc81eefe5435b0348dcf57",
       "b12x": "cd615bd69ed1a99d6b59217329a3ff429b5277fe"
+    },
+    {
+      "vllm": "e9e04990ef8ec0be589ce0fd122bc9914c6c7a8e",
+      "b12x": "1a8b9401584ada0372939df49e658c3dbeae7658"
+    },
+    {
+      "vllm": "151600709e4a2c1ddf038851dcf2fb4a81f11bab",
+      "b12x": "cd615bd69ed1a99d6b59217329a3ff429b5277fe"
     }
   ],
   "checkpoint_config": "experiments/2026-10-03-transport-profiles/checkpoint-config.json",

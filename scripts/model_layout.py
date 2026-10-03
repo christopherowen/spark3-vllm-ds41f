@@ -37,6 +37,23 @@ def bf16_storage(rows: int, columns: int) -> dict:
     return {"logical_shape": [rows, columns], "bf16_bytes": rows * columns * 2}
 
 
+def kernel_scratch(cluster: dict, expert: int, alignment: dict) -> dict:
+    """Routed-expert scratch alignment of the selected kernel family (B12X unless named)."""
+    if cluster.get("kernel_backend", "b12x") == "tilelang":
+        return {
+            "compact_moe_n64_path": False,
+            "compact_moe_intermediate_width_when_selected": None,
+            "note": "TileLang's routed-expert GEMMs read K in blocks of 128, or of 192 or 64 when 128 does not divide "
+                    "the per-rank width (TP4's 576), so neither weights nor scratch are padded.",
+        }
+    compact = expert % 128 == 64
+    return {
+        "compact_moe_n64_path": compact,
+        "compact_moe_intermediate_width_when_selected": round_up(expert, alignment["compact_moe_intermediate_channels"]) if compact else None,
+        "note": "Scratch alignment is not expert weight padding; actual kernel selection also depends on routed rows.",
+    }
+
+
 def describe(root: Path, cluster: dict, capacity_bytes: int) -> dict:
     raw = (root / LAYOUT_PATH).read_bytes()
     audit = json.loads(raw)
@@ -172,11 +189,7 @@ def describe(root: Path, cluster: dict, capacity_bytes: int) -> dict:
             ] if nvfp4_head or nvfp4_markov else [],
             "storage_note": "Serialized tensor storage only: excludes scalar scales, allocator rounding and plan-dependent GEMM workspaces. A BF16 draft head is the target head's own tensor, not a second copy. Activation examples use actual head input rows, not necessarily the scheduled batch rows.",
         },
-        "kernel_scratch": {
-            "compact_moe_n64_path": expert % 128 == 64,
-            "compact_moe_intermediate_width_when_selected": round_up(expert, alignment["compact_moe_intermediate_channels"]) if expert % 128 == 64 else None,
-            "note": "Scratch alignment is not expert weight padding; actual kernel selection also depends on routed rows.",
-        },
+        "kernel_scratch": kernel_scratch(cluster, expert, alignment),
         "scheduled_rows": {
             "target_graph_capacities": graph_sizes,
             "target_exact_low_concurrency_graphs": [

@@ -1,0 +1,354 @@
+{
+  "schema_version": 1,
+  "generated_from_baseline": "2026-10-02-karmic-kraken-r5o-64k",
+  "sources": {
+    "vllm": {
+      "kind": "git",
+      "upstream": "https://github.com/local-inference-lab/vllm.git",
+      "contribution_remote": "https://github.com/christopherowen/vllm.git",
+      "tracking_ref": "refs/heads/integration/karmic-kraken-beta",
+      "revision": "04c30fa98e7917fee0a24c739ea503ce1e22538d",
+      "revision_url": "https://github.com/local-inference-lab/vllm/commit/04c30fa98e7917fee0a24c739ea503ce1e22538d",
+      "role": "serving source: Local Inference Lab's DS4.1 integration branch, used unchanged; canonical vllm-project/vllm main is parked",
+      "patch_series": "experiments/2026-10-03-tilelang-kernels/tp4/vllm/series",
+      "canonical_base": {
+        "upstream": "https://github.com/vllm-project/vllm.git",
+        "revision": "0f8fa53acf43a9a6a7a1f7e6b196950c78cd6d7a"
+      }
+    },
+    "vllm_base_image": {
+      "kind": "oci",
+      "upstream": "docker.io/vllm/vllm-openai",
+      "tag": "nightly-af1c01499b289be555c475669ba50a88e96d846e",
+      "source_revision": "af1c01499b289be555c475669ba50a88e96d846e",
+      "recorded_base_digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+      "role": "CUDA 13.0.2 and vLLM runtime base"
+    },
+    "b12x": {
+      "kind": "git",
+      "upstream": "https://github.com/local-inference-lab/b12x.git",
+      "contribution_remote": null,
+      "tracking_ref": "refs/heads/integration/karmic-kraken-beta",
+      "revision": "f8069b2c0be1311df3b112591c6b8876a843f8be",
+      "revision_url": "https://github.com/local-inference-lab/b12x/commit/f8069b2c0be1311df3b112591c6b8876a843f8be",
+      "applied_upstream_commits": [],
+      "role": "DeepSeek V4.1 kernels and RoCE collectives",
+      "patch_series": "experiments/2026-10-03-balanced-policy/b12x/series"
+    },
+    "nccl": {
+      "kind": "git",
+      "upstream": "https://github.com/NVIDIA/nccl.git",
+      "contribution_remote": null,
+      "tracking_ref": "refs/tags/v2.30.7-1",
+      "revision": "73cf112295c33aee2b895f329f592f2a9b4b0f97",
+      "revision_url": "https://github.com/NVIDIA/nccl/commit/73cf112295c33aee2b895f329f592f2a9b4b0f97",
+      "role": "NCCL 2.30.7, the runtime base image's version, rebuilt for SM121 with the IB send-path fence fix; replaces the nvidia-nccl-cu13 wheel's libnccl.so.2",
+      "patch_series": "experiments/2026-10-03-balanced-policy/nccl-adaptive/series"
+    },
+    "tilelang": {
+      "kind": "git",
+      "upstream": "https://github.com/tile-ai/tilelang.git",
+      "contribution_remote": "https://github.com/christopherowen/tilelang.git",
+      "tracking_ref": "refs/heads/main",
+      "revision": "b95ee4ffb52ae26e15619cad38c6f41e7e0a2b46",
+      "revision_url": "https://github.com/tile-ai/tilelang/commit/b95ee4ffb52ae26e15619cad38c6f41e7e0a2b46",
+      "version": "0.1.15",
+      "submodules": true,
+      "role": "TileLang 0.1.15 compiler for the TileLang kernel backend, built from source with SM120-family block-scaled MMA patches; replaces the base image's tilelang 0.1.12",
+      "patch_series": "patches/tilelang/series"
+    },
+    "tile_kernels": {
+      "kind": "git",
+      "upstream": "https://github.com/deepseek-ai/TileKernels.git",
+      "contribution_remote": null,
+      "tracking_ref": "refs/heads/main",
+      "revision": "66258df6175d2f630ffecb04c5ab66bff8a2ae6a",
+      "revision_url": "https://github.com/deepseek-ai/TileKernels/commit/66258df6175d2f630ffecb04c5ab66bff8a2ae6a",
+      "version": "2.0.0",
+      "role": "DeepSeek's TileLang kernels (pure Python, release 2.0.0) for the TileLang kernel backend; used unchanged"
+    },
+    "flashinfer": {
+      "kind": "git",
+      "upstream": "https://github.com/flashinfer-ai/flashinfer.git",
+      "contribution_remote": null,
+      "tracking_ref": "refs/heads/main",
+      "revision": "07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
+      "revision_url": "https://github.com/flashinfer-ai/flashinfer/commit/07869c61ba581e6d6b8ad8d142f4a6c89b707cc1",
+      "submodules": true,
+      "role": "not a build input of the promoted image (FlashInfer 0.6.18.post1 comes from the runtime base image); tracked for upstream review only"
+    },
+    "cutlass": {
+      "kind": "git",
+      "upstream": "https://github.com/NVIDIA/cutlass.git",
+      "contribution_remote": null,
+      "tracking_ref": "refs/heads/main",
+      "revision": "cb4247394dd82148787aed73e5dc7cef33cbf862",
+      "revision_url": "https://github.com/NVIDIA/cutlass/commit/cb4247394dd82148787aed73e5dc7cef33cbf862",
+      "release_tag": "v4.7.1",
+      "role": "CUTLASS headers for the SM121 _C_stable_libtorch and _moe_C_stable_libtorch rebuild"
+    },
+    "cutlass_dsl": {
+      "kind": "pypi-wheel-set",
+      "upstream": "https://pypi.org/project/nvidia-cutlass-dsl/4.7.1/",
+      "version": "4.7.1",
+      "lockfile": "requirements/cutlass-dsl-aarch64.txt",
+      "role": "CuTe DSL compiler and CUDA 12/13 runtime libraries; required at 4.7.1 by vLLM and at >=4.7 by quack-kernels, used by B12X (pin moved by patch 0002), FlashInfer and the cuDNN frontend"
+    },
+    "model": {
+      "kind": "huggingface",
+      "upstream": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash",
+      "repository": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+      "release_note": "https://www.deepseek.com/en/news/deepseek-v4-1-flash/",
+      "technical_report": "https://arxiv.org/abs/2609.19969",
+      "technical_report_artifact": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/dba1be0a40aa45a94ad051997016db3960a90277/DeepSeek_V41_Tech_Report.pdf",
+      "technical_report_sha256": "ba68e2e40408125ae6d2f63a9a241b61c73910691c74ec1a2a7023c851eac08d",
+      "role": "unchanged native FP8/FP4 weights and tokenizer"
+    }
+  },
+  "references": {
+    "mia_sglang_ds41f_sparks": {
+      "kind": "git-watch",
+      "url": "https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-DGX-Sparks",
+      "observed_revision": "6b40a5e105ed466463af65fa2e51bbd28c6c017d",
+      "added_to_watchlist": "2026-09-20",
+      "role": "SGLang comparison for multi-Spark launch, tuning, benchmark methodology, and native-weight performance"
+    },
+    "sfxnz_ds41f_exl3_vllm_2x": {
+      "kind": "git-watch",
+      "url": "https://github.com/sfxnz/DeepSeek-V4.1-Flash-EXL3-vLLM-2x-DGX-Spark",
+      "observed_revision": "45d330336f0adc28012147dc054750df8c580313",
+      "added_to_watchlist": "2026-09-24",
+      "role": "disk-Engram host-path fixes, GB10 memory hygiene, and one-lever-per-boot measurement discipline on vLLM TP2; EXL3 2-bit experts and an MXFP8 LM head change quality and are not deployment inputs"
+    },
+    "tpurtell_ds41rt": {
+      "kind": "git-watch",
+      "url": "https://github.com/tpurtell/ds41rt",
+      "observed_revision": "58d929c517d5a3655403f6145f13cb0ea784d08f",
+      "observed_tag": "v14",
+      "added_to_watchlist": "2026-09-24",
+      "role": "native DeepSeek V4.1 Flash runtime with an RTX coordinator and DGX Spark expert workers; verification-cycle and host-synchronization mechanisms, dSpark policy, and A/B release methodology; not a vLLM/B12X source"
+    },
+    "cudafast_qwen38_engine": {
+      "kind": "git-watch",
+      "url": "https://github.com/Layr-Labs/cudafast-qwen38-125b-a6b-engine",
+      "observed_revision": "5707d4f23362a7208483028e6d34519267266729",
+      "added_to_watchlist": "2026-09-24",
+      "role": "engine for the cuda.fast single-DGX-Spark optimization challenge (Qwen 3.8 Flash); GB10 decode, prefill, and speculative-decoding techniques under a sealed benchmark harness; different model"
+    },
+    "mia_exl3_ds41f_2x": {
+      "kind": "git-watch",
+      "url": "https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-EXL3-2x-DGX-Sparks",
+      "added_to_watchlist": "2026-09-20",
+      "role": "EXL3 performance and memory reference; quality-changing quantization is not a deployment input"
+    },
+    "mia_dspark_dsv4_2x": {
+      "kind": "git-watch",
+      "url": "https://github.com/MiaAI-Lab/DeepSeek-v4-Flash-DSpark-2x-DGX-Spark",
+      "added_to_watchlist": "2026-09-20",
+      "role": "DSpark speculative-decoding and DGX Spark tuning ideas to evaluate against upstream vLLM"
+    },
+    "rhys_ds41f_spark8": {
+      "kind": "git-watch",
+      "url": "https://github.com/rhys101/DeepSeek-V4.1-Flash-vLLM-DGX-Spark-8",
+      "observed_revision": "3ac7546756b86af18728485925c783b54023f803",
+      "added_to_watchlist": "2026-09-20",
+      "role": "eight-Spark native-prefill, resident-Engram, RoCE scaling, long-context acceptance, and earlier-vLLM reference; current headline results use SGLang"
+    },
+    "knapcio_ds41f_spark4_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/knapcio/DeepSeek-V4.1-Flash-4x-DGX-Spark-TP4",
+      "observed_revision": "f28d39ebe0596ecaf121dc730c60d9f284df283f",
+      "added_to_watchlist": "2026-09-20",
+      "role": "four-Spark native-weight SGLang TP4 performance, long-context, Engram, prefill, transport, and quality reference; not a vLLM TP3 deployment input"
+    },
+    "jspark3_deepseek": {
+      "kind": "git-watch",
+      "url": "https://github.com/jakejharris/jspark3-deepseek",
+      "reference": "v2.0.1",
+      "added_to_watchlist": "2026-09-20",
+      "role": "three-Spark topology, operations, and benchmark comparison"
+    },
+    "spark_vllm_docker": {
+      "kind": "git-watch",
+      "url": "https://github.com/eugr/spark-vllm-docker",
+      "added_to_watchlist": "2026-09-20",
+      "role": "DGX Spark container packaging and CUDA, NCCL, PyTorch, and vLLM version reconnaissance"
+    },
+    "glm_switchless_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/jnardiello/GLM-5.3-Flash-FP8-4-DGX-Spark-Switchless",
+      "observed_revision": "ee2ad05a3c8ca41347a5e1dd545ceb5e9fba7972",
+      "added_to_watchlist": "2026-09-20",
+      "role": "four-node switchless topology and profiling reference; GLM-specific changes are not deployment inputs"
+    },
+    "tonyd2wild_glm53_nvfp4_spark4_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/tonyd2wild/GLM-5.3-Flash-NVFP4-1M-KV-4x-DGX-Spark",
+      "observed_revision": "2ac4e8dd661b12e6a1d7e69df711707abd6b9cd4",
+      "added_to_watchlist": "2026-09-21",
+      "role": "four-Spark GB10 memory, startup, concurrency, CUDA-graph, DFlash2, and long-context methodology reference; GLM TP4 and NVFP4 changes are not deployment inputs"
+    },
+    "oomwrap": {
+      "kind": "git-watch",
+      "url": "https://github.com/osolmaz/oomwrap",
+      "added_to_watchlist": "2026-09-20",
+      "role": "memory-pressure supervision ideas for comparison with the repository's systemd memguard"
+    },
+    "deepseek_harness": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/deepseek-harness",
+      "observed_revision": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+      "added_to_watchlist": "2026-09-20",
+      "role": "official end-to-end agent, tool-call, reasoning, and multimodal compatibility workload; not a serving microbenchmark"
+    },
+    "deepseek_flashmla": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/FlashMLA",
+      "observed_revision": "ba89a3466e9470ad08ab39738d4e7bb66989e1e7",
+      "added_to_watchlist": "2026-09-20",
+      "role": "official DeepSeek V4.1 attention-kernel semantics and performance reference"
+    },
+    "vllm_recipes": {
+      "kind": "git-watch",
+      "url": "https://github.com/vllm-project/recipes",
+      "observed_revision": "7918dcde8a706ef09bc4a708186012661abe2077",
+      "added_to_watchlist": "2026-09-20",
+      "role": "upstream DeepSeek V4.1 serving recipe and current model-feature guidance"
+    },
+    "joesinvestments_glm53_humming_spark4_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/joesinvestments/GLM-5.3-Flash-Uncensored-Humming-4x-DGX-Spark",
+      "observed_revision": "c02754f9001334358eadbff62bf2a64ecb983316",
+      "added_to_watchlist": "2026-09-24",
+      "role": "vLLM main plus Humming build with a checksum-verified v0.30 rollback, measured cost of tracking main, per-stack quality probes, safe lab lane and agent-session benchmark methodology; GLM TP4, NVFP4 and uncensored-checkpoint specifics are not deployment inputs"
+    },
+    "hawkbearpig_dgpp": {
+      "kind": "git-watch",
+      "url": "https://github.com/HawkBearPig/dgpp",
+      "observed_revision": "7c3d2e1301429c765e4f959f62f592ed7fd1afbb",
+      "added_to_watchlist": "2026-09-26",
+      "role": "DGX Spark C++/CUDA inference engine serving native DS4.1 Flash at TP4 over RoCE; mechanisms only"
+    },
+    "tensorfold": {
+      "kind": "git-watch",
+      "url": "https://github.com/ashhart/TensorFold",
+      "observed_revision": "3283e59b0e205a579b4554d15d4107b9577fe685",
+      "added_to_watchlist": "2026-09-26",
+      "role": "exact-decoding engine (MLX/Metal, and CUDA on 1-2 DGX Sparks since 0.3.0); speculative-decoding exactness gate and draft selection only"
+    },
+    "morrowmake_glm53_cmp170hx": {
+      "kind": "git-watch",
+      "url": "https://github.com/Morrowmake/glm53-flash-cmp170hx-recipe",
+      "observed_revision": "d319e5239980d8c76d8211e0d156a05cd51d50cb",
+      "added_to_watchlist": "2026-09-26",
+      "role": "GLM-5.3-Flash on 4x Ampere CMP 170HX with a vLLM fork; TP vs PP on limited links, determinism and release methods only"
+    },
+    "raspy135_ds41f_spark2": {
+      "kind": "git-watch",
+      "url": "https://github.com/raspy135/deepseek-v41-flash-spark_dual",
+      "observed_revision": "a345145054b6ed0428cf80232b60f3011149bee1",
+      "added_to_watchlist": "2026-09-27",
+      "role": "two-Spark DS4.1 Flash engine; adaptive draft depth, dual-rail prefill, persistent prefix cache and RoCE GID notes only; expert pruning changes output"
+    },
+    "mmastrac_glm53_gx10_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/kindlingai/glm-5.3-flash-gx10",
+      "observed_revision": "a3c3a1d7b2155e2e6ddc8d586d9999d27580c78e",
+      "added_to_watchlist": "2026-09-28",
+      "role": "GLM-5.3-Flash NVFP4 on GX10 (GB10) at TP 2/3/4/6 (formerly mmastrac/glm-5.3-flash-4x-gx10); TP3 zero-padding, switchless ring, dual-PCIe-root collectives, snapshots and adaptive draft length reference only"
+    },
+    "jayleaton_glm53_tensorfold_spark2": {
+      "kind": "git-watch",
+      "url": "https://github.com/jayleaton/glm53-tensorfold-spark",
+      "observed_revision": "defa6e7c7ce92a40582ff1c2986719739fbf8003",
+      "added_to_watchlist": "2026-09-28",
+      "role": "GLM-5.3-Flash on 2x Sparks with TensorFold; prepared-weight restarts, byte-exact drafting check, session caching and memory stress methods only; abliterated and requantized weights"
+    },
+    "drowzeys_ds41f_tr3_hybrid_spark4": {
+      "kind": "git-watch",
+      "url": "https://github.com/drowzeys/keys-DeepSeekV4.1-Flash-TR3-Hybrid-1M-Context-8M-KV-Four-DGX-Sparks-with-abliterated-option",
+      "observed_revision": "4b69803bf6eca380a775e40b322ac2542dae3a59",
+      "added_to_watchlist": "2026-09-28",
+      "role": "DS4.1 TR3-Hybrid quant (EXL3 K3 tail, native MXFP4 keep experts) on 4x Sparks TP4 with 1M context; large-sample KLD fidelity gate, batched-token versus KV-pool trade and MoE block_m sweeps only; quality-changing and abliterated weights"
+    },
+    "joesinvestments_glm53_redhat_humming_spark4_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/joesinvestments/GLM-5.3-Flash-RedHat-NVFP4-vLLM-Humming-4x-DGX-Spark",
+      "observed_revision": "b10a507aca3dc9b4b8fe007558b0f3f5914f81a8",
+      "added_to_watchlist": "2026-09-29",
+      "role": "GLM-5.3-Flash TP4 on vLLM main plus Humming; long-reply corruption check, indexer workspace and kpool ring fixes, NCCL RoCE fence fix and measurement lessons only; weights, drafter and flags are not deployment inputs"
+    },
+    "deepseek_deepgemm": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/DeepGEMM",
+      "observed_revision": "057ca5964aae0879ff2e0eb71ee05a3cb0ba3df7",
+      "added_to_watchlist": "2026-09-30",
+      "role": "official DeepSeek GEMM, MoE, indexer, gate and mHC kernels (SM90/SM100); numerics and fusion design reference"
+    },
+    "deepseek_deepep": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/DeepEP",
+      "observed_revision": "93eb6eb238127e96c6d7a4a625a6dad158348509",
+      "added_to_watchlist": "2026-09-30",
+      "role": "official DeepSeek communication library V2.5; Engram buffering, batched collectives and NCCL Gin reference"
+    },
+    "deepseek_tilekernels": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/TileKernels",
+      "observed_revision": "66258df6175d2f630ffecb04c5ab66bff8a2ae6a",
+      "added_to_watchlist": "2026-09-30",
+      "role": "official DeepSeek TileLang kernels (SM90/SM100); Engram gate, mHC, routing and quantization semantics reference"
+    },
+    "deepseek_deepselect": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/DeepSelect",
+      "observed_revision": "bfa4507d935f17ebfc3d0f00ff7d3c9a4d0e5c18",
+      "added_to_watchlist": "2026-09-30",
+      "role": "official DeepSeek DSA indexer and sampler top-k kernels; selection semantics and algorithm reference"
+    },
+    "deepseek_deepjit": {
+      "kind": "git-watch",
+      "url": "https://github.com/deepseek-ai/DeepJIT",
+      "observed_revision": "3732a3b9a0a2e5126396908a362ba5abdf043b2f",
+      "added_to_watchlist": "2026-09-30",
+      "role": "official DeepSeek JIT runtime; JIT cache keying, cross-node sharing and warmup reference"
+    },
+    "ptx_gym": {
+      "kind": "git-watch",
+      "url": "https://github.com/francois141/ptx_gym",
+      "observed_revision": "ee0310c93fc8cf94cac53f5ee9097544e0522dc3",
+      "added_to_watchlist": "2026-09-30",
+      "role": "PTX candidate evaluation environment (sanitizer, reference comparison, profiling); kernel-gate methodology reference"
+    },
+    "kindlingai_glm53_full_exl3_tp6": {
+      "kind": "git-watch",
+      "url": "https://github.com/kindlingai/glm-5.3-full-exl3-tp6",
+      "observed_revision": "0ecf21ebcccd924f7f7c47eda0333282d8e177f5",
+      "added_to_watchlist": "2026-09-30",
+      "role": "full GLM-5.3 EXL3 on six or four Sparks; expert re-fragmenting, head padding, small-message RoCE collectives and fast loading reference"
+    },
+    "othexmr_glm53_ringside_spark4_tp4": {
+      "kind": "git-watch",
+      "url": "https://github.com/othexmr/GLM-5.3-Flash-NVFP4-2x-4x-DGX-Sparks-RiNGSiDE",
+      "observed_revision": "6606f7638aff044a8170e414818477679934a1c3",
+      "added_to_watchlist": "2026-09-30",
+      "role": "GLM-5.3-Flash NVFP4 on two or four ring-cabled switchless Sparks; ring collectives, served-file provenance, indexer split and long-context correctness-fix reference"
+    },
+    "blake_snc_sm121_kernels": {
+      "kind": "git-watch",
+      "url": "https://github.com/blake-snc/sm121-kernels",
+      "observed_revision": "e5a28a311bf63c6e2f1a0e7ca5bc84b62b5af33f",
+      "added_to_watchlist": "2026-10-01",
+      "role": "hand-written PTX kernels for SM121; deterministic split-K GEMV/GEMM, batched verify GEMM bit-identical to one-row decode, FP8 flash attention and architecture notes"
+    },
+    "sparkring": {
+      "kind": "git-watch",
+      "url": "https://github.com/FujitsuPolycom/sparkring",
+      "observed_revision": "4efccc83ef53887f31a053e295f78bb8be8ac749",
+      "added_to_watchlist": "2026-10-02",
+      "role": "ConnectX-7 hardware forwarding for a four-node switchless ring; network mechanism only"
+    }
+  },
+  "source_manifest": "experiments/2026-10-03-tilelang-kernels/tp4/source.json"
+}

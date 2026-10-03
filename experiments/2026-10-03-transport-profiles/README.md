@@ -41,6 +41,9 @@ the resolved graph/transport settings. Generated configs retain this report
 inside `tuning_origin`. It is documentation/provenance; serving does not read
 it as a second set of padding controls. The source audit is checked against
 the selected vLLM/B12X tree pair and mounted model snapshot before reporting.
+It also lists the [TileLang candidate's](../2026-10-03-tilelang-kernels/README.md)
+trees: its vLLM patch changes kernels, not padding or sharding, and the report's
+kernel scratch follows the profile's `kernel_backend`.
 
 | Model dimension | TP3 | TP4 |
 | --- | --- | --- |

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "tp3": {
+      "base_config": "experiments/2026-10-03-tilelang-kernels/tp3/cluster.json",
+      "base_sha256": "1b71942f16a2a82dd2ed60ac5b6c73d546be6f41634e4752187007b59808ef84",
+      "status": "TileLang kernels on the promoted TP3 settings; physical triangle required. Image build and qualification pending.",
+      "node_count": 3,
+      "transport": "rocenante-direct",
+      "rocenante": {
+        "VLLM_ROCE_ALLREDUCE_MAX_SIZE": "2MB",
+        "VLLM_ROCE_ALLGATHER_MAX_SIZE": "4MB",
+        "B12X_ROCE_ALLREDUCE_DISPATCH_MAX_BYTES": null,
+        "B12X_ROCE_SPIN_LIMIT": "5000000"
+      },
+      "nccl": {
+        "NCCL_MIN_NCHANNELS": null,
+        "NCCL_MAX_NCHANNELS": "8",
+        "NCCL_BUFFSIZE": "1048576",
+        "NCCL_LL128_BUFFSIZE": "262144",
+        "NCCL_PROTO": "^LL128",
+        "NCCL_SWITCHLESS_BIDIRECTIONAL": null,
+        "NCCL_MIN_TRAFFIC_PER_CHANNEL": null,
+        "NCCL_THREAD_THRESHOLDS": null
+      }
+    },
+    "tp4": {
+      "base_config": "experiments/2026-10-03-tilelang-kernels/tp4/cluster.json",
+      "base_sha256": "e0333a33baecc00929e1d6656e4ce7d1a0aa3d3008d45762b676108aff07ebbd",
+      "status": "TileLang kernels on the TP4 candidate's balanced transport and policy adapter. Image build and qualification pending.",
+      "node_count": 4,
+      "transport": "rocenante-ring4",
+      "rocenante": {
+        "VLLM_ROCE_ALLREDUCE_MAX_SIZE": "2MB",
+        "VLLM_ROCE_ALLGATHER_MAX_SIZE": "2MB",
+        "B12X_ROCE_ALLREDUCE_DISPATCH_MAX_BYTES": "1048576",
+        "B12X_ROCE_SPIN_LIMIT": "5000000"
+      },
+      "nccl": {
+        "NCCL_MIN_NCHANNELS": "4",
+        "NCCL_MAX_NCHANNELS": "4",
+        "NCCL_BUFFSIZE": "4194304",
+        "NCCL_LL128_BUFFSIZE": "262144",
+        "NCCL_PROTO": "^LL128",
+        "NCCL_SWITCHLESS_BIDIRECTIONAL": "2",
+        "NCCL_MIN_TRAFFIC_PER_CHANNEL": "512",
+        "NCCL_THREAD_THRESHOLDS": "-2 -2 -2 1 1 1"
+      }
+    }
+  }
+}

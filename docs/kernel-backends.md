@@ -7,7 +7,7 @@ drafter), linear layers and MoE. Omitting it selects `b12x`.
 | Backend | Status | Kernel sources |
 | --- | --- | --- |
 | `b12x` | promoted: `config/cluster.json` and both [page-size profiles](memory-profiles.md) | B12X in the promoted image |
-| `tilelang` | [candidate](../experiments/2026-10-03-tilelang-kernels/README.md), not built | TileLang 0.1.15 with `patches/tilelang`, DeepSeek's TileKernels 2.0.0, and the DS4.1 TileLang kernels as an extra vLLM patch |
+| `tilelang` | [candidate](../experiments/2026-10-03-tilelang-kernels/README.md) for TP3 and TP4, not built | TileLang 0.1.15 with `patches/tilelang`, DeepSeek's TileKernels 2.0.0, and the DS4.1 TileLang kernels as an extra vLLM patch |
 
 ## What it does not select
 
@@ -55,6 +55,15 @@ A TileLang profile, launch disabled until qualified, needs:
 Doctor rejects a TileLang profile that lacks any of these. A B12X profile needs
 none of them, and a lock that lists neither source builds exactly as before.
 The two sources are built together; a lock listing only one is rejected.
+
+The candidate has one profile per topology, each the B12X configuration of that
+topology with only the policy, image and sources changed: `tp3` mirrors the
+promoted TP3 profile and `tp4` the TP4 candidate. Its tuning catalog
+(`experiments/2026-10-03-tilelang-kernels/profiles.json`) repeats the B12X
+catalog's transport settings, so `bin/spark3 tuning --profiles-config <catalog>
+create tp3|tp4` materializes TileLang configurations exactly as the B12X ones
+are. A TP4 profile keeps its own pinned DSpark cost directory: the curves are
+keyed by shapes, not by kernel family.
 
 ## Image
 

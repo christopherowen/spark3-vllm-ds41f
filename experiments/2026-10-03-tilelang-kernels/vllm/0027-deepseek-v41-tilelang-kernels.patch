@@ -1,4 +1,4 @@
-From dd8f0a4c8fb5917ffe06b99ffde6edd22c60cc7d Mon Sep 17 00:00:00 2001
+From ddb79610fc0b49b2327fb266aa72bf4a6d921a3e Mon Sep 17 00:00:00 2001
 From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Sat, 3 Oct 2026 18:09:37 +0200
 Subject: [PATCH] feat(deepseek-v4.1): TileLang kernel backend
@@ -20,6 +20,11 @@ The TileLang family adds:
   TileKernels' fused SwiGLU with the route weight before the down
   projection, combine). Plans hold no buffers; scratch comes from the vLLM
   workspace, reserved before memory profiling.
+- Both tensor-parallel layouts: TP3 (24 heads and 768-wide expert rows per
+  rank) and TP4 (16 heads, 576-wide rows). The block-scaled GEMMs take any
+  K block that is a multiple of 64 (128 for TP3; 192 and 64 for TP4's
+  K=576), reading the two scale words a block straddles and passing the MMA
+  its offset, so no operand is padded.
 - AttentionBackendEnum.TILELANG and DeepseekV41TileLangAttention, which
   override the layer's indexer and attention hooks.
 - tilelang linear and MoE backends: TileLangFP8LinearMethod,
@@ -39,13 +44,13 @@ half-size main pages whenever the worker shared the engine's config.
 requirements/cuda.txt moves to tilelang 0.1.15.
 ---
  requirements/cuda.txt                         |    2 +-
- .../attention/test_deepseek_v41_tilelang.py   |  562 ++++++++
- .../moe/test_deepseek_v41_tilelang_moe.py     |  120 ++
- .../test_deepseek_v41_tilelang_linear.py      |  115 ++
+ .../attention/test_deepseek_v41_tilelang.py   |  563 ++++++++
+ .../moe/test_deepseek_v41_tilelang_moe.py     |  121 ++
+ .../test_deepseek_v41_tilelang_linear.py      |  120 ++
  vllm/config/kernel.py                         |    5 +
  vllm/envs.py                                  |    8 +
  .../layers/fused_moe/oracle/mxfp4.py          |   26 +-
- .../layers/fused_moe/tilelang.py              |  235 ++++
+ .../layers/fused_moe/tilelang.py              |  238 ++++
  vllm/model_executor/models/config.py          |   34 +-
  vllm/models/deepseek_v4_1/attention.py        |  403 +++---
  vllm/models/deepseek_v4_1/b12x_layers.py      |   48 +-
@@ -55,14 +60,14 @@ requirements/cuda.txt moves to tilelang 0.1.15.
  vllm/models/deepseek_v4_1/quant_config.py     |   66 +-
  .../models/deepseek_v4_1/tilelang/__init__.py |   16 +
  .../deepseek_v4_1/tilelang/attention.py       |  238 ++++
- vllm/models/deepseek_v4_1/tilelang/gemm.py    |  168 +++
+ vllm/models/deepseek_v4_1/tilelang/gemm.py    |  200 +++
  vllm/models/deepseek_v4_1/tilelang/indexer.py | 1187 +++++++++++++++++
- vllm/models/deepseek_v4_1/tilelang/linear.py  |  167 +++
- vllm/models/deepseek_v4_1/tilelang/moe.py     |  958 +++++++++++++
+ vllm/models/deepseek_v4_1/tilelang/linear.py  |  175 +++
+ vllm/models/deepseek_v4_1/tilelang/moe.py     |  938 +++++++++++++
  vllm/models/deepseek_v4_1/tilelang/norm.py    |   38 +
  .../deepseek_v4_1/tilelang/sparse_mla.py      |  840 ++++++++++++
  vllm/v1/attention/backends/registry.py        |    3 +
- 24 files changed, 5079 insertions(+), 263 deletions(-)
+ 24 files changed, 5109 insertions(+), 263 deletions(-)
  create mode 100644 tests/kernels/attention/test_deepseek_v41_tilelang.py
  create mode 100644 tests/kernels/moe/test_deepseek_v41_tilelang_moe.py
  create mode 100644 tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py
@@ -92,10 +97,10 @@ index 00a56ac3b..eceff33b4 100644
  nvtx==0.2.15
 diff --git a/tests/kernels/attention/test_deepseek_v41_tilelang.py b/tests/kernels/attention/test_deepseek_v41_tilelang.py
 new file mode 100644
-index 000000000..be5359ac3
+index 000000000..caaaf2dd0
 --- /dev/null
 +++ b/tests/kernels/attention/test_deepseek_v41_tilelang.py
-@@ -0,0 +1,562 @@
+@@ -0,0 +1,563 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1 TileLang attention kernels against torch references.
@@ -591,7 +596,8 @@ index 000000000..be5359ac3
 +
 +
 +@pytest.mark.parametrize("idx_width", [0, 512])
-+@pytest.mark.parametrize("heads", [16, 64])
++# Heads per rank: TP4 (16), TP3 (24 of 72 padded), TP1 (64).
++@pytest.mark.parametrize("heads", [16, 24, 64])
 +def test_sparse_mla(
 +    idx_width, heads, rows=6, swa_width=128, swa_page=128, idx_page=128
 +):
@@ -660,10 +666,10 @@ index 000000000..be5359ac3
 +        assert torch.equal(out, outs["extend"]), f"{kernel} differs from extend"
 diff --git a/tests/kernels/moe/test_deepseek_v41_tilelang_moe.py b/tests/kernels/moe/test_deepseek_v41_tilelang_moe.py
 new file mode 100644
-index 000000000..523a20bf0
+index 000000000..73da08ea5
 --- /dev/null
 +++ b/tests/kernels/moe/test_deepseek_v41_tilelang_moe.py
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,121 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1 TileLang routed experts against an FP32 torch reference."""
@@ -742,8 +748,9 @@ index 000000000..523a20bf0
 +    xq, sf = tile_kernels.quant.per_token_cast(
 +        x, "e4m3", 32, round_sf=True, use_packed_ue8m0=True
 +    )
-+    scale = torch.exp2(sf.contiguous().view(torch.uint8).float() - 127)
-+    xd = xq.float() * scale.repeat_interleave(32, -1)
++    # Rows of packed exponents are padded to whole words.
++    exps = sf.contiguous().view(torch.uint8)[:, : x.shape[1] // 32]
++    xd = xq.float() * torch.exp2(exps.float() - 127).repeat_interleave(32, -1)
 +    out = torch.zeros(x.shape, dtype=torch.float32, device=DEVICE)
 +    for slot in range(ids.shape[1]):
 +        e = ids[:, slot].long()
@@ -755,11 +762,11 @@ index 000000000..523a20bf0
 +    return out
 +
 +
++# Down projection K blocks of 128, 192 (TP4's 576-wide rows) and 64.
++@pytest.mark.parametrize("hidden, intermediate", [(512, 256), (384, 576), (384, 320)])
 +@pytest.mark.parametrize("rows", [1, 12, 300])
 +@pytest.mark.parametrize("idx_dtype", [torch.int32, torch.int64])
-+def test_moe_experts(
-+    rows, idx_dtype, num_experts=32, topk=6, hidden=512, intermediate=256
-+):
++def test_moe_experts(rows, idx_dtype, hidden, intermediate, num_experts=32, topk=6):
 +    w13_packed, w13_sf, w13 = _experts(num_experts, 2 * intermediate, hidden, 1)
 +    w2_packed, w2_sf, w2 = _experts(num_experts, hidden, intermediate, 2)
 +    plan = MoeExpertsV41Plan(
@@ -786,10 +793,10 @@ index 000000000..523a20bf0
 +        assert torch.equal(solo[0], out[r]), f"row {r} changed with batch composition"
 diff --git a/tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py b/tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py
 new file mode 100644
-index 000000000..9e61104c8
+index 000000000..d4cd9c54d
 --- /dev/null
 +++ b/tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,120 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1 TileLang GEMMs and RMSNorm against torch references."""
@@ -843,11 +850,16 @@ index 000000000..9e61104c8
 +        x, "e4m3", 32, round_sf=True, use_packed_ue8m0=True
 +    )
 +    sf = sf.contiguous().view(torch.uint8)
-+    values = xq.float() * torch.exp2(sf.float() - 127).repeat_interleave(32, -1)
++    # Rows of packed exponents are padded to whole words.
++    exps = sf[:, : x.shape[1] // 32]
++    values = xq.float() * torch.exp2(exps.float() - 127).repeat_interleave(32, -1)
 +    return xq, sf, values
 +
 +
-+@pytest.mark.parametrize("n, k", [(256, 512), (1536, 1024), (224, 384)])
++# K blocks of 128 and, for TP4's 576-wide shared expert rows, 192 and 64.
++@pytest.mark.parametrize(
++    "n, k", [(256, 512), (1536, 1024), (224, 384), (320, 576), (1152, 576)]
++)
 +def test_mxfp8_gemm(n, k):
 +    weight, exps, weight_values = _block32_weight(n, k, 1)
 +    weight_sf = pack_scale_words(exps, rows=n)
@@ -856,7 +868,7 @@ index 000000000..9e61104c8
 +    ref = x_values @ weight_values.T
 +    outs = {}
 +    for rows in ROWS:
-+        gemm = mxfp8_gemm(n, k, **default_config(rows))
++        gemm = mxfp8_gemm(n, k, **default_config(rows, k))
 +        out = torch.empty((rows, n), dtype=torch.bfloat16, device=DEVICE)
 +        gemm(
 +            xq[:rows], weight, sf[:rows].contiguous().view(torch.uint32), weight_sf, out
@@ -1049,10 +1061,10 @@ index 1c38e4378..4315c4c16 100644
              w2_bias=w2_bias,
 diff --git a/vllm/model_executor/layers/fused_moe/tilelang.py b/vllm/model_executor/layers/fused_moe/tilelang.py
 new file mode 100644
-index 000000000..c6ca4be11
+index 000000000..e5488698a
 --- /dev/null
 +++ b/vllm/model_executor/layers/fused_moe/tilelang.py
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,238 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""TileLang MXFP4 x MXFP8 routed experts for SM12x (``--moe-backend tilelang``).
@@ -1093,7 +1105,9 @@ index 000000000..c6ca4be11
 +from vllm.platforms import current_platform
 +from vllm.utils.import_utils import has_tilelang
 +
-+_BLOCK_K = 128
++# Output columns come in 128-wide tiles; K blocks are multiples of 64.
++_BLOCK_N = 128
++_K_ALIGN = 64
 +
 +
 +def _kernels():
@@ -1166,10 +1180,11 @@ index 000000000..c6ca4be11
 +        if moe_config.in_dtype != torch.bfloat16:
 +            return False, f"kernel does not support {moe_config.in_dtype} activations"
 +        intermediate = moe_config.intermediate_size_per_partition
-+        if moe_config.hidden_dim % _BLOCK_K or intermediate % _BLOCK_K:
++        # Hidden is the down projection's N; the gate/up N is 2 * intermediate.
++        if moe_config.hidden_dim % _BLOCK_N or intermediate % _K_ALIGN:
 +            reason = (
-+                "hidden size and per-rank intermediate size must be multiples of "
-+                f"{_BLOCK_K}"
++                f"hidden size must be a multiple of {_BLOCK_N} and per-rank "
++                f"intermediate size a multiple of {_K_ALIGN}"
 +            )
 +            return False, reason
 +        return mk.FusedMoEExperts.is_supported_config(
@@ -2509,10 +2524,10 @@ index 000000000..5a3aed28e
 +__all__ = ["DeepseekV41TileLangAttention", "DeepseekV41TileLangBackend"]
 diff --git a/vllm/models/deepseek_v4_1/tilelang/gemm.py b/vllm/models/deepseek_v4_1/tilelang/gemm.py
 new file mode 100644
-index 000000000..99e38f5ca
+index 000000000..db61cad83
 --- /dev/null
 +++ b/vllm/models/deepseek_v4_1/tilelang/gemm.py
-@@ -0,0 +1,168 @@
+@@ -0,0 +1,200 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1-Flash block-32 FP8 linear for SM120 / SM121.
@@ -2539,6 +2554,27 @@ index 000000000..99e38f5ca
 +SF_WORD_K = 4 * SF_BLOCK  # K elements per packed scale word
 +
 +
++def scale_words(k: int) -> int:
++    """Packed UE8M0 words per row of a K-wide operand: four K32 exponents each."""
++    return tilelang.cdiv(k, SF_WORD_K)
++
++
++def block_scale_words(block_K: int) -> int:
++    """Scale words one K block reads: blocks off a 128 boundary straddle two words."""
++    return tilelang.cdiv(block_K + block_K % SF_WORD_K, SF_WORD_K)
++
++
++def pick_block_K(K: int, widest: int = 192) -> int:
++    """128 when it divides K; else the widest multiple of 64 up to ``widest`` that does.
++
++    TP3's 768-wide expert rows take 128; TP4's 576 take 192 (or 64).
++    """
++    for block_K in (128, *range(widest - widest % 64, 0, -64)):
++        if K % block_K == 0:
++            return block_K
++    raise ValueError(f"K={K} must be a multiple of 64")
++
++
 +@tilelang.jit
 +def mxfp8_gemm(
 +    N: int,
@@ -2552,20 +2588,22 @@ index 000000000..99e38f5ca
 +):
 +    """``C[M, N] = (A * SFA) @ (B * SFB)^T`` for MXFP8 ``A[M, K]``, ``B[N, K]``.
 +
-+    M is dynamic.
++    M is dynamic. ``SFA`` / ``SFB`` hold ``ceil(K / 128)`` packed UE8M0 words
++    per row. ``block_K`` is any multiple of 64 dividing K; a block that starts
++    off a 128-element boundary reads the two words it straddles and tells the
++    MMA where it starts (``k_start``), so no operand is padded.
 +
 +    Each output accumulates over K in the same order whatever the tile shape,
 +    so a row's result does not depend on M or on the configuration chosen.
 +    """
-+    assert K % SF_WORD_K == 0, f"K must be a multiple of {SF_WORD_K}"
-+    assert block_K % SF_WORD_K == 0 and K % block_K == 0, (
-+        "block_K must divide K and be a multiple of 128"
++    assert K % block_K == 0 and block_K % 64 == 0, (
++        "block_K must divide K and be a multiple of 64"
 +    )
 +    M = T.dynamic("M")
 +    in_dtype = T.float8_e4m3fn
 +    accum_dtype = T.float32
-+    sf_words = K // SF_WORD_K
-+    block_words = block_K // SF_WORD_K
++    sf_words = scale_words(K)
++    block_words = block_scale_words(block_K)
 +
 +    @T.prim_func
 +    def main(
@@ -2589,15 +2627,17 @@ index 000000000..99e38f5ca
 +                T.copy(A[by * block_M, ko * block_K], A_shared)
 +                T.copy(B[bx * block_N, ko * block_K], B_shared)
 +                # Edge tiles clamp their scale rows; those rows are never stored.
++                word0 = ko * block_K // SF_WORD_K
 +                for i, w in T.Parallel(block_M, block_words):
 +                    SFA_shared[i, w] = SFA[
-+                        T.min(by * block_M + i, M - 1), ko * block_words + w
++                        T.min(by * block_M + i, M - 1), T.min(word0 + w, sf_words - 1)
 +                    ]
 +                for j, w in T.Parallel(block_N, block_words):
 +                    SFB_shared[j, w] = SFB[
-+                        T.min(bx * block_N + j, N - 1), ko * block_words + w
++                        T.min(bx * block_N + j, N - 1), T.min(word0 + w, sf_words - 1)
 +                    ]
-+                # The staged scale words are tile-local, so this tile's K starts at 0.
++                # The staged words start at the block's first word; k_start
++                # places the block inside it.
 +                T.mma_gemm_blockscaled(
 +                    A_shared,
 +                    B_shared,
@@ -2605,7 +2645,7 @@ index 000000000..99e38f5ca
 +                    SFA_shared,
 +                    SFB_shared,
 +                    transpose_B=True,
-+                    k_start=0,
++                    k_start=ko * block_K % SF_WORD_K,
 +                    sf_a_granularity_k=SF_BLOCK,
 +                    sf_b_granularity_k=SF_BLOCK,
 +                )
@@ -2663,24 +2703,31 @@ index 000000000..99e38f5ca
 +
 +
 +def pack_scale_words(exponents: torch.Tensor, rows: int | None = None) -> torch.Tensor:
-+    """Pack ``[rows, K / 32]`` UE8M0 bytes into ``[rows, K / 128]`` uint32 words.
++    """Pack ``[..., K / 32]`` UE8M0 bytes into ``[..., ceil(K / 128)]`` uint32 words.
 +
-+    A ``[rows / 32, K / 32]`` block-scale grid is first broadcast to every row.
++    With ``rows``, a ``[rows / 32, K / 32]`` block-scale grid is first
++    broadcast to every row. Rows whose exponent count is not a multiple of
++    four gain unread padding bytes (TP4's 576-wide rows: 18 bytes become 20).
 +    """
++    exponents = exponents.view(torch.uint8)
 +    if rows is not None and exponents.shape[0] != rows:
 +        exponents = exponents.repeat_interleave(rows // exponents.shape[0], dim=0)
-+    return exponents.contiguous().view(torch.uint32).contiguous()
++    pad = -exponents.shape[-1] % 4
++    if pad:
++        exponents = torch.nn.functional.pad(exponents, (0, pad), value=127)
++    return exponents.contiguous().view(torch.uint32)
 +
 +
-+def default_config(M: int) -> dict:
++def default_config(M: int, K: int) -> dict:
 +    """Tile choice by row count: decode needs more, smaller N tiles to fill the GPU.
 +
 +    Tiles stay at least 64 rows tall. On SM121, warp-specialized 32x64 tiles
-+    with cp.async scale staging intermittently read stale scales.
++    with cp.async scale staging intermittently read stale scales. The large
++    tiles keep K blocks of 128 or 64 to stay within 99 KiB of shared memory.
 +    """
 +    if M <= 64:
-+        return dict(block_M=64, block_N=64, num_stages=3)
-+    return dict(block_M=128, block_N=128, num_stages=2)
++        return dict(block_M=64, block_N=64, block_K=pick_block_K(K), num_stages=3)
++    return dict(block_M=128, block_N=128, block_K=pick_block_K(K, 128), num_stages=2)
 diff --git a/vllm/models/deepseek_v4_1/tilelang/indexer.py b/vllm/models/deepseek_v4_1/tilelang/indexer.py
 new file mode 100644
 index 000000000..973feca5b
@@ -3876,10 +3923,10 @@ index 000000000..973feca5b
 +        return out, scores
 diff --git a/vllm/models/deepseek_v4_1/tilelang/linear.py b/vllm/models/deepseek_v4_1/tilelang/linear.py
 new file mode 100644
-index 000000000..1a1d64436
+index 000000000..cdc2fd297
 --- /dev/null
 +++ b/vllm/models/deepseek_v4_1/tilelang/linear.py
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,175 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""TileLang linear methods for DeepSeek-V4.1 (``--linear-backend tilelang``).
@@ -3906,7 +3953,14 @@ index 000000000..1a1d64436
 +    retain_cuda_graph_capture_resource,
 +)
 +
-+from .gemm import SF_BLOCK, bf16_gemm, default_config, mxfp8_gemm, pack_scale_words
++from .gemm import (
++    SF_BLOCK,
++    bf16_gemm,
++    default_config,
++    mxfp8_gemm,
++    pack_scale_words,
++    scale_words,
++)
 +
 +_LAYERS: WeakValueDictionary[int, nn.Module] = WeakValueDictionary()
 +_SMALL_ROWS = 64  # rows served by the decode tile configuration
@@ -3920,7 +3974,8 @@ index 000000000..1a1d64436
 +
 +
 +def _activation_specs(rows: int, k: int):
-+    return (((rows, k), torch.float8_e4m3fn), ((rows, k // SF_BLOCK), torch.uint8))
++    # TileKernels pads each row's packed UE8M0 exponents to whole words.
++    return (((rows, k), torch.float8_e4m3fn), ((rows, 4 * scale_words(k)), torch.uint8))
 +
 +
 +def _carve(scratch: torch.Tensor, specs):
@@ -3994,7 +4049,7 @@ index 000000000..1a1d64436
 +            layer.weight_scale_inv.view(torch.uint8), rows=n
 +        )
 +        layer.tilelang_gemms = tuple(
-+            mxfp8_gemm(n, k, **default_config(rows))
++            mxfp8_gemm(n, k, **default_config(rows, k))
 +            for rows in (_SMALL_ROWS, _SMALL_ROWS + 1)
 +        )
 +        layer.tilelang_key = id(layer)
@@ -4049,10 +4104,10 @@ index 000000000..1a1d64436
 +__all__ = ["TileLangFP8LinearMethod", "TileLangLinearMethod"]
 diff --git a/vllm/models/deepseek_v4_1/tilelang/moe.py b/vllm/models/deepseek_v4_1/tilelang/moe.py
 new file mode 100644
-index 000000000..012dfeb31
+index 000000000..9b24708c5
 --- /dev/null
 +++ b/vllm/models/deepseek_v4_1/tilelang/moe.py
-@@ -0,0 +1,958 @@
+@@ -0,0 +1,938 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1-Flash MoE dispatch and combine for SM120 / SM121.
@@ -4099,7 +4154,14 @@ index 000000000..012dfeb31
 +import tilelang.language as T
 +import torch
 +
-+from .gemm import SF_BLOCK, SF_WORD_K
++from .gemm import (
++    SF_BLOCK,
++    SF_WORD_K,
++    block_scale_words,
++    pack_scale_words,
++    pick_block_K,
++    scale_words,
++)
 +
 +# Routes handled by one CTA of the dispatch kernels.
 +_CHUNK = 512
@@ -4570,27 +4632,32 @@ index 000000000..012dfeb31
 +):
 +    """``C[r] = (A[row(r)] * SFA) @ (B[e] * SFB[e])^T``, ``e`` the expert of row ``r``.
 +
-+    ``A``: ``[rows, K]`` E4M3 with packed UE8M0 words ``SFA[rows, K / 128]``;
-+    ``B``: ``[experts, N, K]`` E2M1 (packed bytes) with ``SFB[experts, N, K / 128]``.
-+    With ``tiled=True``, ``B`` and ``SFB`` are in the tile-major layout of
-+    ``tile_expert_weights``, so each tile's weights and scales are contiguous.
++    ``A``: ``[rows, K]`` E4M3 with packed UE8M0 words ``SFA[rows, ceil(K / 128)]``;
++    ``B``: ``[experts, N, K]`` E2M1 (packed bytes) with
++    ``SFB[experts, N, ceil(K / 128)]``. With ``tiled=True``, ``B`` is in the
++    tile-major layout of ``tile_expert_weights``, so each tile is contiguous.
++
++    ``block_K`` is any multiple of 64 dividing K. A block that starts off a
++    128-element boundary reads the two scale words it straddles and tells the
++    MMA where it starts (``k_start``), so no operand is padded.
 +
 +    A ``num_stages``-deep pipeline loads the next K blocks while the current
 +    one multiplies: the expert's weights by TMA, the gathered activation rows
-+    and all scale words by ``cp.async``.
++    and the scale words by ``cp.async``.
 +    """
-+    assert K % block_K == 0 and block_K % SF_WORD_K == 0, (
-+        "block_K must divide K and be a multiple of 128"
++    assert K % block_K == 0 and block_K % 64 == 0, (
++        "block_K must divide K and be a multiple of 64"
 +    )
 +    tokens, tiles = T.dynamic("tokens, tiles")
 +    a_rows = tokens if gather else tiles * block_M
 +    accum_dtype = T.float32
-+    sf_words = K // SF_WORD_K
-+    block_words = block_K // SF_WORD_K
++    sf_words = scale_words(K)
++    block_words = block_scale_words(block_K)
 +    k_blocks = K // block_K
 +    a_segments = block_M * block_K // 16  # 16-byte cp.async copies of one A block
 +    a_copies = tilelang.cdiv(a_segments, threads)
 +    sfa_copies = tilelang.cdiv(block_M * block_words, threads)
++    sfb_copies = tilelang.cdiv(block_N * block_words, threads)
 +    stages = num_stages
 +    assert stages >= 2
 +    assert N % block_N == 0, "N must be a multiple of block_N"
@@ -4600,14 +4667,6 @@ index 000000000..012dfeb31
 +        if tiled
 +        else (num_experts, N, K)
 +    )
-+    sfb_shape = (
-+        (num_experts * n_blocks * k_blocks, block_N, block_words)
-+        if tiled
-+        else (num_experts, N, sf_words)
-+    )
-+    sfb_vec = (
-+        4 if (block_N * block_words) % 4 == 0 else 1
-+    )  # words per cp.async of tiled scales
 +
 +    @T.macro
 +    def load(
@@ -4660,56 +4719,39 @@ index 000000000..012dfeb31
 +                    16,
 +                    a_row[c] >= 0,
 +                )
++        # The block's scale words; the last row word may lie past a short row.
++        word0 = ko * block_K // SF_WORD_K
 +        for c in T.unroll(sfa_copies):
 +            e = c * threads + tx
 +            if e < block_M * block_words:
++                w = e % block_words
 +                T.ptx_cp_async(
++                    T.access_ptr(SFA_shared[s, e // block_words, w], "w", 1),
 +                    T.access_ptr(
-+                        SFA_shared[s, e // block_words, e % block_words], "w", 1
-+                    ),
-+                    T.access_ptr(
-+                        SFA[T.max(sfa_row[c], 0), ko * block_words + e % block_words],
++                        SFA[T.max(sfa_row[c], 0), T.min(word0 + w, sf_words - 1)],
 +                        "r",
 +                        1,
 +                    ),
 +                    1,
 +                    sfa_row[c] >= 0,
 +                )
-+        if tiled:
-+            tile = (expert * n_blocks + bx) * k_blocks + ko
-+            for c in T.unroll(tilelang.cdiv(block_N * block_words // sfb_vec, threads)):
-+                e = (c * threads + tx) * sfb_vec
-+                if e < block_N * block_words:
-+                    T.ptx_cp_async(
-+                        T.access_ptr(
-+                            SFB_shared[s, e // block_words, e % block_words],
-+                            "w",
-+                            sfb_vec,
-+                        ),
-+                        T.access_ptr(
-+                            SFB[tile, e // block_words, e % block_words], "r", sfb_vec
-+                        ),
-+                        sfb_vec,
-+                    )
-+        else:
-+            for c in T.unroll(tilelang.cdiv(block_N * block_words, threads)):
-+                e = c * threads + tx
-+                if e < block_N * block_words:
-+                    T.ptx_cp_async(
-+                        T.access_ptr(
-+                            SFB_shared[s, e // block_words, e % block_words], "w", 1
-+                        ),
-+                        T.access_ptr(
-+                            SFB[
-+                                expert,
-+                                bx * block_N + e // block_words,
-+                                ko * block_words + e % block_words,
-+                            ],
-+                            "r",
-+                            1,
-+                        ),
++        for c in T.unroll(sfb_copies):
++            e = c * threads + tx
++            if e < block_N * block_words:
++                w = e % block_words
++                T.ptx_cp_async(
++                    T.access_ptr(SFB_shared[s, e // block_words, w], "w", 1),
++                    T.access_ptr(
++                        SFB[
++                            expert,
++                            bx * block_N + e // block_words,
++                            T.min(word0 + w, sf_words - 1),
++                        ],
++                        "r",
 +                        1,
-+                    )
++                    ),
++                    1,
++                )
 +        T.ptx_commit_group()
 +        T.barrier_arrive(loaded[s])
 +
@@ -4718,7 +4760,7 @@ index 000000000..012dfeb31
 +        A: T.Tensor((a_rows, K), T.float8_e4m3fn),
 +        SFA: T.Tensor((a_rows, sf_words), T.uint32),
 +        B: T.Tensor(b_shape, T.float4_e2m1fn),
-+        SFB: T.Tensor(sfb_shape, T.uint32),
++        SFB: T.Tensor((num_experts, N, sf_words), T.uint32),
 +        Order: T.Tensor((tiles * block_M,), T.int32),
 +        TileExpert: T.Tensor((tiles,), T.int32),
 +        C: T.Tensor((tiles * block_M, N), out_dtype),
@@ -4809,7 +4851,8 @@ index 000000000..012dfeb31
 +                T.ptx_wait_group(stages - 1)
 +                T.barrier_wait(loaded[ko % stages], (ko // stages) % 2)
 +                T.sync_threads()
-+                # The staged scale words are block-local, so this block's K starts at 0.
++                # The staged words start at the block's first word; k_start
++                # places the block inside it.
 +                T.mma_gemm_blockscaled(
 +                    A_shared[ko % stages, :, :],
 +                    B_shared[ko % stages, :, :],
@@ -4817,7 +4860,7 @@ index 000000000..012dfeb31
 +                    SFA_shared[ko % stages, :, :],
 +                    SFB_shared[ko % stages, :, :],
 +                    transpose_B=True,
-+                    k_start=0,
++                    k_start=ko * block_K % SF_WORD_K,
 +                    sf_a_granularity_k=SF_BLOCK,
 +                    sf_b_granularity_k=SF_BLOCK,
 +                )
@@ -4829,8 +4872,8 @@ index 000000000..012dfeb31
 +    return main
 +
 +
-+def tile_expert_weights(b_packed, b_words, block_N, block_K):
-+    """Tile-major copies of ``[E, N, K / 2]`` weights and ``[E, N, K / 128]`` words.
++def tile_expert_weights(b_packed, block_N, block_K):
++    """Tile-major copy of ``[E, N, K / 2]`` packed E2M1 expert weights.
 +
 +    Tile ``(e, n, k)`` (``block_N`` rows by ``block_K`` columns) becomes one
 +    contiguous ``[block_N, block_K / 2]`` slab, at index
@@ -4838,15 +4881,8 @@ index 000000000..012dfeb31
 +    """
 +    E, N, half_k = b_packed.shape
 +    K = 2 * half_k
-+    b = b_packed.view(E, N // block_N, block_N, K // block_K, block_K // 2).permute(
-+        0, 1, 3, 2, 4
-+    )
-+    w = b_words.view(
-+        E, N // block_N, block_N, K // block_K, block_K // SF_WORD_K
-+    ).permute(0, 1, 3, 2, 4)
-+    return b.reshape(-1, block_N, block_K // 2).contiguous(), w.reshape(
-+        -1, block_N, block_K // SF_WORD_K
-+    ).contiguous()
++    b = b_packed.view(E, N // block_N, block_N, K // block_K, block_K // 2)
++    return b.permute(0, 1, 3, 2, 4).reshape(-1, block_N, block_K // 2).contiguous()
 +
 +
 +def _spans(specs):
@@ -4895,28 +4931,28 @@ index 000000000..012dfeb31
 +        swiglu_limit=None,
 +        block_M=32,
 +        block_N=128,
-+        block_K=128,
 +        num_stages=3,
 +    ):
-+        assert hidden % block_K == 0 and intermediate % block_K == 0, (
-+            "hidden and intermediate must be multiples of block_K"
-+        )
 +        self.num_experts, self.topk, self.hidden, self.intermediate = (
 +            num_experts,
 +            topk,
 +            hidden,
 +            intermediate,
 +        )
-+        self.block_M, self.block_N, self.block_K = block_M, block_N, block_K
-+        config = dict(
-+            block_N=block_N, block_K=block_K, num_stages=num_stages, tiled=True
-+        )
++        self.block_M, self.block_N = block_M, block_N
++        # Each GEMM's K block divides its own K: TP3's 768-wide expert rows
++        # take 128, TP4's 576 take 192.
++        self.gate_up_block_K = pick_block_K(hidden)
++        self.down_block_K = pick_block_K(intermediate)
++        config = dict(block_N=block_N, num_stages=num_stages, tiled=True)
 +        self.gate_up = grouped_fp8_fp4_gemm(
-+            num_experts, 2 * intermediate, hidden, topk, True, block_M, **config
-+        )
++            num_experts, 2 * intermediate, hidden, topk, True, block_M,
++            block_K=self.gate_up_block_K, **config,
++        )  # fmt: skip
 +        self.down = grouped_fp8_fp4_gemm(
-+            num_experts, hidden, intermediate, topk, False, block_M, **config
-+        )
++            num_experts, hidden, intermediate, topk, False, block_M,
++            block_K=self.down_block_K, **config,
++        )  # fmt: skip
 +        # Routers emit int32 or int64 expert ids.
 +        self.dispatch = {
 +            dtype: MoeDispatchV41Plan(num_experts, topk, block_M, hidden, dtype)
@@ -4926,15 +4962,14 @@ index 000000000..012dfeb31
 +        self.swiglu = _swiglu_kernel(self.tk, intermediate, num_experts, swiglu_limit)
 +
 +    def prepare_weights(self, w13, w13_scale, w2, w2_scale):
-+        """Tile-major ``(w13, w13 words, w2, w2 words)`` from E2M1 weights and UE8M0."""
-+
-+        def tiled(weight, scale):
-+            words = scale.view(torch.uint8).contiguous().view(torch.uint32)
-+            return tile_expert_weights(
-+                weight.view(torch.int8), words, self.block_N, self.block_K
-+            )
-+
-+        return (*tiled(w13, w13_scale), *tiled(w2, w2_scale))
++        """``(w13 tiles, w13 words, w2 tiles, w2 words)`` from E2M1 and UE8M0."""
++        block_N = self.block_N
++        return (
++            tile_expert_weights(w13.view(torch.int8), block_N, self.gate_up_block_K),
++            pack_scale_words(w13_scale),
++            tile_expert_weights(w2.view(torch.int8), block_N, self.down_block_K),
++            pack_scale_words(w2_scale),
++        )
 +
 +    def workspace_specs(self, rows, idx_dtype=torch.int64):
 +        dispatch = self.dispatch[idx_dtype]
@@ -4943,10 +4978,10 @@ index 000000000..012dfeb31
 +        return (
 +            *dispatch.workspace_specs(rows),
 +            ((rows, hidden), torch.float8_e4m3fn),  # tokens, MXFP8
-+            ((rows, hidden // SF_BLOCK), torch.uint8),
++            ((rows, 4 * scale_words(hidden)), torch.uint8),
 +            ((layout_rows, 2 * inter), torch.bfloat16),  # gate/up output
 +            ((layout_rows, inter), torch.float8_e4m3fn),  # down input, MXFP8
-+            ((layout_rows, inter // SF_BLOCK), torch.uint8),
++            ((layout_rows, 4 * scale_words(inter)), torch.uint8),
 +            ((layout_rows, hidden), torch.bfloat16),  # down output
 +        )
 +

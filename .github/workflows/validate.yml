@@ -180,7 +180,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Use the example site configuration
-        run: cp config/nodes.example.json config/nodes.json
-      - name: Apply the candidate series and check the patch heads, trees and submodule commits
-        run: bin/spark3 --cluster-config experiments/2026-10-03-tilelang-kernels/cluster.json build prepare --only vllm,tilelang,tile_kernels
+      - name: Use the example site configurations
+        run: |
+          cp config/nodes.example.json config/nodes.json
+          cp config/examples/nodes-ring4.json config/nodes-ring4.local.json
+      - name: Apply the TP3 series and check the patch heads, trees and submodule commits
+        run: bin/spark3 --cluster-config experiments/2026-10-03-tilelang-kernels/tp3/cluster.json build prepare --only vllm,tilelang,tile_kernels
+      - name: Apply the TP4 series (TileLang and TileKernels are the TP3 ones)
+        run: bin/spark3 --cluster-config experiments/2026-10-03-tilelang-kernels/tp4/cluster.json build prepare --only vllm

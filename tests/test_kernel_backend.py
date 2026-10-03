@@ -23,6 +23,17 @@ kernel_backend = spark3.kernel_backend
 
 CANDIDATE = "experiments/2026-10-03-tilelang-kernels"
 FLAGS = ("--attention-backend", "--linear-backend", "--moe-backend")
+# Each TileLang profile and the B12X configuration it mirrors, with that
+# configuration's lock and an example node map of its topology.
+TWINS = {
+    "tp3": ("config/cluster.json", "upstreams.lock.json", "config/nodes.example.json"),
+    "tp4": ("experiments/2026-10-03-collective-contract/candidate.json",
+            "experiments/2026-10-03-collective-contract/upstreams.lock.json",
+            "config/examples/nodes-ring4.json"),
+}
+# Per-boot artifacts a TileLang arm keeps apart from its twin's: pinned DSpark
+# cost curves are keyed by shapes only, and profiler traces by directory.
+ARTIFACT_DIRS = {"tp4": ("ring4-collective-20261003", "ring4-tilelang-20261003")}
 
 
 def speculative(cluster: dict) -> dict:
@@ -36,9 +47,21 @@ class KernelBackendTest(unittest.TestCase):
         self.base = spark3.read_json("config/cluster.json")
         self.base["distributed"]["master_addr"] = head
         self.lock = spark3.read_json("upstreams.lock.json")
-        self.candidate = spark3.read_json(f"{CANDIDATE}/cluster.json")
+        self.candidate = spark3.read_json(f"{CANDIDATE}/tp3/cluster.json")
         self.candidate["distributed"]["master_addr"] = head
-        self.candidate_lock = spark3.read_json(f"{CANDIDATE}/upstreams.lock.json")
+        self.candidate_lock = spark3.read_json(f"{CANDIDATE}/tp3/upstreams.lock.json")
+
+    def twin(self, name):
+        """(TileLang profile, its lock, the B12X configuration it mirrors, that lock, node map)."""
+        config, lock, node_file = TWINS[name]
+        nodes = spark3.read_json(node_file)
+        head = next(node for node in nodes["nodes"] if node.get("head"))["management_ip"]
+        candidate = spark3.read_json(f"{CANDIDATE}/{name}/cluster.json")
+        base = spark3.read_json(config)
+        for cluster in (candidate, base):
+            cluster["distributed"]["master_addr"] = head
+        return (candidate, spark3.read_json(f"{CANDIDATE}/{name}/upstreams.lock.json"),
+                base, spark3.read_json(lock), nodes)
 
     def ready(self):
         """The candidate, with a copy of its source manifest that the test may edit."""
@@ -83,6 +106,15 @@ class KernelBackendTest(unittest.TestCase):
         cluster, lock, _, patch = self.ready()
         with patch:
             self.assertEqual(self.errors(cluster, lock), [])
+        for name in TWINS:
+            with self.subTest(topology=name):
+                candidate, candidate_lock, base, base_lock, nodes = self.twin(name)
+                for config, upstreams in ((candidate, candidate_lock), (base, base_lock)):
+                    errors = [p for p in spark3.local_doctor(config, nodes, upstreams)
+                              if not isinstance(p, spark3.Warn)]
+                    self.assertEqual(errors, [])
+                self.assertEqual(kernel_backend.backend(candidate), "tilelang")
+                self.assertFalse(candidate["deployment"]["launch_enabled"])
         self.assertEqual(kernel_backend.backend(cluster), "tilelang")
         self.assertFalse(cluster["deployment"]["launch_enabled"])
         for flag in FLAGS:
@@ -95,40 +127,85 @@ class KernelBackendTest(unittest.TestCase):
             self.assertEqual(env["VLLM_PLUGINS"], "b12x_loader")
             self.assertEqual(spark3.topology.argument(cluster, "--load-format"), "b12x")
 
-    def test_candidate_matches_promoted_configuration_except_the_policy(self):
-        candidate = copy.deepcopy(self.candidate)
-        base = copy.deepcopy(self.base)
-        for cluster in (candidate, base):
-            for flag in FLAGS:
-                spark3.topology.set_argument(cluster, flag, "-")
-            config = speculative(cluster)
-            config["attention_backend"] = "-"
-            spark3.topology.set_argument(cluster, "--speculative-config", json.dumps(config))
-            for key in ("kernel_backend", "upstreams_config"):
-                cluster.pop(key, None)
-            for key in ("image", "expected_labels"):
-                cluster["container"].pop(key)
-            for key in ("launch_enabled", "branch"):
-                cluster["deployment"].pop(key, None)
-            cluster["environment"].pop(kernel_backend.ENVIRONMENT, None)
-        self.assertEqual(candidate, base)
-        labels = self.candidate["container"]["expected_labels"]
-        for name in ("b12x", "nccl"):
-            self.assertEqual(labels[kernel_backend.label(name)],
-                             self.base["container"]["expected_labels"][kernel_backend.label(name)])
+    def test_candidates_match_their_b12x_configuration_except_the_policy(self):
+        for name in TWINS:
+            with self.subTest(topology=name):
+                candidate, candidate_lock, base, base_lock, _ = self.twin(name)
+                labels = candidate["container"]["expected_labels"]
+                for source in ("b12x", "nccl"):
+                    self.assertEqual(labels[kernel_backend.label(source)],
+                                     base["container"]["expected_labels"][kernel_backend.label(source)])
+                    self.assertEqual(candidate_lock["sources"][source], base_lock["sources"][source])
+                self.assertEqual(spark3.read_json(candidate_lock["source_manifest"])["vllm"]["base_revision"],
+                                 spark3.read_json(base_lock["source_manifest"])["vllm"]["base_revision"])
+                # The TileLang series is the twin's series plus the TileLang patch.
+                series = [Path(candidate_lock["sources"]["vllm"]["patch_series"]).parent / patch
+                          for patch in spark3.read_series(ROOT / candidate_lock["sources"]["vllm"]["patch_series"])]
+                twin = [Path(base_lock["sources"]["vllm"]["patch_series"]).parent / patch
+                        for patch in spark3.read_series(ROOT / base_lock["sources"]["vllm"]["patch_series"])]
+                resolved = [(ROOT / path).resolve() for path in series]
+                self.assertEqual(resolved[:-1], [(ROOT / path).resolve() for path in twin])
+                self.assertEqual(resolved[-1].name, "0027-deepseek-v41-tilelang-kernels.patch")
+                before, after = ARTIFACT_DIRS.get(name, (None, None))
+                for cluster in (candidate, base):
+                    for flag in FLAGS:
+                        spark3.topology.set_argument(cluster, flag, "-")
+                    config = speculative(cluster)
+                    config["attention_backend"] = "-"
+                    spark3.topology.set_argument(cluster, "--speculative-config", json.dumps(config))
+                    for key in ("kernel_backend", "upstreams_config"):
+                        cluster.pop(key, None)
+                    for key in ("image", "expected_labels"):
+                        cluster["container"].pop(key)
+                    for key in ("launch_enabled", "branch"):
+                        cluster["deployment"].pop(key, None)
+                    cluster["environment"].pop(kernel_backend.ENVIRONMENT, None)
+                    if before:
+                        cluster["environment"]["SPARK3_DSPARK_COST_DIR"] = (
+                            cluster["environment"]["SPARK3_DSPARK_COST_DIR"].replace(after, before))
+                        profiler = spark3.topology.argument(cluster, "--profiler-config")
+                        spark3.topology.set_argument(cluster, "--profiler-config", profiler.replace(after, before))
+                self.assertEqual(candidate, base)
 
     def test_candidate_build_inputs_record_every_source(self):
-        self.assertEqual(self.errors(self.candidate, self.candidate_lock), [])
-        inputs = spark3.build_inputs(self.candidate_lock)
-        manifest = spark3.read_json(self.candidate_lock["source_manifest"])
-        self.assertEqual(inputs["vllm"]["expected_tree"], manifest["vllm"]["expected_tree"])
-        self.assertEqual(
-            self.candidate["container"]["expected_labels"][kernel_backend.label("vllm")],
-            manifest["vllm"]["expected_tree"],
-        )
-        self.assertEqual(inputs["tilelang"]["expected_tree"], "1697ad52fab8379ce78f9abc547c7b1e02cd9c5e")
-        self.assertIn("3rdparty/tvm", inputs["tilelang"]["submodules"])
-        self.assertEqual(inputs["tile_kernels"]["patch_head"], inputs["tile_kernels"]["revision"])
+        images = set()
+        for name in TWINS:
+            with self.subTest(topology=name):
+                candidate, lock, base, _, _ = self.twin(name)
+                inputs = spark3.build_inputs(lock)
+                manifest = spark3.read_json(lock["source_manifest"])
+                self.assertEqual(inputs["vllm"]["expected_tree"], manifest["vllm"]["expected_tree"])
+                self.assertEqual(candidate["container"]["expected_labels"][kernel_backend.label("vllm")],
+                                 manifest["vllm"]["expected_tree"])
+                self.assertEqual(manifest["vllm"]["patchset_sha256"], spark3.patchset_sha256(lock["sources"]["vllm"]))
+                self.assertEqual(inputs["tilelang"]["expected_tree"], "1697ad52fab8379ce78f9abc547c7b1e02cd9c5e")
+                self.assertIn("3rdparty/tvm", inputs["tilelang"]["submodules"])
+                self.assertEqual(inputs["tile_kernels"]["patch_head"], inputs["tile_kernels"]["revision"])
+                self.assertNotEqual(candidate["container"]["image"], base["container"]["image"])
+                images.add(candidate["container"]["image"])
+        self.assertEqual(len(images), len(TWINS))
+
+    def test_tuning_catalog_mirrors_the_b12x_profiles(self):
+        profiles = spark3.transport_profiles
+        b12x = spark3.read_json(profiles.DEFAULT_PROFILES)["profiles"]
+        catalog = f"{CANDIDATE}/profiles.json"
+        self.assertEqual(set(spark3.read_json(catalog)["profiles"]), set(b12x))
+        for name in b12x:
+            with self.subTest(topology=name):
+                profile, resolved = profiles.resolve(ROOT, catalog, name)
+                self.assertEqual(profile["base_config"], f"{CANDIDATE}/{name}/cluster.json")
+                self.assertEqual(resolved, spark3.read_json(profile["base_config"]))
+                for key in ("node_count", "transport", "rocenante", "nccl"):
+                    self.assertEqual(profile[key], b12x[name][key])
+                layout = spark3.model_layout.describe(ROOT, resolved, profiles.size_bytes(
+                    resolved["environment"]["VLLM_ROCE_ALLREDUCE_MAX_SIZE"]))
+                _, twin = profiles.resolve(ROOT, profiles.DEFAULT_PROFILES, name)
+                twin_layout = spark3.model_layout.describe(ROOT, twin, profiles.size_bytes(
+                    twin["environment"]["VLLM_ROCE_ALLREDUCE_MAX_SIZE"]))
+                for key in ("model_dimensions", "drafter", "scheduled_rows", "transport_layout"):
+                    self.assertEqual(layout[key], twin_layout[key])
+                self.assertFalse(layout["kernel_scratch"]["compact_moe_n64_path"])
+                self.assertIsNone(layout["kernel_scratch"]["compact_moe_intermediate_width_when_selected"])
 
     def test_missing_patch_is_reported_without_crashing(self):
         series = Path(self.candidate_lock["sources"]["vllm"]["patch_series"])

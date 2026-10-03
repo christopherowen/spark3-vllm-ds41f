@@ -68,7 +68,7 @@ Prepare an isolated tree:
 ```sh
 bin/spark3 upstream prepare vllm
 bin/spark3 upstream prepare b12x
-bin/spark3 --cluster-config experiments/2026-10-03-tilelang-kernels/cluster.json upstream prepare tilelang
+bin/spark3 --cluster-config experiments/2026-10-03-tilelang-kernels/tp3/cluster.json upstream prepare tilelang
 ```
 
 The helper clones the canonical repository as `upstream`, adds Christopher's fork
