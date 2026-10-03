@@ -217,3 +217,29 @@ The step-end tail also showed the DSpark transition head on BF16 cuBLAS under
 TileLang (about 1.4 ms per step, against 0.42 ms with B12X's vocabulary row
 kernel): the logits processor enabled B12X's vocabulary projection only for
 the `b12x` linear backend. That is fixed in image v5; round 3 measures it.
+
+## Round 3: B12X's vocabulary projection under TileLang
+
+Image `-r5o-roce-contract-tilelang-v5` ([round3-tilelang.json](round3-tilelang.json))
+against the unchanged round-2 control, 2026-10-03 20:40–20:55 UTC, both with
+native drafter heads.
+
+| Case | B12X | TileLang | Change |
+| --- | ---: | ---: | ---: |
+| prose, 1 stream | 62.6 ± 3.7% | 62.7 ± 0.4% | +0.3% |
+| prose, 8 streams | 213.7 ± 6.4% | 215.9 ± 0.2% | +1.0% |
+| code, 1 stream | 79.8 ± 28.3% | 80.0 ± 0.3% | +0.2% |
+| code, 8 streams | 249.0 ± 7.3% | 247.9 ± 0.2% | −0.4% |
+
+Every difference is within noise; quality 5/5 in both arms. The transition
+head now runs B12X's vocabulary row kernel under TileLang (0.42 ms per step,
+as in the B12X arm), and the step-end tail is level: median 6.37 ms (B12X)
+against 6.18 ms (TileLang). On the profiled workload TileLang spends 3.1 ms
+less main-stream kernel time per decode step (routed experts −2.7 ms, dense
+projections +0.17, sparse MLA and indexer +0.19).
+
+Across rounds 2 and 3 TileLang is at parity with B12X at TP4 (decode −1.7% to
++4.2%, prefill +2% to +4%). What remains in both arms' step-end tail is 2.6 ms
+of BF16 vocabulary GEMMs (the target head and the first native draft head),
+which already stream at about 250 GB/s; reading fewer bytes losslessly (an
+exact 12-bit BF16 form) is the remaining lever there that keeps native weights.
