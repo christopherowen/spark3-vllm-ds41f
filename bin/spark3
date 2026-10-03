@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CLUSTER_CONFIG = "config/cluster.json"
 sys.path.insert(0, str(ROOT / "scripts"))
 import mesh_fabric
+import kernel_backend
 import kernel_readiness
 import topology
 import transport_profiles
@@ -276,6 +277,7 @@ class Warn(str):
 
 def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
     problems: list[str] = topology.problems(cluster, nodes)
+    problems.extend(kernel_backend.problems(cluster))
     if cluster.get("promoted_baseline") != upstreams.get("generated_from_baseline"):
         problems.append("cluster and upstream locks name different baselines")
     host = cluster.get("host", {})
@@ -329,7 +331,7 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
                     if not patch_name.startswith("TODO-") and not (
                         series_path.parent / patch_name
                     ).is_file():
-                        problems.append(f"{name}: missing patch {patch_name}")
+                        problems.append(f"{name}: missing patch {patch_name} (listed in {series})")
         lockfile = source.get("lockfile")
         if lockfile and not (ROOT / lockfile).is_file():
             problems.append(f"{name}: missing dependency lock {lockfile}")
@@ -349,6 +351,13 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
     source_manifest = read_json(
         upstreams.get("source_manifest", "manifests/sources/2026-09-20-active-source.json")
     )
+    problems.extend(kernel_backend.source_problems(cluster, upstreams, source_manifest))
+    listed = [name for name in OPTIONAL_BUILD_PROJECTS if name in upstreams["sources"]]
+    if listed and len(listed) != len(OPTIONAL_BUILD_PROJECTS):
+        problems.append(f"{' and '.join(OPTIONAL_BUILD_PROJECTS)} are built together; the lock lists only {listed[0]}")
+    for name in listed:
+        if not upstreams["sources"][name].get("version"):
+            problems.append(f"{name}: package version is not recorded in the lock")
     if topology.transport(cluster) in ("rocenante-ring4", "rocenante-mesh4"):
         mode = topology.transport(cluster)
         record = source_manifest["b12x"]
@@ -363,11 +372,18 @@ def local_doctor(cluster: dict, nodes: dict, upstreams: dict) -> list[str]:
         problems.extend(mesh_fabric.site_problems(nodes))
         if cluster.get("deployment", {}).get("launch_enabled"):
             problems.append("mesh4 is available for bounded collective qualification only; serving lifecycle is not qualified")
-    for name in BUILD_PROJECTS:
-        wanted = source_manifest[name].get("patchset_sha256")
-        actual = patchset_sha256(upstreams["sources"][name])
-        if wanted != actual:
+    for name in build_projects(upstreams["sources"]):
+        source = upstreams["sources"][name]
+        if missing_patches(source):
+            continue  # reported above
+        record = source_manifest.get(name)
+        if record is None:
+            problems.append(f"{name}: source manifest has no record")
+            continue
+        if record.get("patchset_sha256") != patchset_sha256(source):
             problems.append(f"{name}: patch-set fingerprint differs from source manifest")
+        if source.get("submodules") and not isinstance(record.get("submodules"), dict):
+            problems.append(f"{name}: source manifest does not record its submodule commits")
     for relative, wanted in source_manifest.get("deployment_artifacts", {}).items():
         candidate = ROOT / relative
         if not candidate.is_file():
@@ -1917,6 +1933,9 @@ BUILD_ROOT = ROOT / ".work/build"
 # directories are re-prepared.
 BUILD_LAYOUT = 2
 BUILD_PROJECTS = ("vllm", "b12x", "nccl")
+# Built only when the lock lists them (the TileLang kernel backend); each adds
+# its own <name>-source context.
+OPTIONAL_BUILD_PROJECTS = ("tilelang", "tile_kernels")
 BUILD_PARTS = ("vllm", "b12x", "nccl", "cutlass", "wheels")
 BUILD_CONTEXTS = (
     "vllm-source", "b12x-source", "nccl-source", "cutlass-source", "cutlass-dsl-wheels", "vllm-deletions"
@@ -1951,16 +1970,66 @@ print("GPU import smoke passed")
 """
 
 
+def build_projects(sources: dict) -> tuple[str, ...]:
+    """The required projects, then each optional one the lock or inputs list."""
+    return BUILD_PROJECTS + tuple(name for name in OPTIONAL_BUILD_PROJECTS if name in sources)
+
+
+def build_contexts(inputs: dict) -> tuple[str, ...]:
+    return BUILD_CONTEXTS + tuple(f"{name}-source" for name in OPTIONAL_BUILD_PROJECTS if name in inputs)
+
+
+def missing_patches(source: dict) -> list[str]:
+    """Repository paths of a source's series and patches that do not exist yet."""
+    series = source.get("patch_series")
+    if not series:
+        return []
+    series_path = ROOT / series
+    if not series_path.is_file():
+        return [series]
+    return [
+        (series_path.parent / name).resolve().relative_to(ROOT.resolve()).as_posix()
+        for name in read_series(series_path)
+        if not name.startswith("TODO-") and not (series_path.parent / name).is_file()
+    ]
+
+
+def smoke_script(upstreams: dict) -> str:
+    """The GPU import smoke, extended for an image with the TileLang sources."""
+    if "tilelang" not in upstreams["sources"]:
+        return SMOKE_SCRIPT
+    version = upstreams["sources"]["tilelang"]["version"]
+    script = SMOKE_SCRIPT + (
+        "import importlib.metadata\n\n"
+        "import tilelang\n"
+        "import tile_kernels  # noqa: F401\n\n"
+        f"assert importlib.metadata.version(\"tilelang\") == {version!r}, tilelang.__version__\n"
+        "print(\"TileLang\", tilelang.__version__)\n"
+    )
+    manifest = read_json(upstreams["source_manifest"])
+    if kernel_backend.CAPABILITY in manifest["vllm"].get("capabilities", []):
+        script += "import vllm.models.deepseek_v4_1.tilelang  # noqa: F401\n"
+    return script + "print(\"TileLang import smoke passed\")\n"
+
+
 def git_output(directory: Path, *arguments: str) -> str:
     return subprocess.run(
         ["git", *arguments], cwd=directory, check=True, text=True, stdout=subprocess.PIPE
     ).stdout.strip()
 
 
-def build_inputs(upstreams: dict) -> dict:
-    """Everything that determines the build contexts, read from the lock."""
+def build_inputs(upstreams: dict, parts: list[str] | None = None) -> dict:
+    """Everything that determines the build contexts, read from the lock.
+
+    A project whose series lists a patch that does not exist yet stops the
+    build. With an explicit list of parts, an unlisted project's inputs are
+    recorded as incomplete instead, so the other series can still be prepared.
+    """
     manifest = read_json(upstreams["source_manifest"])
     sources = upstreams["sources"]
+    listed = [name for name in OPTIONAL_BUILD_PROJECTS if name in sources]
+    if listed and len(listed) != len(OPTIONAL_BUILD_PROJECTS):
+        raise SystemExit(f"{' and '.join(OPTIONAL_BUILD_PROJECTS)} are built together; the lock lists only {listed[0]}")
     base = sources["vllm_base_image"]
     inputs = {
         "base_image": f"{base['upstream']}@{base['recorded_base_digest']}",
@@ -1968,9 +2037,26 @@ def build_inputs(upstreams: dict) -> dict:
         "cutlass": {key: sources["cutlass"][key] for key in ("upstream", "revision", "release_tag")},
         "cutlass_dsl_wheels": expected_wheel_hashes(),
     }
-    for name in BUILD_PROJECTS:
+    for name in build_projects(sources):
         source = sources[name]
-        record = manifest[name]
+        missing = missing_patches(source)
+        if missing and (parts is None or name in parts):
+            raise SystemExit(
+                f"{name}: missing patch {', '.join(missing)}; add it and record its patch head, "
+                f"tree and fingerprint in {upstreams['source_manifest']}"
+            )
+        if missing:
+            inputs[name] = {
+                "upstream": source["upstream"],
+                "tracking_ref": source["tracking_ref"],
+                "revision": source["revision"],
+                "patch_series": source.get("patch_series"),
+                "missing_patches": missing,
+            }
+            continue
+        record = manifest.get(name)
+        if record is None:
+            raise SystemExit(f"{name}: {upstreams['source_manifest']} has no record")
         patchset = patchset_sha256(source)
         if patchset != record["patchset_sha256"]:
             raise SystemExit(
@@ -1986,6 +2072,14 @@ def build_inputs(upstreams: dict) -> dict:
             "patch_head": record["patch_head"],
             "expected_tree": record["expected_tree"],
         }
+        if name in OPTIONAL_BUILD_PROJECTS:
+            if not source.get("version"):
+                raise SystemExit(f"{name}: record its package version in the upstreams lock")
+            inputs[name]["version"] = source["version"]
+        if source.get("submodules"):
+            if not isinstance(record.get("submodules"), dict):
+                raise SystemExit(f"{name}: record its submodule commits in {upstreams['source_manifest']}")
+            inputs[name]["submodules"] = record["submodules"]
     if sources["vllm"].get("canonical_base"):
         inputs["vllm"]["canonical_upstream"] = sources["vllm"]["canonical_base"]["upstream"]
     return inputs
@@ -2011,7 +2105,25 @@ def project_problems(source: Path, record: dict) -> list[str]:
         problems.append(f"{source.name}: tree {tree}, expected {record['expected_tree']}")
     if head != record["patch_head"]:
         problems.append(f"{source.name}: patch head {head}, expected {record['patch_head']}")
+    if record.get("submodules") is not None and submodule_commits(source) != record["submodules"]:
+        problems.append(f"{source.name}: submodule checkouts differ from the source manifest")
     return problems
+
+
+def submodule_commits(source: Path) -> dict[str, str] | None:
+    """Each submodule's checked-out commit, or None when one is missing or
+    differs from the commit its superproject records."""
+    output = subprocess.run(
+        ["git", "submodule", "status", "--recursive"],
+        cwd=source, check=True, text=True, stdout=subprocess.PIPE,
+    ).stdout
+    commits = {}
+    for line in output.splitlines():
+        if not line.startswith(" "):
+            return None
+        commit, path = line[1:].split()[:2]
+        commits[path] = commit
+    return commits
 
 
 def replace_directory(temporary: Path, destination: Path) -> None:
@@ -2048,6 +2160,14 @@ def prepare_project(directory: Path, name: str, record: dict) -> None:
                     cwd=temporary,
                 )
         checked(["git", "diff", "--check", record["revision"], "HEAD"], cwd=temporary)
+        if record.get("submodules") is not None:
+            # The commits the patched superproject records, nested ones
+            # included; project_problems compares them with the manifest.
+            checked(
+                ["git", "submodule", "update", "--quiet", "--init", "--recursive",
+                 "--depth", "1", "--jobs", "4"],
+                cwd=temporary,
+            )
         problems = project_problems(temporary, record)
         if problems:
             raise SystemExit("; ".join(problems))
@@ -2176,7 +2296,7 @@ def build_problems(directory: Path, inputs: dict) -> list[str]:
         problems.append(f"prepared with build layout {record.get('schema')}, now {BUILD_LAYOUT}")
     if record.get("inputs") != inputs:
         problems.append("inputs.json does not match the lock")
-    for name in BUILD_PROJECTS:
+    for name in build_projects(inputs):
         problems.extend(project_problems(directory / "src" / name, inputs[name]))
     for name, digest in record.get("contexts", {}).items():
         context = directory / "context" / name
@@ -2184,7 +2304,7 @@ def build_problems(directory: Path, inputs: dict) -> list[str]:
             problems.append(f"{name}: context is missing")
         elif tree_digest(context) != digest:
             problems.append(f"{name}: context changed since it was prepared")
-    if sorted(record.get("contexts", {})) != sorted(BUILD_CONTEXTS):
+    if sorted(record.get("contexts", {})) != sorted(build_contexts(inputs)):
         problems.append("inputs.json does not record every build context")
     problems.extend(wheel_problems(directory / "context/cutlass-dsl-wheels"))
     if not (directory / "context/cutlass-source/include/cutlass/cutlass.h").is_file():
@@ -2194,19 +2314,24 @@ def build_problems(directory: Path, inputs: dict) -> list[str]:
 
 def command_build_prepare(args: argparse.Namespace) -> int:
     _, _, upstreams = configuration(args)
-    inputs = build_inputs(upstreams)
+    parts = args.only.split(",") if args.only else None
+    if parts:
+        unknown = sorted(set(parts) - set(BUILD_PARTS) - set(OPTIONAL_BUILD_PROJECTS))
+        if unknown:
+            raise SystemExit(f"unknown build parts: {', '.join(unknown)}")
+        unlisted = [part for part in parts if part in OPTIONAL_BUILD_PROJECTS and part not in upstreams["sources"]]
+        if unlisted:
+            raise SystemExit(f"{', '.join(unlisted)}: not listed in the upstreams lock")
+    inputs = build_inputs(upstreams, parts)
     directory = build_directory(inputs)
-    parts = args.only.split(",") if args.only else list(BUILD_PARTS)
-    unknown = sorted(set(parts) - set(BUILD_PARTS))
-    if unknown:
-        raise SystemExit(f"unknown build parts: {', '.join(unknown)}")
+    parts = parts or [*BUILD_PARTS, *build_projects(inputs)]
     if not args.only and not build_problems(directory, inputs):
         print(f"build inputs ready: {directory.relative_to(ROOT)}")
         return 0
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "inputs.json").unlink(missing_ok=True)
     print(f"preparing {directory.relative_to(ROOT)}", flush=True)
-    for name in BUILD_PROJECTS:
+    for name in build_projects(inputs):
         if name in parts:
             prepare_project(directory, name, inputs[name])
     if "cutlass" in parts:
@@ -2217,7 +2342,7 @@ def command_build_prepare(args: argparse.Namespace) -> int:
         print("partial preparation; run bin/spark3 build prepare for the complete inputs")
         return 0
     context = directory / "context"
-    for name in (*BUILD_PROJECTS, "cutlass"):
+    for name in (*build_projects(inputs), "cutlass"):
         export_source(directory / "src" / name, context / f"{name}-source")
     deleted = vllm_deletions(directory, inputs)
     deletions = context / "vllm-deletions"
@@ -2228,7 +2353,7 @@ def command_build_prepare(args: argparse.Namespace) -> int:
     record = {
         "schema": BUILD_LAYOUT,
         "inputs": inputs,
-        "contexts": {name: tree_digest(context / name) for name in BUILD_CONTEXTS},
+        "contexts": {name: tree_digest(context / name) for name in build_contexts(inputs)},
         "vllm_deletions": len(deleted),
     }
     temporary = directory / ".inputs.json"
@@ -2340,7 +2465,7 @@ def image_labels(tag: str) -> dict | None:
     return {"id": inspection["Id"], "labels": inspection["Config"].get("Labels") or {}}
 
 
-def smoke_image(cluster: dict, tag: str) -> None:
+def smoke_image(cluster: dict, tag: str, script: str = SMOKE_SCRIPT) -> None:
     require_idle_build_host(cluster)
     available = available_memory_gib()
     if available < SMOKE_MEMORY_GIB + 8:
@@ -2353,7 +2478,7 @@ def smoke_image(cluster: dict, tag: str) -> None:
             f"--memory={SMOKE_MEMORY_GIB}g", f"--memory-swap={SMOKE_MEMORY_GIB}g",
             "--entrypoint", "/usr/bin/python3", tag, "-",
         ],
-        input=SMOKE_SCRIPT,
+        input=script,
         text=True,
         check=True,
     )
@@ -2381,7 +2506,7 @@ def command_build_image(args: argparse.Namespace) -> int:
             "docker", "buildx", "build", "--platform", "linux/arm64", "--network", "host", "--load",
             "--file", str(ROOT / "docker/Dockerfile"), "--tag", tag,
         ]
-        for name in BUILD_CONTEXTS:
+        for name in build_contexts(inputs):
             rendered += ["--build-context", f"{name}={context / name}"]
         build_args = {
             "BASE_IMAGE": inputs["base_image"],
@@ -2391,7 +2516,7 @@ def command_build_image(args: argparse.Namespace) -> int:
             "VLLM_COMPILE_JOBS": str(jobs),
             "VLLM_NVCC_THREADS": str(BUILD_NVCC_THREADS),
         }
-        for name in BUILD_PROJECTS:
+        for name in build_projects(inputs):
             record = inputs[name]
             prefix = name.upper()
             build_args.update({
@@ -2401,6 +2526,10 @@ def command_build_image(args: argparse.Namespace) -> int:
                 f"{prefix}_PATCH_HEAD": record["patch_head"],
                 f"{prefix}_TREE": record["expected_tree"],
             })
+            if "version" in record:
+                build_args[f"{prefix}_VERSION"] = record["version"]
+        if "tilelang" in inputs:
+            build_args.update(RUNTIME_STAGE="runtime-tilelang", TILELANG_COMPILE_JOBS=str(jobs))
         for key, value in build_args.items():
             rendered += ["--build-arg", f"{key}={value}"]
         if os.environ.get("GITHUB_TOKEN"):
@@ -2433,12 +2562,12 @@ def command_build_image(args: argparse.Namespace) -> int:
     image = image_labels(tag)
     if image is None:
         raise SystemExit(f"the build finished but {tag} is not present")
-    for name in BUILD_PROJECTS:
+    for name in build_projects(inputs):
         label = image["labels"].get(f"local.spark3.{name}.tree")
         if label != inputs[name]["expected_tree"]:
             raise SystemExit(f"{tag}: label local.spark3.{name}.tree is {label!r}")
     print(f"built {tag} {image['id']} in {elapsed:.0f}s; lowest MemAvailable {minimum:.1f} GiB", flush=True)
-    smoke_image(cluster, tag)
+    smoke_image(cluster, tag, smoke_script(upstreams))
     receipts = directory / "images"
     receipts.mkdir(exist_ok=True)
     receipt = {
@@ -2457,8 +2586,8 @@ def command_build_image(args: argparse.Namespace) -> int:
 
 
 def command_build_smoke(args: argparse.Namespace) -> int:
-    cluster, _, _ = configuration(args)
-    smoke_image(cluster, args.image or cluster["container"]["image"])
+    cluster, _, upstreams = configuration(args)
+    smoke_image(cluster, args.image or cluster["container"]["image"], smoke_script(upstreams))
     return 0
 
 
@@ -3855,6 +3984,7 @@ def bench_identity(cluster: dict, nodes: dict, config_name: str, config_path: Pa
         "nodes_config": cluster.get("nodes_config", "config/nodes.json"),
         "topology": nodes,
         "transport": topology.transport(cluster),
+        "kernel_backend": kernel_backend.backend(cluster),
         "promoted_baseline": cluster.get("promoted_baseline"),
         "image": cluster["container"]["image"],
         "client_commit": repository_revision(),
@@ -4221,7 +4351,8 @@ def parser() -> argparse.ArgumentParser:
     build_prepare.add_argument(
         "--only",
         metavar="PARTS",
-        help="comma-separated subset of: " + ", ".join(BUILD_PARTS) + " (sources only, no contexts)",
+        help="comma-separated subset of: " + ", ".join((*BUILD_PARTS, *OPTIONAL_BUILD_PROJECTS))
+        + " (sources only, no contexts; the last two only when the lock lists them)",
     )
     build_prepare.set_defaults(func=command_build_prepare)
     build_check = build_commands.add_parser("check", help="verify the prepared build directory")

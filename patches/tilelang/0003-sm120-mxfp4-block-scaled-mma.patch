@@ -1,0 +1,448 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Sat, 3 Oct 2026 00:41:10 +0200
+Subject: [PATCH 3/3] [CUDA] Support SM120 MXFP4 block-scaled MMA
+
+Add mma.sync.m16n8k64.kind::mxf4nvf4.block_scale.scale_vec::2X with UE8M0
+scales, one per 32 K elements, for packed E2M1 operands. MXFP4 runs on the
+same packed-E2M1 operand path as NVFP4. T.gemm_blockscaled and
+T.mma_gemm_blockscaled select it when both operands are packed E2M1 and the
+scale granularity is 32; granularity 16 keeps NVFP4.
+
+A packed scale word covers two K64 atoms; the byte selector (0 or 2) picks
+the atom's half. The compact K-major scale package and the static
+four-block ping-pong remain NVFP4-only; MXFP4 uses row-major scale words.
+
+Validated on GB10 (sm_121a): exact MXFP4 products, and the block-scaled
+suites (212 tests) pass.
+---
+ src/cuda/codegen/codegen_cuda.cc              |  13 +-
+ .../cuda/instruction/mma_block_scale.h        |  54 +++++++-
+ ...tilelang_language_mxfp4_mma_block_scale.py | 127 ++++++++++++++++++
+ .../macro/mma_sm120_macro_generator.py        |  41 ++++--
+ tilelang/cuda/language/gemm_op.py             |   9 +-
+ tilelang/cuda/op/gemm/gemm_mma_sm120.py       |  12 +-
+ 6 files changed, 231 insertions(+), 25 deletions(-)
+ create mode 100644 testing/python/language/test_tilelang_language_mxfp4_mma_block_scale.py
+
+diff --git a/src/cuda/codegen/codegen_cuda.cc b/src/cuda/codegen/codegen_cuda.cc
+index 457fe9bf..4f4fb730 100644
+--- a/src/cuda/codegen/codegen_cuda.cc
++++ b/src/cuda/codegen/codegen_cuda.cc
+@@ -3390,19 +3390,25 @@ void CodeGenTileLangCUDA::VisitExpr_(const CallNode *op, std::ostream &os) {
+         row_col_f32 && shape == "m16n8k64" && kind == "mxf4nvf4" &&
+         scale_vec_size == 4 && A_dtype == "e2m1" && B_dtype == "e2m1" &&
+         scale_type == "ue4m3";
++    bool supported_mxf4nvf4_2x_ue8m0 =
++        row_col_f32 && shape == "m16n8k64" && kind == "mxf4nvf4" &&
++        scale_vec_size == 2 && A_dtype == "e2m1" && B_dtype == "e2m1" &&
++        scale_type == "ue8m0";
+     bool supported_mxf8f6f4_1x_ue8m0 =
+         row_col_f32 && shape == "m16n8k32" && kind == "mxf8f6f4" &&
+         scale_vec_size == 1 && scale_type == "ue8m0" &&
+         mxf8f6f4_operand_enums.count(A_dtype) &&
+         mxf8f6f4_operand_enums.count(B_dtype);
+-    ICHECK(supported_mxf4nvf4_4x_ue4m3 || supported_mxf8f6f4_1x_ue8m0)
++    ICHECK(supported_mxf4nvf4_4x_ue4m3 || supported_mxf4nvf4_2x_ue8m0 ||
++           supported_mxf8f6f4_1x_ue8m0)
+         << "Unsupported ptx_mma_block_scale configuration: accum_dtype="
+         << accum_dtype << ", shape=" << shape << ", A_layout=" << A_layout
+         << ", B_layout=" << B_layout << ", kind=" << kind
+         << ", scale_vec_size=" << scale_vec_size << ", A_dtype=" << A_dtype
+         << ", B_dtype=" << B_dtype << ", scale_type=" << scale_type
+         << ". Currently supported: f32 m16n8k64 row.col kind::mxf4nvf4 "
+-           "scale_vec::4X e2m1.e2m1 f32 ue4m3, and f32 m16n8k32 row.col "
++           "scale_vec::4X e2m1.e2m1 f32 ue4m3 or scale_vec::2X e2m1.e2m1 f32 "
++           "ue8m0, and f32 m16n8k32 row.col "
+            "kind::mxf8f6f4 scale_vec::1X {e2m1,e3m2,e2m3,e4m3,e5m2} f32 ue8m0.";
+ 
+     auto resolve_fp4_packed_buffer =
+@@ -3423,6 +3429,9 @@ void CodeGenTileLangCUDA::VisitExpr_(const CallNode *op, std::ostream &os) {
+     std::string mma_kind_enum = "tl::SM120MmaBlockScaledKind::kMxf4nvf4";
+     std::string scale_type_enum = "tl::SM120MmaScaleType::kUE4M3";
+     std::string operand_type_enums;
++    if (supported_mxf4nvf4_2x_ue8m0) {
++      scale_type_enum = "tl::SM120MmaScaleType::kUE8M0";
++    }
+     if (supported_mxf8f6f4_1x_ue8m0) {
+       mma_kind_enum = "tl::SM120MmaBlockScaledKind::kMxf8f6f4";
+       scale_type_enum = "tl::SM120MmaScaleType::kUE8M0";
+diff --git a/src/tl_templates/cuda/instruction/mma_block_scale.h b/src/tl_templates/cuda/instruction/mma_block_scale.h
+index 0d579fe5..b5f0a0dc 100644
+--- a/src/tl_templates/cuda/instruction/mma_block_scale.h
++++ b/src/tl_templates/cuda/instruction/mma_block_scale.h
+@@ -51,6 +51,12 @@ struct SM120MmaBlockScaledConfig<SM120MmaBlockScaledKind::kMxf4nvf4, 4,
+   static constexpr bool kSupported = true;
+ };
+ 
++template <>
++struct SM120MmaBlockScaledConfig<SM120MmaBlockScaledKind::kMxf4nvf4, 2,
++                                 SM120MmaScaleType::kUE8M0> {
++  static constexpr bool kSupported = true;
++};
++
+ template <>
+ struct SM120MmaBlockScaledConfig<SM120MmaBlockScaledKind::kMxf8f6f4, 1,
+                                  SM120MmaScaleType::kUE8M0> {
+@@ -99,6 +105,38 @@ TL_DEVICE void sm120_mma_m16n8k64_mxf4nvf4_4x_ue4m3(
+       scale_a_byte_id, scale_a_thread_id, scale_b_byte_id, scale_b_thread_id);
+ }
+ 
++// SM120a MXFP4 block-scaled warp MMA, one UE8M0 scale per 32 K elements:
++// mma.sync.aligned.m16n8k64.row.col.kind::mxf4nvf4.block_scale.scale_vec::2X
++// The two scales of a K64 atom sit in one half of the scale word; the byte
++// selector (0 or 2) picks the half.
++TL_DEVICE void sm120_mma_m16n8k64_mxf4nvf4_2x_ue8m0(
++    float *d, const uint32_t *a, const uint32_t *b, const float *c,
++    uint32_t scale_a, uint32_t scale_b, uint16_t scale_a_byte_id,
++    uint16_t scale_a_thread_id, uint16_t scale_b_byte_id,
++    uint16_t scale_b_thread_id) {
++#if defined(CUTE_ARCH_MXF4NVF4_2X_UE8M0_MMA_ENABLED) &&                        \
++    defined(TL_SM120_BLOCK_SCALED_MMA_ENABLED)
++  asm volatile(
++      "mma.sync.aligned.m16n8k64.row.col.kind::mxf4nvf4.block_scale.scale_vec::"
++      "2X.f32.e2m1.e2m1.f32.ue8m0 "
++      "{%0, %1, %2, %3}, "
++      "{%4, %5, %6, %7}, "
++      "{%8, %9}, "
++      "{%10, %11, %12, %13}, "
++      "{%14}, {%15, %16}, "
++      "{%17}, {%18, %19};\n"
++      : "=f"(d[0]), "=f"(d[1]), "=f"(d[2]), "=f"(d[3])
++      : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]),
++        "f"(c[0]), "f"(c[1]), "f"(c[2]), "f"(c[3]), "r"(scale_a),
++        "h"(scale_a_byte_id), "h"(scale_a_thread_id), "r"(scale_b),
++        "h"(scale_b_byte_id), "h"(scale_b_thread_id));
++#else
++  CUTE_INVALID_CONTROL_PATH(
++      "tl::sm120_mma_sync_blockscaled kind::mxf4nvf4 scale_vec::2X requires "
++      "sm_120a/f or sm_121a/f and CUDA 12.8 or later");
++#endif
++}
++
+ // SM120a MX block-scaled warp MMA, one UE8M0 scale per 32 K elements:
+ // mma.sync.aligned.m16n8k32.row.col.kind::mxf8f6f4.block_scale.scale_vec::1X
+ // The byte selector picks one of the four K32 scales packed in a scale word.
+@@ -212,15 +250,21 @@ TL_DEVICE void sm120_mma_sync_blockscaled(float *d, const uint32_t *a,
+   static_assert(
+       SM120MmaBlockScaledConfig<Kind, ScaleVecSize, SType>::kSupported,
+       "Unsupported sm120 mma.block_scale configuration: kind::mxf4nvf4 needs "
+-      "scale_vec::4X with ue4m3 scales, kind::mxf8f6f4 needs scale_vec::1X "
+-      "with ue8m0 scales");
++      "scale_vec::4X with ue4m3 or scale_vec::2X with ue8m0 scales, "
++      "kind::mxf8f6f4 needs scale_vec::1X with ue8m0 scales");
+   if constexpr (Kind == SM120MmaBlockScaledKind::kMxf4nvf4) {
+     static_assert(AType == SM120MmaOperandType::kE2M1 &&
+                       BType == SM120MmaOperandType::kE2M1,
+                   "kind::mxf4nvf4 only supports e2m1 operands");
+-    detail::sm120_mma_m16n8k64_mxf4nvf4_4x_ue4m3(
+-        d, a, b, c, scale_a, scale_b, scale_a_byte_id, scale_a_thread_id,
+-        scale_b_byte_id, scale_b_thread_id);
++    if constexpr (ScaleVecSize == 4) {
++      detail::sm120_mma_m16n8k64_mxf4nvf4_4x_ue4m3(
++          d, a, b, c, scale_a, scale_b, scale_a_byte_id, scale_a_thread_id,
++          scale_b_byte_id, scale_b_thread_id);
++    } else {
++      detail::sm120_mma_m16n8k64_mxf4nvf4_2x_ue8m0(
++          d, a, b, c, scale_a, scale_b, scale_a_byte_id, scale_a_thread_id,
++          scale_b_byte_id, scale_b_thread_id);
++    }
+   } else {
+     detail::sm120_mma_m16n8k32_mxf8f6f4_1x_ue8m0<AType, BType>(
+         d, a, b, c, scale_a, scale_b, scale_a_byte_id, scale_a_thread_id,
+diff --git a/testing/python/language/test_tilelang_language_mxfp4_mma_block_scale.py b/testing/python/language/test_tilelang_language_mxfp4_mma_block_scale.py
+new file mode 100644
+index 00000000..c47929b2
+--- /dev/null
++++ b/testing/python/language/test_tilelang_language_mxfp4_mma_block_scale.py
+@@ -0,0 +1,127 @@
++"""SM120/SM121 ``mma.sync kind::mxf4nvf4.block_scale.scale_vec::2X`` (MXFP4, UE8M0 per 32)."""
++
++import pytest
++
++import tilelang
++import tilelang.language as T
++import tilelang.testing
++from tilelang import tvm
++from tilelang.cuda.intrinsics.macro.mma_sm120_macro_generator import block_scale_mma_kind_for_dtypes
++from tilelang.cuda.language.intrinsics import TensorCoreIntrinEmitterSM120
++
++_E2M1_VALUES = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, -0.0, -0.5, -1.0, -1.5, -2.0, -3.0, -4.0, -6.0)
++
++
++def _emitter():
++    return TensorCoreIntrinEmitterSM120(
++        is_blockscaled=True,
++        kind="mxf4nvf4",
++        scale_vec_size=2,
++        stype="ue8m0",
++        a_dtype=T.float4_e2m1fn,
++        b_dtype=T.float4_e2m1fn,
++        accum_dtype=T.float32,
++        a_transposed=False,
++        b_transposed=True,
++        block_row_warps=2,
++        block_col_warps=2,
++        warp_row_tiles=32,
++        warp_col_tiles=32,
++        chunk=128,
++        num_elems_per_byte=2,
++    )
++
++
++def test_mxfp4_selected_by_granularity():
++    assert block_scale_mma_kind_for_dtypes("float4_e2m1fn", "float4_e2m1fn", 32) == ("mxf4nvf4", 2, "ue8m0")
++    assert block_scale_mma_kind_for_dtypes("float4_e2m1fn", "float4_e2m1fn", 16) == ("mxf4nvf4", 4, "ue4m3")
++
++
++def test_mxfp4_emitter_selects_scale_halves():
++    emitter = _emitter()
++    assert emitter.mma_prefix == "m16n8k64"
++    assert emitter.uses_packed_fp4 and not emitter.is_nvf4
++    # Each K64 atom reads one half of the packed word: selector 0, then 2.
++    assert [emitter._scale_byte_id(0, ki, 32) for ki in range(2)] == [0, 2]
++    assert [emitter._scale_word_k(0, ki, 32) for ki in range(4)] == [0, 0, 1, 1]
++
++
++def _make_mxfp4_matmul_kernel(M, N, K):
++    words = K // 128
++
++    @T.prim_func
++    def main(
++        A: T.Tensor((M, K), T.float4_e2m1fn),
++        B: T.Tensor((N, K), T.float4_e2m1fn),
++        SFA: T.Tensor((M, words), T.uint32),
++        SFB: T.Tensor((N, words), T.uint32),
++        C: T.Tensor((M, N), T.float32),
++    ):
++        with T.Kernel(T.ceildiv(N, 64), T.ceildiv(M, 64), threads=128) as (bx, by):
++            A_shared = T.alloc_shared((64, 128), T.float4_e2m1fn)
++            B_shared = T.alloc_shared((64, 128), T.float4_e2m1fn)
++            SFA_shared = T.alloc_shared((64, 1), T.uint32)
++            SFB_shared = T.alloc_shared((64, 1), T.uint32)
++            C_local = T.alloc_fragment((64, 64), T.float32)
++            T.clear(C_local)
++            for ko in T.serial(K // 128):
++                for i, k in T.Parallel(64, 128):
++                    A_shared[i, k] = A[by * 64 + i, ko * 128 + k]
++                for j, k in T.Parallel(64, 128):
++                    B_shared[j, k] = B[bx * 64 + j, ko * 128 + k]
++                for i in T.Parallel(64):
++                    SFA_shared[i, 0] = SFA[by * 64 + i, ko]
++                for j in T.Parallel(64):
++                    SFB_shared[j, 0] = SFB[bx * 64 + j, ko]
++                T.mma_gemm_blockscaled(
++                    A_shared,
++                    B_shared,
++                    C_local,
++                    SFA_shared,
++                    SFB_shared,
++                    transpose_B=True,
++                    k_start=0,
++                    sf_a_granularity_k=32,
++                    sf_b_granularity_k=32,
++                )
++            T.copy(C_local, C[by * 64, bx * 64])
++
++    return main
++
++
++@pytest.mark.parametrize("arch", ["sm_120a", "sm_121a"])
++def test_mxfp4_codegen(arch):
++    target = tvm.target.Target({"kind": "cuda", "arch": arch})
++    with target:
++        result = tilelang.lower(_make_mxfp4_matmul_kernel(64, 64, 256), target=target, enable_device_compile=False)
++    assert "tl::SM120MmaBlockScaledKind::kMxf4nvf4, 2, tl::SM120MmaScaleType::kUE8M0" in result.kernel_source
++
++
++def _random_mxfp4(rows, K, seed):
++    """Packed E2M1 codes and power-of-two UE8M0 scales; products sum exactly in FP32."""
++    import torch
++
++    gen = torch.Generator(device="cuda").manual_seed(seed)
++    codes = torch.randint(0, 16, (rows, K), generator=gen, device="cuda").to(torch.uint8)
++    packed = (codes[:, 0::2] | (codes[:, 1::2] << 4)).view(torch.int8).contiguous()
++    exponents = (127 + torch.randint(-2, 3, (rows, K // 32), generator=gen, device="cuda")).to(torch.uint8)
++    values = torch.tensor(_E2M1_VALUES, device="cuda")[codes.long()]
++    return packed, exponents, values * torch.exp2(exponents.float() - 127.0).repeat_interleave(32, dim=1)
++
++
++@tilelang.testing.requires_cuda
++@tilelang.testing.requires_cuda_compute_version_ge(12, 0)
++@tilelang.testing.requires_cuda_compute_version_lt(13, 0)
++@pytest.mark.parametrize("M, N, K", [(64, 64, 128), (128, 192, 512)])
++def test_mxfp4_mma_block_scale_correctness(M, N, K):
++    import torch
++
++    a, sfa, a_values = _random_mxfp4(M, K, seed=5)
++    b, sfb, b_values = _random_mxfp4(N, K, seed=6)
++    kernel = tilelang.compile(_make_mxfp4_matmul_kernel(M, N, K), target="cuda", out_idx=[4])
++    out = kernel(a, b, sfa.view(torch.uint32), sfb.view(torch.uint32))
++    torch.testing.assert_close(out, a_values @ b_values.T, rtol=0, atol=0)
++
++
++if __name__ == "__main__":
++    tilelang.testing.main()
+diff --git a/tilelang/cuda/intrinsics/macro/mma_sm120_macro_generator.py b/tilelang/cuda/intrinsics/macro/mma_sm120_macro_generator.py
+index fb461c77..32ca2c76 100644
+--- a/tilelang/cuda/intrinsics/macro/mma_sm120_macro_generator.py
++++ b/tilelang/cuda/intrinsics/macro/mma_sm120_macro_generator.py
+@@ -274,6 +274,17 @@ _SUPPORTED_BLOCK_SCALE_MMA_CONFIGS = {
+         scale_type="ue4m3",
+         operand_dtype_abbrvs=("e2m1",),
+     ),
++    # MXFP4: packed E2M1 with one UE8M0 scale per 32 K elements. A scale word
++    # covers two K64 atoms; the byte selector (0 or 2) picks the atom's half.
++    ("mxf4nvf4", 2, "ue8m0"): BlockScaleMmaConfig(
++        kind="mxf4nvf4",
++        mma_prefix="m16n8k64",
++        atom_k=64,
++        scale_vec_size=2,
++        sf_vec_size=32,
++        scale_type="ue8m0",
++        operand_dtype_abbrvs=("e2m1",),
++    ),
+     # MX block scaling: one UE8M0 scale per 32 K elements. A packed scale word
+     # holds the scales of four consecutive K32 atoms; the byte selector picks one.
+     # Every operand occupies one byte per element in the MMA registers: FP8
+@@ -301,14 +312,16 @@ def block_scale_register_dtype(dtype) -> str:
+     return "uint8" if "float4_e2m1_unpacked" in str(dtype) else str(dtype)
+ 
+ 
+-def block_scale_mma_kind_for_dtypes(a_dtype: str, b_dtype: str) -> tuple[str, int, str]:
++def block_scale_mma_kind_for_dtypes(a_dtype: str, b_dtype: str, sf_granularity_k: int = 16) -> tuple[str, int, str]:
+     """Return the SM120 ``(kind, scale_vec_size, scale_type)`` for operand dtypes.
+ 
+-    Packed E2M1 on both sides selects NVF4; any byte-per-element operand
+-    (FP8, or E2M1 in unpacked shared storage) selects MX ``kind::mxf8f6f4``.
++    Packed E2M1 on both sides selects ``kind::mxf4nvf4``: NVFP4 (UE4M3 per 16)
++    or, with a granularity of 32, MXFP4 (UE8M0 per 32). Any byte-per-element
++    operand (FP8, or E2M1 in unpacked shared storage) selects MX
++    ``kind::mxf8f6f4``.
+     """
+     if _is_packed_fp4(a_dtype) and _is_packed_fp4(b_dtype):
+-        return "mxf4nvf4", 4, "ue4m3"
++        return ("mxf4nvf4", 2, "ue8m0") if int(sf_granularity_k) == 32 else ("mxf4nvf4", 4, "ue4m3")
+     return "mxf8f6f4", 1, "ue8m0"
+ 
+ 
+@@ -405,10 +418,15 @@ class TensorCoreIntrinEmitterSM120(MMAIntrinEmitter):
+             super()._initialize_abbrev(a_dtype, b_dtype, accum_dtype)
+ 
+     @property
+-    def is_nvf4(self) -> bool:
+-        """Whether this emitter issues the packed-E2M1 ``kind::mxf4nvf4`` MMA."""
++    def uses_packed_fp4(self) -> bool:
++        """Whether operands are packed E2M1 (``kind::mxf4nvf4``, NVFP4 or MXFP4)."""
+         return self.is_blockscaled and self.kind == "mxf4nvf4"
+ 
++    @property
++    def is_nvf4(self) -> bool:
++        """Whether this emitter issues NVFP4 (``kind::mxf4nvf4.scale_vec::4X``)."""
++        return self.uses_packed_fp4 and self.scale_vec_size == 4
++
+     def _initialize_mma_prefix(self, k_dim: int = 16):
+         if self.is_blockscaled:
+             self.mma_prefix = self.block_scale_config.mma_prefix
+@@ -416,7 +434,7 @@ class TensorCoreIntrinEmitterSM120(MMAIntrinEmitter):
+             super()._initialize_mma_prefix(k_dim)
+ 
+     def make_mma_load_layout(self, local_buf, matrix="A"):
+-        if not self.is_nvf4 or matrix != "A":
++        if not self.uses_packed_fp4 or matrix != "A":
+             return super().make_mma_load_layout(local_buf, matrix)
+ 
+         # SM120 A registers are ordered (K8, M8, K32), matching ldmatrix.x4.
+@@ -457,7 +475,7 @@ class TensorCoreIntrinEmitterSM120(MMAIntrinEmitter):
+         )
+ 
+     def ldmatrix_a(self, A_local_buf: Buffer, A_shared_buf: Buffer | BufferRegion, ki: PrimExpr, rk: PrimExpr | None = 0):
+-        if not self.is_nvf4:
++        if not self.uses_packed_fp4:
+             return super().ldmatrix_a(A_local_buf, A_shared_buf, ki, rk)
+         warp_row_tiles = self.warp_row_tiles
+         warp_rows = self.warp_rows
+@@ -507,7 +525,7 @@ class TensorCoreIntrinEmitterSM120(MMAIntrinEmitter):
+         return _warp_ld_a_e2m1(A_local_buf, A_region, ki, thread_binding, rk)
+ 
+     def ldmatrix_b(self, B_local_buf: Buffer, B_shared_buf: Buffer | BufferRegion, ki: PrimExpr, rk: PrimExpr | None = 0):
+-        if not self.is_nvf4:
++        if not self.uses_packed_fp4:
+             return super().ldmatrix_b(B_local_buf, B_shared_buf, ki, rk)
+         warp_col_tiles = self.warp_col_tiles
+         warp_cols = self.warp_cols
+@@ -600,10 +618,11 @@ class TensorCoreIntrinEmitterSM120(MMAIntrinEmitter):
+         """Byte of the packed scale word that holds this K atom's scale.
+ 
+         ``scale_vec::4X`` consumes all four bytes, so its selector is 0. With
+-        ``scale_vec::1X`` each K32 atom reads one byte. The selector folds to a
++        ``scale_vec::2X`` a K64 atom reads one half (selector 0 or 2), and with
++        ``scale_vec::1X`` a K32 atom reads one byte. The selector folds to a
+         constant when the K tile is a multiple of four scale blocks.
+         """
+-        if self.scale_vec_size != 1:
++        if self.scale_vec_size == 4:
+             return 0
+         _k_start = tvm.tirx.const(k_start, "int32") if isinstance(k_start, int) else k_start
+         return (_k_start + self.micro_size_k * ki) // int(sf_granularity_k) % 4
+diff --git a/tilelang/cuda/language/gemm_op.py b/tilelang/cuda/language/gemm_op.py
+index 7d2ac075..74b565df 100644
+--- a/tilelang/cuda/language/gemm_op.py
++++ b/tilelang/cuda/language/gemm_op.py
+@@ -117,8 +117,9 @@ def gemm_blockscaled(
+       ``(1,2,1)``.
+     - SM120 family (SM120, SM121), ``C`` in a fragment: synchronous warp
+       MMA with FP32 accumulation. Packed E2M1 operands use
+-      ``mma.sync.m16n8k64.kind::mxf4nvf4.block_scale`` with UE4M3 scales
+-      (granularity 16). E4M3/E5M2 operands, or E2M1 in
++      ``mma.sync.m16n8k64.kind::mxf4nvf4.block_scale``, with UE4M3 scales
++      for granularity 16 (NVFP4) or UE8M0 scales for granularity 32 (MXFP4).
++      E4M3/E5M2 operands, or E2M1 in
+       ``float4_e2m1_unpacked`` shared memory, use
+       ``mma.sync.m16n8k32.kind::mxf8f6f4.block_scale`` with UE8M0 scales
+       (granularity 32); A and B may differ. Scale words pack four
+@@ -427,7 +428,9 @@ def mma_gemm_blockscaled(
+     The operand dtypes select the instruction:
+ 
+     - packed E2M1 A and B: ``m16n8k64.kind::mxf4nvf4.block_scale.scale_vec::4X``
+-      with UE4M3 scales, ``sf_*_granularity_k=16``;
++      with UE4M3 scales and ``sf_*_granularity_k=16`` (NVFP4), or
++      ``scale_vec::2X`` with UE8M0 scales and ``sf_*_granularity_k=32``
++      (MXFP4, ``sf_layout="rowmajor"``);
+     - E4M3/E5M2, or E2M1 stored as ``float4_e2m1_unpacked`` shared memory:
+       ``m16n8k32.kind::mxf8f6f4.block_scale.scale_vec::1X`` with UE8M0 scales,
+       ``sf_*_granularity_k=32`` and ``sf_layout="rowmajor"``.
+diff --git a/tilelang/cuda/op/gemm/gemm_mma_sm120.py b/tilelang/cuda/op/gemm/gemm_mma_sm120.py
+index 6421379c..95643302 100644
+--- a/tilelang/cuda/op/gemm/gemm_mma_sm120.py
++++ b/tilelang/cuda/op/gemm/gemm_mma_sm120.py
+@@ -33,8 +33,9 @@ class GemmMMASm120BlockScaled(GemmBlockScaledMixin, GemmMMA):
+     """SM120 warp-level block-scaled MMA lowering.
+ 
+     The operand dtypes select the instruction: packed E2M1 operands issue
+-    ``kind::mxf4nvf4`` (UE4M3 scales per 16 K), and E4M3/E5M2 operands issue
+-    ``kind::mxf8f6f4`` (UE8M0 scales per 32 K). Both read uint32 words that
++    ``kind::mxf4nvf4``, as NVFP4 (UE4M3 scales per 16 K) or MXFP4 (UE8M0
++    scales per 32 K), and E4M3/E5M2 operands issue ``kind::mxf8f6f4`` (UE8M0
++    scales per 32 K). Both read uint32 words that
+     pack the scales of four consecutive scale blocks.
+ 
+     A may be shared or a full fragment; B remains shared. Fragment A and
+@@ -59,12 +60,15 @@ class GemmMMASm120BlockScaled(GemmBlockScaledMixin, GemmMMA):
+ 
+     @property
+     def block_scale_kind(self) -> tuple[str, int, str]:
+-        return block_scale_mma_kind_for_dtypes(self.a_dtype, self.b_dtype)
++        return block_scale_mma_kind_for_dtypes(self.a_dtype, self.b_dtype, self.sf_a_granularity_k)
+ 
+     def _validate_operands(self) -> None:
+         if not (self.is_gemm_ss() or self.is_gemm_rs()):
+             raise ValueError("T.mma_gemm_blockscaled requires shared or fragment A and shared B")
+-        if self.block_scale_kind[0] == "mxf8f6f4":
++        kind, scale_vec_size, _ = self.block_scale_kind
++        if kind == "mxf4nvf4" and scale_vec_size == 2 and self.sf_layout != "rowmajor":
++            raise ValueError("SM120 MXFP4 block-scaled GEMM currently requires sf_layout='rowmajor'")
++        if kind == "mxf8f6f4":
+             if self.sf_layout != "rowmajor":
+                 raise ValueError("SM120 kind::mxf8f6f4 block-scaled GEMM currently requires sf_layout='rowmajor'")
+             if self.is_gemm_rs():

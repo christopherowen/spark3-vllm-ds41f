@@ -24,6 +24,7 @@ and running on all three nodes from `config/cluster.json`.
 | Memory-saver | signed DKMS 0.2.0 on all nodes; loaded UVM leaf-table packing enabled |
 | Page-size profiles | 64 KiB selected; 4 KiB retains 2.2 GiB KV and a 262,144-token limit |
 | Display carve-out | embedding and output-head weights (842.5 MiB per rank) in the firmware scanout reserve (`SPARK3_DISPLAY_CARVEOUT_WEIGHTS=1`, the GPU's DRM card by PCI path, `/dev/dri/by-path/pci-000f:01:00.0-card`, as `/dev/dri/card0`); the DRM file closes after the import, so the text console keeps drawing |
+| Kernel backend | B12X (the default; neither `kernel_backend` nor `VLLM_DS41_KERNEL_BACKEND` is set); TileLang is a [candidate](kernel-backends.md) |
 | Sparse-attention arithmetic | B12X's tuned choice (`VLLM_DS41_ATTENTION_COMPUTE=auto`); BF16 (patch 0023) is available and off pending a fidelity test |
 | Image input | vision tower loaded, up to 4 images per request, no host preprocessing cache |
 | DSpark | 5 draft tokens, draft TP 3, adaptive verification (cost scale 2.0), dead verification rows below survival 0.2, block rejection; vocabulary-parallel greedy drafts, NVFP4 drafter head and Markov projection |

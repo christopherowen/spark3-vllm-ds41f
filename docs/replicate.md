@@ -104,7 +104,9 @@ named by the lock's inputs. It fetches the pinned vLLM and B12X revisions,
 applies the patch series, and checks both against the source manifest's
 patch heads and trees. It also fetches CUTLASS and the hash-locked CuTe DSL
 wheels, then exports clean build contexts. Re-running it reuses or repairs the
-directory. `build image --apply`:
+directory. A profile that selects the TileLang kernel backend also fetches
+TileLang and TileKernels ([kernel-backends.md](kernel-backends.md)).
+`build image --apply`:
 
 - refuses to run next to a live service;
 - sizes compile jobs to available memory, and cancels if MemAvailable falls

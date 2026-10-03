@@ -175,3 +175,12 @@ jobs:
         run: python3 experiments/2026-10-03-collective-contract/test-contract.py
       - name: Check TP3 and TP4 layout against pinned source helpers
         run: python3 experiments/2026-10-03-transport-profiles/check-layout-source.py
+
+  tilelang-kernels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Use the example site configuration
+        run: cp config/nodes.example.json config/nodes.json
+      - name: Apply the candidate series and check the patch heads, trees and submodule commits
+        run: bin/spark3 --cluster-config experiments/2026-10-03-tilelang-kernels/cluster.json build prepare --only vllm,tilelang,tile_kernels
