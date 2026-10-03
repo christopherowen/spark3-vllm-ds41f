@@ -1,16 +1,13 @@
 {
   "schema_version": 1,
   "promoted_baseline": "2026-10-02-karmic-kraken-r5o-64k",
-  "kernel_backend": "tilelang",
   "container": {
     "name": "dsv41-karmic-kraken",
-    "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v3",
+    "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-v1",
     "expected_labels": {
-      "local.spark3.vllm.tree": "fe2f92f6c9d2c7cb1aa32b5d3a0ae96932a7de25",
+      "local.spark3.vllm.tree": "eddc36748f26903f27fc81eefe5435b0348dcf57",
       "local.spark3.b12x.tree": "cd615bd69ed1a99d6b59217329a3ff429b5277fe",
-      "local.spark3.nccl.tree": "6af10aa730a64fcee8781d62340a9c9184e79469",
-      "local.spark3.tilelang.tree": "1697ad52fab8379ce78f9abc547c7b1e02cd9c5e",
-      "local.spark3.tile_kernels.tree": "647708813ac13c2fac5bdcd252f6cb8390379b85"
+      "local.spark3.nccl.tree": "6af10aa730a64fcee8781d62340a9c9184e79469"
     },
     "docker_run_args": [
       "--network=host",
@@ -122,7 +119,6 @@
     "VLLM_CACHE_ROOT": "/cache/kkref/jit/vllm-r5o",
     "VLLM_DS41_DRAFT_NVFP4_HEAD": "0",
     "VLLM_DS41_ENGRAM_OVERLAP": "0",
-    "VLLM_DS41_KERNEL_BACKEND": "tilelang",
     "VLLM_DS41_MARKOV_NVFP4": "0",
     "VLLM_ENABLE_PCIE_ALLREDUCE": "0",
     "VLLM_ENABLE_ROCE_ALLREDUCE": "1",
@@ -155,7 +151,7 @@
     "NCCL_IB_SUBNET_PREFIX_LEN": "24",
     "B12X_ROCE_TOPOLOGY": "ring4",
     "B12X_ROCE_MESH_ROTATE": "0",
-    "SPARK3_DSPARK_COST_DIR": "/cache/kkref/dspark-costs/ring4-tilelang-v3-nativeheads-20261003",
+    "SPARK3_DSPARK_COST_DIR": "/cache/kkref/dspark-costs/ring4-collective-nativeheads-20261003",
     "NCCL_SWITCHLESS_BIDIRECTIONAL": "2",
     "NCCL_MIN_TRAFFIC_PER_CHANNEL": "512",
     "NCCL_THREAD_THRESHOLDS": "-2 -2 -2 1 1 1",
@@ -200,13 +196,13 @@
     "--engram-config",
     "{\"table_memory\":\"disk\",\"disk_resident_scales\":false,\"projection_tp\":true}",
     "--attention-backend",
-    "TILELANG",
+    "B12X",
     "--linear-backend",
-    "tilelang",
+    "b12x",
     "--moe-backend",
-    "tilelang",
+    "b12x",
     "--speculative-config",
-    "{\"method\":\"dspark\",\"num_speculative_tokens\":5,\"draft_tensor_parallel_size\":4,\"attention_backend\":\"TILELANG\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"block\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":2.0}",
+    "{\"method\":\"dspark\",\"num_speculative_tokens\":5,\"draft_tensor_parallel_size\":4,\"attention_backend\":\"B12X\",\"draft_sample_method\":\"greedy\",\"rejection_sample_method\":\"block\",\"enable_adaptive_verification\":true,\"adaptive_verification_cost_scale\":2.0}",
     "--jit-monitor-mode",
     "warn",
     "--compilation-config",
@@ -232,7 +228,7 @@
     "--mm-processor-cache-gb",
     "0",
     "--profiler-config",
-    "{\"profiler\":\"torch\",\"torch_profiler_dir\":\"/cache/kkref/profiles/ring4-tilelang-20261003\",\"torch_profiler_with_stack\":false,\"torch_profiler_record_shapes\":true,\"ignore_frontend\":true,\"torch_profiler_use_gzip\":true}"
+    "{\"profiler\":\"torch\",\"torch_profiler_dir\":\"/cache/kkref/profiles/ring4-collective-20261003\",\"torch_profiler_with_stack\":false,\"torch_profiler_record_shapes\":true,\"ignore_frontend\":true,\"torch_profiler_use_gzip\":true}"
   ],
   "distributed": {
     "master_addr": "10.0.1.71",
@@ -249,22 +245,22 @@
   "fabric": {
     "transport": "rocenante-ring4"
   },
-  "upstreams_config": "experiments/2026-10-03-tilelang-kernels/tp4/upstreams.lock.json",
+  "upstreams_config": "experiments/2026-10-03-collective-contract/upstreams.lock.json",
   "tuning_origin": {
-    "catalog": "experiments/2026-10-03-tilelang-kernels/profiles.json",
-    "catalog_sha256": "0d4c74716d19ce0c27ce699404371a4effcf8557f6552499d20dfe53432a7ed0",
+    "catalog": "experiments/2026-10-03-transport-profiles/profiles.json",
+    "catalog_sha256": "c84f6b50805f4ed4a5b158f811ad6bfb1d8db936cc8a6741fc174d927922841e",
     "profile": "tp4",
-    "base_config": "experiments/2026-10-03-tilelang-kernels/tp4/cluster.json",
-    "base_sha256": "44c37b138eb0151d1c73931b10a4ad05b5c5f78b2eacda3d917cacc9afd2ead7",
+    "base_config": "experiments/2026-10-03-collective-contract/candidate.json",
+    "base_sha256": "cd15b6caa6c02559f90831099c70e7dab500b5118b1004b365109d73027497aa",
     "derived_layout": {
       "authority": "derived audit, not runtime options or a live observation",
       "audit_file": "experiments/2026-10-03-transport-profiles/model-layout.json",
-      "audit_sha256": "2b77289584e8f58d49c1118b35df1edd020d248589a66e25490ccaf8dee96f68",
+      "audit_sha256": "bf680f2ceecf74c32a82e494a7f7a32e0033724e2d5cee7464076a70abe98186",
       "evidence": "experiments/2026-10-03-tp3-tp4-comparison/padding.md",
       "model_snapshot": "dba1be0a40aa45a94ad051997016db3960a90277",
       "checkpoint_config_sha256": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
       "source_trees": {
-        "vllm": "fe2f92f6c9d2c7cb1aa32b5d3a0ae96932a7de25",
+        "vllm": "eddc36748f26903f27fc81eefe5435b0348dcf57",
         "b12x": "cd615bd69ed1a99d6b59217329a3ff429b5277fe"
       },
       "tensor_parallel_size": 4,
@@ -500,9 +496,9 @@
         "storage_note": "Serialized tensor storage only: excludes scalar scales, allocator rounding and plan-dependent GEMM workspaces. Activation examples use actual head input rows, not necessarily the scheduled batch rows."
       },
       "kernel_scratch": {
-        "compact_moe_n64_path": false,
-        "compact_moe_intermediate_width_when_selected": null,
-        "note": "TileLang's routed-expert GEMMs read K in blocks of 128, or of 192 or 64 when 128 does not divide the per-rank width (TP4's 576), so neither weights nor scratch are padded."
+        "compact_moe_n64_path": true,
+        "compact_moe_intermediate_width_when_selected": 640,
+        "note": "Scratch alignment is not expert weight padding; actual kernel selection also depends on routed rows."
       },
       "scheduled_rows": {
         "target_graph_capacities": [
