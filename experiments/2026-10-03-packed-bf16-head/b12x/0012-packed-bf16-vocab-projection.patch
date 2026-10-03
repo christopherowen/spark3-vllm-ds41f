@@ -1,0 +1,1001 @@
+From a50af346ab7dfa66fe1bfd063078f4cd6775de8f Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Sat, 3 Oct 2026 23:43:45 +0200
+Subject: [PATCH] feat(gemm): vocabulary projection over exact 12-bit packed
+ BF16 weights
+
+Upstream-base: f8069b2c0be1311df3b112591c6b8876a843f8be
+
+A BF16 vocabulary head is read once per decode step, so its cost is its
+bytes. Each value keeps its sign and mantissa in one byte and its exponent
+in a 4-bit code over a 15-exponent window chosen per tensor; code 0 keeps
+exponent 0, so zeros and subnormals are exact. Values outside the window
+are stored exactly in a per-row exception list and added after the main
+dot product. pack() verifies that every bit round-trips and refuses
+otherwise, so the packed tensor is the checkpoint tensor in 75% of the
+bytes.
+
+The Triton projection decodes in registers and accumulates in FP32 on
+tensor cores. Each output sums its row's 128-column groups in order and
+then its exceptions, independent of token count and tile configuration,
+so a token's logits are the same bits in any batch.
+
+On GB10, for DeepSeek V4.1's 32,320 x 5,120 TP4 vocabulary shard (25,992
+exceptions), it reads 224-242 GB/s: 1.03-1.11 ms for 1-48 rows against
+1.36-1.55 ms for cuBLAS BF16 and 1.31 ms for the BF16 row kernel at one
+row.
+
+Quality: lossless storage; logits differ from cuBLAS BF16 only by FP32
+accumulation order. Tests: exact round trip including zeros, subnormals,
+infinities and out-of-window values; reference match; bit-identical
+logits across batch sizes and every tile configuration; CUDA graph
+replay; shared-memory model against compiler limits; registry contract.
+Upstream-status: local experiment, not submitted.
+---
+ b12x/__init__.py                              |   1 +
+ b12x/gemm/__init__.py                         |   3 +
+ .../packed_bf16_vocab_projection/__init__.py  |  60 +++++++
+ .../_contracts.py                             |  97 +++++++++++
+ .../packed_bf16_vocab_projection/_format.py   | 138 +++++++++++++++
+ .../packed_bf16_vocab_projection/_kernel.py   | 114 ++++++++++++
+ .../_preparation.py                           |  99 +++++++++++
+ .../packed_bf16_vocab_projection/_tuning.py   | 160 +++++++++++++++++
+ b12x/gemm/packed_bf16_vocab_projection/api.py |  31 ++++
+ .../gemm/test_packed_bf16_vocab_projection.py | 164 ++++++++++++++++++
+ 10 files changed, 867 insertions(+)
+ create mode 100644 b12x/gemm/packed_bf16_vocab_projection/__init__.py
+ create mode 100644 b12x/gemm/packed_bf16_vocab_projection/_contracts.py
+ create mode 100644 b12x/gemm/packed_bf16_vocab_projection/_format.py
+ create mode 100644 b12x/gemm/packed_bf16_vocab_projection/_kernel.py
+ create mode 100644 b12x/gemm/packed_bf16_vocab_projection/_preparation.py
+ create mode 100644 b12x/gemm/packed_bf16_vocab_projection/_tuning.py
+ create mode 100644 b12x/gemm/packed_bf16_vocab_projection/api.py
+ create mode 100644 tests/gemm/test_packed_bf16_vocab_projection.py
+
+diff --git a/b12x/__init__.py b/b12x/__init__.py
+index adaf26e4..9f8d4773 100644
+--- a/b12x/__init__.py
++++ b/b12x/__init__.py
+@@ -51,6 +51,7 @@ _OPS: tuple[str, ...] = (
+     "gemm.mxfp8_linear",
+     "gemm.tensor_fp8_linear",
+     "gemm.mla_query_projection",
++    "gemm.packed_bf16_vocab_projection",
+     "gemm.trellis_linear",
+     "gemm.wo_projection",
+     "moe.fused_moe",
+diff --git a/b12x/gemm/__init__.py b/b12x/gemm/__init__.py
+index 6ad85f03..a78b1a19 100644
+--- a/b12x/gemm/__init__.py
++++ b/b12x/gemm/__init__.py
+@@ -8,6 +8,8 @@
+ - ``mxfp8_linear`` / ``tensor_fp8_linear``: compatibility aliases for
+   ``blockscaled`` packed-weight calls.
+ - ``mla_query_projection``: fused MXFP8 MLA query projection and assembly.
++- ``packed_bf16_vocab_projection``: vocabulary projection over exact 12-bit
++  packed BF16 weights.
+ - ``trellis_linear``: native EXL3 Trellis W4A16/direct-W4A8 dense linear.
+ - ``wo_projection``: fused MLA WO-A/WO-B projections (+ inverse-RoPE variant).
+ """
+@@ -24,6 +26,7 @@ _OP_MODULES = (
+     "mxfp8_linear",
+     "tensor_fp8_linear",
+     "mla_query_projection",
++    "packed_bf16_vocab_projection",
+     "trellis_linear",
+     "wo_projection",
+ )
+diff --git a/b12x/gemm/packed_bf16_vocab_projection/__init__.py b/b12x/gemm/packed_bf16_vocab_projection/__init__.py
+new file mode 100644
+index 00000000..c2545d42
+--- /dev/null
++++ b/b12x/gemm/packed_bf16_vocab_projection/__init__.py
+@@ -0,0 +1,60 @@
++"""Prepared vocabulary projection over exact 12-bit packed BF16 weights.
++
++``pack`` stores a BF16 weight in 12 bits per value with every bit preserved
++(see ``_format``); ``plan`` declares the projection geometry,
++``PreparationSession`` selects and primes one configuration, and
++``bind``/``run`` consume only its prepared ``Plan``. A token's logits are the
++same bits whatever the batch size.
++"""
++from __future__ import annotations
++
++from typing import TYPE_CHECKING
++
++from ..._lib.meta import OpMeta, Provenance, install_lazy_api
++
++META = OpMeta(
++    name="packed_bf16_vocab_projection",
++    group="gemm",
++    api_style="prepared",
++    entry_points=(
++        "Caps",
++        "Plan",
++        "Binding",
++        "PackedBf16Weight",
++        "PackedBf16VocabProjectionConfig",
++        "PackedBf16VocabProjectionQuery",
++        "pack",
++        "unpack",
++        "plan",
++        "bind",
++        "run",
++        "is_supported",
++    ),
++    dtypes=("bf16",),
++    requires=("triton",),
++    provenance=Provenance(
++        repo="https://github.com/local-inference-lab/b12x",
++        commit="f8069b2c",
++        paths=("b12x/gemm/packed_bf16_vocab_projection",),
++    ),
++    test_path="tests/gemm/test_packed_bf16_vocab_projection.py",
++    since="1.3.0",
++)
++
++if TYPE_CHECKING:
++    from .api import (  # noqa: F401
++        Binding,
++        Caps,
++        PackedBf16VocabProjectionConfig,
++        PackedBf16VocabProjectionQuery,
++        PackedBf16Weight,
++        Plan,
++        bind,
++        is_supported,
++        pack,
++        plan,
++        run,
++        unpack,
++    )
++
++install_lazy_api(globals(), META)
+diff --git a/b12x/gemm/packed_bf16_vocab_projection/_contracts.py b/b12x/gemm/packed_bf16_vocab_projection/_contracts.py
+new file mode 100644
+index 00000000..c2e26108
+--- /dev/null
++++ b/b12x/gemm/packed_bf16_vocab_projection/_contracts.py
+@@ -0,0 +1,97 @@
++"""Declarative and prepared packed BF16 vocabulary projection boundary."""
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++import torch
++
++from b12x.preparation import FrozenMapping, Plan
++from b12x.preparation.types import require_prepared
++
++from ._format import PackedBf16Weight
++from ._kernel import packed_bf16_vocab_projection  # noqa: F401
++from ._tuning import PackedBf16VocabProjectionConfig
++
++
++def _canonical_device(device: torch.device | str) -> torch.device:
++    result = torch.device(device)
++    if result.type == "cuda" and result.index is None:
++        result = torch.device("cuda", torch.cuda.current_device())
++    return result
++
++
++@dataclass(frozen=True, kw_only=True)
++class Caps:
++    device: torch.device | str
++    max_tokens: int
++    in_features: int
++    out_features: int
++
++    def __post_init__(self) -> None:
++        object.__setattr__(self, "device", _canonical_device(self.device))
++        for name in ("max_tokens", "in_features", "out_features"):
++            value = int(getattr(self, name))
++            if value <= 0:
++                raise ValueError(f"{name} must be positive, got {value}")
++            object.__setattr__(self, name, value)
++
++
++@dataclass(frozen=True, kw_only=True)
++class Binding:
++    plan: Plan
++    source: torch.Tensor
++    weight: PackedBf16Weight
++
++
++def plan(
++    caps: Caps, *, invocation: FrozenMapping = FrozenMapping(),
++    override: PackedBf16VocabProjectionConfig | None = None,
++) -> Plan:
++    """Declare projection preparation without resolving a configuration."""
++    from ._preparation import make_plan
++
++    return make_plan(caps, invocation=invocation, override=override)
++
++
++def _bind(caps: Caps, *, plan: Plan, source: torch.Tensor, weight: PackedBf16Weight) -> Binding:
++    if not isinstance(weight, PackedBf16Weight):
++        raise TypeError("weight must be a PackedBf16Weight")
++    if source.ndim != 2 or not 0 < source.shape[0] <= caps.max_tokens:
++        raise ValueError(f"source must have 1..{caps.max_tokens} rows, got {tuple(source.shape)}")
++    if source.shape[1] != caps.in_features or source.dtype != torch.bfloat16:
++        raise ValueError(f"source must be BF16 with K={caps.in_features}, got {source.dtype} {tuple(source.shape)}")
++    if (weight.out_features, weight.in_features) != (caps.out_features, caps.in_features):
++        raise ValueError(
++            f"weight must pack shape {(caps.out_features, caps.in_features)}, "
++            f"got {(weight.out_features, weight.in_features)}"
++        )
++    tensors = (("source", source), ("values", weight.values), ("exception_rows", weight.exception_rows),
++               ("exception_entries", weight.exception_entries), ("row_offsets", weight.row_offsets))
++    for name, tensor in tensors:
++        if tensor.device != caps.device:
++            raise ValueError(f"{name} must be on {caps.device}, got {tensor.device}")
++        if not tensor.is_contiguous():
++            raise ValueError(f"{name} must be contiguous")
++    if weight.row_offsets.numel() != caps.out_features + 1:
++        raise ValueError("row_offsets must have out_features + 1 entries")
++    return Binding(plan=plan, source=source, weight=weight)
++
++
++def bind(plan: Plan, *, source: torch.Tensor, weight: PackedBf16Weight) -> Binding:
++    """Bind live tensors to a fully prepared projection."""
++    state = require_prepared(plan, "gemm.packed_bf16_vocab_projection", source.device)
++    return state.bind(plan=plan, source=source, weight=weight)
++
++
++def run(binding: Binding) -> torch.Tensor:
++    """Run the configuration selected during preparation."""
++    if not isinstance(binding, Binding):
++        raise TypeError("binding must be Binding")
++    weight = binding.weight
++    return torch.ops.b12x.packed_bf16_vocab_projection(
++        binding.source, weight.values, weight.exception_rows, weight.exception_entries,
++        weight.row_offsets, weight.exponent_base, binding.plan.handle,
++    )
++
++
++__all__ = ["Binding", "Caps", "Plan", "bind", "plan", "run"]
+diff --git a/b12x/gemm/packed_bf16_vocab_projection/_format.py b/b12x/gemm/packed_bf16_vocab_projection/_format.py
+new file mode 100644
+index 00000000..4c01b8a5
+--- /dev/null
++++ b/b12x/gemm/packed_bf16_vocab_projection/_format.py
+@@ -0,0 +1,138 @@
++"""Exact 12-bit storage for BF16 vocabulary weights.
++
++A BF16 value is a sign bit, an 8-bit exponent and a 7-bit mantissa. Each value
++here keeps its sign and mantissa in one byte and its exponent in a 4-bit code:
++code ``c`` in 1..15 means exponent ``base + c - 1`` for one 15-exponent window
++chosen per tensor, and code 0 means exponent 0 (zero and subnormal values keep
++their bits exactly). The rare values whose exponent falls outside the window
++are exceptions: their slot holds +0 and their exact BF16 bits sit in a per-row
++list that the projection adds after the main dot product.
++
++Row layout, ``K + K / 2`` bytes: the ``K`` sign-and-mantissa bytes, then the
++codes. Byte ``j`` of each 128-column group's 64 code bytes holds the code of
++column ``j`` in its low nibble and of column ``j + 64`` in its high nibble.
++
++``pack`` checks that unpacking reproduces every input bit and refuses
++otherwise, so a packed tensor is the checkpoint tensor, not an approximation.
++"""
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++import torch
++
++GROUP = 128
++WINDOW = 15
++_CHUNK_ROWS = 4_096
++
++
++@dataclass(frozen=True)
++class PackedBf16Weight:
++    """A packed ``[out_features, in_features]`` BF16 weight."""
++
++    values: torch.Tensor
++    exponent_base: int
++    exception_rows: torch.Tensor
++    exception_entries: torch.Tensor
++    row_offsets: torch.Tensor
++    exceptions: int
++
++    @property
++    def out_features(self) -> int:
++        return int(self.values.shape[0])
++
++    @property
++    def in_features(self) -> int:
++        return int(self.values.shape[1]) * 2 // 3
++
++
++def _check_weight(weight: torch.Tensor) -> None:
++    if weight.ndim != 2 or weight.dtype != torch.bfloat16:
++        raise TypeError("packing needs a 2-D torch.bfloat16 weight")
++    if not weight.is_cuda or not weight.is_contiguous():
++        raise ValueError("packing needs a contiguous CUDA weight")
++    if weight.shape[0] == 0 or weight.shape[1] == 0 or weight.shape[1] % GROUP:
++        raise ValueError(f"packing needs rows and K divisible by {GROUP}, got {tuple(weight.shape)}")
++
++
++def _bits(weight: torch.Tensor) -> torch.Tensor:
++    return weight.view(torch.int16).to(torch.int32) & 0xFFFF
++
++
++def _choose_base(weight: torch.Tensor) -> int:
++    """The window start covering the most nonzero exponents, the lowest on ties."""
++    hist = torch.zeros(256, dtype=torch.int64, device=weight.device)
++    for start in range(0, weight.shape[0], _CHUNK_ROWS):
++        exponent = (_bits(weight[start:start + _CHUNK_ROWS]) >> 7) & 0xFF
++        hist += torch.bincount(exponent.flatten(), minlength=256)
++    hist[0] = 0
++    windows = hist.unfold(0, WINDOW, 1).sum(1)
++    windows[0] = -1
++    return int(windows.argmax())
++
++
++def _pack_rows(bits: torch.Tensor, base: int):
++    rows, k = bits.shape
++    exponent = (bits >> 7) & 0xFF
++    inside = (exponent >= base) & (exponent < base + WINDOW)
++    exception = (exponent != 0) & ~inside
++    code = torch.where(inside, exponent - base + 1, 0)
++    low = torch.where(exception, 0, ((bits >> 8) & 0x80) | (bits & 0x7F))
++    code = code.view(rows, k // GROUP, 2, GROUP // 2)
++    codes = (code[:, :, 0] | (code[:, :, 1] << 4)).reshape(rows, k // 2)
++    values = torch.cat((low.to(torch.uint8), codes.to(torch.uint8)), dim=1)
++    row, column = exception.nonzero(as_tuple=True)
++    entries = ((column << 16) | bits[row, column]).to(torch.int32)
++    return values, row.to(torch.int32), entries
++
++
++def _unpack_rows(values: torch.Tensor, base: int, rows: torch.Tensor, entries: torch.Tensor) -> torch.Tensor:
++    count, width = values.shape
++    k = width * 2 // 3
++    low = values[:, :k].to(torch.int32)
++    codes = values[:, k:].to(torch.int32).view(count, k // GROUP, 1, GROUP // 2)
++    code = torch.cat((codes & 0xF, codes >> 4), dim=2).reshape(count, k)
++    exponent = torch.where(code == 0, 0, code + base - 1)
++    bits = ((low & 0x80) << 8) | (exponent << 7) | (low & 0x7F)
++    if entries.numel():
++        bits[rows.long(), (entries >> 16).long()] = entries & 0xFFFF
++    return bits.to(torch.int16).view(torch.bfloat16)
++
++
++def pack(weight: torch.Tensor) -> PackedBf16Weight:
++    """Pack ``weight`` exactly; raise if any value would not round-trip."""
++    _check_weight(weight)
++    out_features, in_features = map(int, weight.shape)
++    base = _choose_base(weight)
++    values = torch.empty((out_features, in_features + in_features // 2), dtype=torch.uint8, device=weight.device)
++    exception_rows, exception_entries = [], []
++    counts = torch.zeros(out_features, dtype=torch.int32, device=weight.device)
++    for start in range(0, out_features, _CHUNK_ROWS):
++        source = weight[start:start + _CHUNK_ROWS]
++        chunk, rows, entries = _pack_rows(_bits(source), base)
++        if not torch.equal(_unpack_rows(chunk, base, rows, entries).view(torch.int16), source.view(torch.int16)):
++            raise ValueError(f"packed BF16 rows {start}..{start + len(source)} do not round-trip")
++        values[start:start + len(source)] = chunk
++        counts[start:start + len(source)] = torch.bincount(rows, minlength=len(source)).to(torch.int32)
++        exception_rows.append(rows + start)
++        exception_entries.append(entries)
++    row_offsets = torch.zeros(out_features + 1, dtype=torch.int32, device=weight.device)
++    row_offsets[1:] = torch.cumsum(counts, 0)
++    rows = torch.cat(exception_rows)
++    entries = torch.cat(exception_entries)
++    exceptions = int(rows.numel())
++    if exceptions == 0:
++        # Kernels take a valid pointer even when the row offsets select nothing.
++        rows = torch.zeros(1, dtype=torch.int32, device=weight.device)
++        entries = torch.zeros(1, dtype=torch.int32, device=weight.device)
++    return PackedBf16Weight(values, base, rows.contiguous(), entries.contiguous(), row_offsets, exceptions)
++
++
++def unpack(packed: PackedBf16Weight) -> torch.Tensor:
++    """The exact BF16 weight that ``packed`` stores."""
++    count = packed.exceptions
++    return _unpack_rows(packed.values, packed.exponent_base,
++                        packed.exception_rows[:count], packed.exception_entries[:count])
++
++
++__all__ = ["GROUP", "PackedBf16Weight", "WINDOW", "pack", "unpack"]
+diff --git a/b12x/gemm/packed_bf16_vocab_projection/_kernel.py b/b12x/gemm/packed_bf16_vocab_projection/_kernel.py
+new file mode 100644
+index 00000000..dded005f
+--- /dev/null
++++ b/b12x/gemm/packed_bf16_vocab_projection/_kernel.py
+@@ -0,0 +1,114 @@
++"""Triton projection over exact 12-bit packed BF16 vocabulary weights."""
++from __future__ import annotations
++
++import torch
++import triton
++import triton.language as tl
++
++from b12x.preparation.types import plan_from_handle, require_prepared
++
++
++@triton.jit
++def _decode(low, code, base_minus_one):
++    low = low.to(tl.int32)
++    code = code.to(tl.int32)
++    exponent = tl.where(code == 0, 0, code + base_minus_one)
++    bits = ((low & 0x80) << 8) | (exponent << 7) | (low & 0x7F)
++    return bits.to(tl.int16).to(tl.bfloat16, bitcast=True)
++
++
++@triton.jit
++def _load_weight(pointer, mask, EVICT_FIRST: tl.constexpr):
++    if EVICT_FIRST:
++        return tl.load(pointer, mask=mask, other=0, eviction_policy="evict_first")
++    return tl.load(pointer, mask=mask, other=0)
++
++
++@triton.jit(do_not_specialize=["rows", "base_minus_one"])
++def _projection_kernel(
++    source,
++    values,
++    output,
++    exception_rows,
++    exception_entries,
++    row_offsets,
++    rows,
++    base_minus_one,
++    K: tl.constexpr,
++    N: tl.constexpr,
++    BLOCK_N: tl.constexpr,
++    BLOCK_M: tl.constexpr,
++    STEP_K: tl.constexpr,
++    NUM_STAGES: tl.constexpr,
++    EVICT_FIRST: tl.constexpr,
++):
++    """Each output is its row's 128-column groups in order, then its exceptions.
++
++    That order does not depend on the token count or the tile configuration,
++    so a token's logits are the same bits in any batch.
++    """
++    vocab = tl.program_id(0) * BLOCK_N + tl.arange(0, BLOCK_N)
++    token = tl.program_id(1) * BLOCK_M + tl.arange(0, BLOCK_M)
++    vocab_mask = vocab < N
++    token_mask = token < rows
++    lane = tl.arange(0, 64)
++    weight_row = values + vocab.to(tl.int64)[:, None] * (K + K // 2)
++    accumulator = tl.zeros((BLOCK_N, BLOCK_M), tl.float32)
++    for step in tl.range(0, K // STEP_K, num_stages=NUM_STAGES):
++        for half in tl.static_range(STEP_K // 128):
++            group = step * (STEP_K // 128) + half
++            column = group * 128
++            low_a = _load_weight(weight_row + column + lane[None, :], vocab_mask[:, None], EVICT_FIRST)
++            low_b = _load_weight(weight_row + column + 64 + lane[None, :], vocab_mask[:, None], EVICT_FIRST)
++            codes = _load_weight(weight_row + K + group * 64 + lane[None, :], vocab_mask[:, None], EVICT_FIRST)
++            source_a = tl.load(source + token[None, :] * K + column + lane[:, None],
++                               mask=token_mask[None, :], other=0.0)
++            source_b = tl.load(source + token[None, :] * K + column + 64 + lane[:, None],
++                               mask=token_mask[None, :], other=0.0)
++            accumulator = tl.dot(_decode(low_a, codes & 0xF, base_minus_one), source_a, accumulator)
++            accumulator = tl.dot(_decode(low_b, codes >> 4, base_minus_one), source_b, accumulator)
++    first = tl.program_id(0) * BLOCK_N
++    start = tl.load(row_offsets + first)
++    end = tl.load(row_offsets + tl.minimum(first + BLOCK_N, N))
++    for index in range(start, end):
++        row = tl.load(exception_rows + index)
++        entry = tl.load(exception_entries + index)
++        value = (entry & 0xFFFF).to(tl.int16).to(tl.bfloat16, bitcast=True).to(tl.float32)
++        hidden = tl.load(source + token * K + (entry >> 16), mask=token_mask, other=0.0).to(tl.float32)
++        accumulator = tl.where((vocab == row)[:, None], accumulator + value * hidden[None, :], accumulator)
++    tl.store(output + token[None, :] * N + vocab[:, None], accumulator.to(tl.bfloat16),
++             mask=vocab_mask[:, None] & token_mask[None, :])
++
++
++@torch.library.custom_op("b12x::packed_bf16_vocab_projection", mutates_args=())
++def packed_bf16_vocab_projection(
++    source: torch.Tensor,
++    values: torch.Tensor,
++    exception_rows: torch.Tensor,
++    exception_entries: torch.Tensor,
++    row_offsets: torch.Tensor,
++    exponent_base: int,
++    plan_handle: int,
++) -> torch.Tensor:
++    """Execute the prepared projection."""
++    state = require_prepared(
++        plan_from_handle(plan_handle), "gemm.packed_bf16_vocab_projection", source.device,
++    )
++    return state.run(source, values, exception_rows, exception_entries, row_offsets, exponent_base)
++
++
++@packed_bf16_vocab_projection.register_fake
++def _packed_bf16_vocab_projection_fake(
++    source: torch.Tensor,
++    values: torch.Tensor,
++    exception_rows: torch.Tensor,
++    exception_entries: torch.Tensor,
++    row_offsets: torch.Tensor,
++    exponent_base: int,
++    plan_handle: int,
++) -> torch.Tensor:
++    del exception_rows, exception_entries, row_offsets, exponent_base, plan_handle
++    return source.new_empty((source.shape[0], values.shape[0]))
++
++
++__all__ = ["packed_bf16_vocab_projection"]
+diff --git a/b12x/gemm/packed_bf16_vocab_projection/_preparation.py b/b12x/gemm/packed_bf16_vocab_projection/_preparation.py
+new file mode 100644
+index 00000000..7c314f68
+--- /dev/null
++++ b/b12x/gemm/packed_bf16_vocab_projection/_preparation.py
+@@ -0,0 +1,99 @@
++"""Packed BF16 vocabulary projection declaration and prepared state."""
++from __future__ import annotations
++
++from collections.abc import Callable
++from dataclasses import dataclass
++
++import torch
++
++from b12x._lib.compile_pool import CompileJob
++from b12x.preparation import FrozenMapping, MemoryRequirements, Plan
++
++from ._contracts import Binding, Caps, _bind
++from ._tuning import TUNING, PackedBf16VocabProjectionConfig, PackedBf16VocabProjectionQuery, block_m
++
++
++def compile_projection(query_payload, config_payload, ordinal):
++    """Compile exactly the selected projection kernel."""
++    from . import _kernel
++
++    query = PackedBf16VocabProjectionQuery(**dict(query_payload))
++    config = PackedBf16VocabProjectionConfig.from_config(FrozenMapping(config_payload))
++    TUNING.validate_query(query, None)
++    TUNING.validate_config(query, config, None)
++    tile_m = block_m(query.max_tokens)
++    with torch.cuda.device(ordinal):
++        return {"projection": _kernel._projection_kernel.warmup(
++            torch.bfloat16, torch.uint8, torch.bfloat16, torch.int32, torch.int32, torch.int32,
++            query.max_tokens, 112,
++            K=query.in_features, N=query.out_features, BLOCK_N=config.block_n, BLOCK_M=tile_m,
++            STEP_K=config.step_k, NUM_STAGES=config.num_stages, EVICT_FIRST=config.evict_first,
++            num_warps=config.num_warps,
++            grid=(triton_cdiv(query.out_features, config.block_n), triton_cdiv(query.max_tokens, tile_m), 1),
++        )}
++
++
++def triton_cdiv(value: int, divisor: int) -> int:
++    return (int(value) + divisor - 1) // divisor
++
++
++@dataclass(frozen=True)
++class _PreparedProjection:
++    caps: Caps
++    query: PackedBf16VocabProjectionQuery
++    config: PackedBf16VocabProjectionConfig
++    runner: Callable[..., torch.Tensor]
++
++    def bind(self, *, plan, source, weight) -> Binding:
++        return _bind(self.caps, plan=plan, source=source, weight=weight)
++
++    def run(self, source, values, exception_rows, exception_entries, row_offsets, exponent_base) -> torch.Tensor:
++        return self.runner(source, values, exception_rows, exception_entries, row_offsets, exponent_base)
++
++
++def make_plan(caps: Caps, *, invocation=FrozenMapping(), override=None) -> Plan:
++    if not isinstance(caps, Caps):
++        raise TypeError("caps must be packed_bf16_vocab_projection.Caps")
++    invocation = FrozenMapping(invocation)
++    if invocation:
++        raise ValueError("packed BF16 vocabulary projection has no invocation metadata")
++    query = PackedBf16VocabProjectionQuery(
++        max_tokens=caps.max_tokens, in_features=caps.in_features, out_features=caps.out_features,
++    )
++
++    def compile_jobs(config, device):
++        return (CompileJob.create(
++            "b12x.gemm.packed_bf16_vocab_projection._preparation:compile_projection",
++            TUNING.encode_query(query), config.to_dict(), device.ordinal,
++        ),)
++
++    def materialize(selection, device):
++        config = selection.config
++        launcher = compile_projection(TUNING.encode_query(query), config.to_dict(), device.ordinal)["projection"]
++        tile_m = block_m(query.max_tokens)
++        n_tiles = triton_cdiv(query.out_features, config.block_n)
++
++        def runner(source, values, exception_rows, exception_entries, row_offsets, exponent_base):
++            rows = int(source.shape[0])
++            if rows < 1 or rows > query.max_tokens:
++                raise ValueError("vocabulary projection source rows differ from preparation")
++            output = torch.empty((rows, query.out_features), dtype=torch.bfloat16, device=source.device)
++            launcher[(n_tiles, triton_cdiv(rows, tile_m), 1)](
++                source, values, output, exception_rows, exception_entries, row_offsets,
++                rows, int(exponent_base) - 1,
++                query.in_features, query.out_features, config.block_n, tile_m,
++                config.step_k, config.num_stages, config.evict_first,
++            )
++            return output
++
++        return _PreparedProjection(caps, query, config, runner)
++
++    return Plan(
++        contract=TUNING, query=query, invocation=invocation, override=override,
++        _compile_jobs=compile_jobs,
++        _memory_requirements=lambda config, device: MemoryRequirements(),
++        _materialize=materialize, _device=caps.device,
++    )
++
++
++__all__ = ["compile_projection", "make_plan"]
+diff --git a/b12x/gemm/packed_bf16_vocab_projection/_tuning.py b/b12x/gemm/packed_bf16_vocab_projection/_tuning.py
+new file mode 100644
+index 00000000..93139759
+--- /dev/null
++++ b/b12x/gemm/packed_bf16_vocab_projection/_tuning.py
+@@ -0,0 +1,160 @@
++"""Configuration contract for the packed BF16 vocabulary projection."""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++from b12x.preparation import (
++    DeviceIdentity,
++    FrozenMapping,
++    Knob,
++    ParameterBinding,
++    TuningContract,
++)
++
++from ._format import GROUP
++
++MAX_TOKENS_PER_TILE = 64
++SHARED_MEMORY_LIMIT = 101_376  # SM120/SM121 dynamic shared memory per block
++_BLOCK_N = (16, 32, 64)
++_STEP_K = (128, 256)
++_WARPS = (2, 4, 8)
++_STAGES = (2, 3, 4, 5, 6)
++
++
++@dataclass(frozen=True, kw_only=True)
++class PackedBf16VocabProjectionQuery:
++    max_tokens: int
++    in_features: int
++    out_features: int
++
++
++@dataclass(frozen=True, kw_only=True)
++class PackedBf16VocabProjectionConfig:
++    block_n: int
++    step_k: int
++    num_warps: int
++    num_stages: int
++    evict_first: bool
++
++    @classmethod
++    def from_config(cls, payload: FrozenMapping) -> "PackedBf16VocabProjectionConfig":
++        expected = set(cls.__dataclass_fields__)
++        if set(payload) != expected:
++            raise ValueError(f"packed BF16 vocabulary projection configs require {sorted(expected)}")
++        return cls(
++            block_n=int(payload["block_n"]),
++            step_k=int(payload["step_k"]),
++            num_warps=int(payload["num_warps"]),
++            num_stages=int(payload["num_stages"]),
++            evict_first=bool(payload["evict_first"]),
++        )
++
++    def to_dict(self) -> dict[str, object]:
++        return {
++            "block_n": self.block_n,
++            "step_k": self.step_k,
++            "num_warps": self.num_warps,
++            "num_stages": self.num_stages,
++            "evict_first": self.evict_first,
++        }
++
++
++def block_m(max_tokens: int) -> int:
++    """Token tile: one tile up to 64 rows, so weights are read once."""
++    return min(max(16, 1 << (int(max_tokens) - 1).bit_length()), MAX_TOKENS_PER_TILE)
++
++
++def shared_memory_bytes(config: "PackedBf16VocabProjectionConfig", max_tokens: int) -> int:
++    """Triton's pipelined staging plus the decoded-weight layout buffer.
++
++    Matches the compiler's reported requirement for every configuration of
++    the GB10 sweep (Triton 3.7): ``stages - 1`` buffers of packed weights and
++    BF16 source columns per K step, and one BF16 half-group of weights.
++    """
++    per_step = config.step_k * (config.block_n * 3 // 2 + 2 * block_m(max_tokens))
++    return (config.num_stages - 1) * per_step + 128 * config.block_n
++
++
++def _encode(query: PackedBf16VocabProjectionQuery) -> dict[str, object]:
++    return {name: getattr(query, name) for name in PackedBf16VocabProjectionQuery.__dataclass_fields__}
++
++
++def _default_config(
++    query: PackedBf16VocabProjectionQuery,
++    _device: DeviceIdentity | None,
++) -> PackedBf16VocabProjectionConfig:
++    # Measured on GB10 for DS4.1 vocabulary shards (32,320 and 43,092 rows, K=5,120).
++    step_k = 256 if query.in_features % 256 == 0 else 128
++    if query.max_tokens <= 16:
++        return PackedBf16VocabProjectionConfig(block_n=16, step_k=step_k, num_warps=4, num_stages=6, evict_first=True)
++    if query.max_tokens <= 32:
++        return PackedBf16VocabProjectionConfig(block_n=16, step_k=step_k, num_warps=4, num_stages=4, evict_first=True)
++    return PackedBf16VocabProjectionConfig(block_n=32, step_k=step_k, num_warps=8, num_stages=3, evict_first=False)
++
++
++def _validate_query(query: PackedBf16VocabProjectionQuery, _device: DeviceIdentity | None) -> None:
++    if not isinstance(query, PackedBf16VocabProjectionQuery):
++        raise TypeError("query must be PackedBf16VocabProjectionQuery")
++    if query.max_tokens <= 0 or query.out_features <= 0:
++        raise ValueError("max_tokens and out_features must be positive")
++    if query.in_features <= 0 or query.in_features % GROUP:
++        raise ValueError(f"in_features must be a positive multiple of {GROUP}")
++
++
++def _validate_config(
++    query: PackedBf16VocabProjectionQuery,
++    config: PackedBf16VocabProjectionConfig,
++    _device: DeviceIdentity | None,
++) -> None:
++    if not isinstance(config, PackedBf16VocabProjectionConfig):
++        raise TypeError("config must be PackedBf16VocabProjectionConfig")
++    if config.block_n not in _BLOCK_N:
++        raise ValueError(f"unsupported block_n {config.block_n}")
++    if config.step_k not in _STEP_K or query.in_features % config.step_k:
++        raise ValueError(f"step_k {config.step_k} must be one of {_STEP_K} and divide K")
++    if config.num_warps not in _WARPS:
++        raise ValueError(f"unsupported warp count {config.num_warps}")
++    if config.num_stages not in _STAGES:
++        raise ValueError(f"unsupported stage count {config.num_stages}")
++    if shared_memory_bytes(config, query.max_tokens) > SHARED_MEMORY_LIMIT:
++        raise ValueError(f"configuration {config} needs more shared memory than SM12x provides")
++
++
++def _tuning_parameters(query, _device):
++    return {"step_k": tuple(step for step in _STEP_K if query.in_features % step == 0)}
++
++
++TUNING = TuningContract(
++    component_id="gemm.packed_bf16_vocab_projection",
++    query_schema_version=1,
++    config_schema_version=1,
++    query_fields=frozenset(PackedBf16VocabProjectionQuery.__dataclass_fields__),
++    config_fields=frozenset(PackedBf16VocabProjectionConfig.__dataclass_fields__),
++    encode_query=_encode,
++    encode_config=PackedBf16VocabProjectionConfig.to_dict,
++    decode_config=PackedBf16VocabProjectionConfig.from_config,
++    validate_query=_validate_query,
++    validate_config=_validate_config,
++    default_config=_default_config,
++    candidate_contract_version=1,
++    knobs=(
++        Knob(name="block_n", values=_BLOCK_N, binding=ParameterBinding.COMPILE),
++        Knob(name="step_k", values=None, binding=ParameterBinding.COMPILE),
++        Knob(name="num_warps", values=_WARPS, binding=ParameterBinding.COMPILE),
++        Knob(name="num_stages", values=_STAGES, binding=ParameterBinding.COMPILE),
++        Knob(name="evict_first", values=(False, True), binding=ParameterBinding.COMPILE),
++    ),
++    parameters=_tuning_parameters,
++)
++
++
++__all__ = [
++    "MAX_TOKENS_PER_TILE",
++    "SHARED_MEMORY_LIMIT",
++    "TUNING",
++    "PackedBf16VocabProjectionConfig",
++    "PackedBf16VocabProjectionQuery",
++    "block_m",
++    "shared_memory_bytes",
++]
+diff --git a/b12x/gemm/packed_bf16_vocab_projection/api.py b/b12x/gemm/packed_bf16_vocab_projection/api.py
+new file mode 100644
+index 00000000..b9a71f9a
+--- /dev/null
++++ b/b12x/gemm/packed_bf16_vocab_projection/api.py
+@@ -0,0 +1,31 @@
++"""Public surface for :mod:`b12x.gemm.packed_bf16_vocab_projection`."""
++from __future__ import annotations
++
++from b12x.preparation import Plan
++
++from ..._lib.gating import default_is_supported
++from . import META
++from ._contracts import Binding, Caps, bind, plan, run
++from ._format import PackedBf16Weight, pack, unpack
++from ._tuning import PackedBf16VocabProjectionConfig, PackedBf16VocabProjectionQuery
++
++
++def is_supported(device=None) -> bool:
++    """True on supported b12x devices with Triton available."""
++    return default_is_supported(device, requires=META.requires)
++
++
++__all__ = [
++    "Binding",
++    "Caps",
++    "PackedBf16VocabProjectionConfig",
++    "PackedBf16VocabProjectionQuery",
++    "PackedBf16Weight",
++    "Plan",
++    "bind",
++    "is_supported",
++    "pack",
++    "plan",
++    "run",
++    "unpack",
++]
+diff --git a/tests/gemm/test_packed_bf16_vocab_projection.py b/tests/gemm/test_packed_bf16_vocab_projection.py
+new file mode 100644
+index 00000000..9a5ba038
+--- /dev/null
++++ b/tests/gemm/test_packed_bf16_vocab_projection.py
+@@ -0,0 +1,164 @@
++from __future__ import annotations
++
++import itertools
++
++import pytest
++import torch
++
++from b12x.gemm import packed_bf16_vocab_projection as projection
++from b12x.gemm.packed_bf16_vocab_projection._tuning import (
++    SHARED_MEMORY_LIMIT,
++    TUNING,
++    block_m,
++    shared_memory_bytes,
++)
++from b12x.preparation import DeviceIdentity, PreparationSession, PreparedCall
++
++cuda_required = pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
++
++Config = projection.PackedBf16VocabProjectionConfig
++
++
++def _weight(rows: int, k: int, *, seed: int = 0, infinities: bool = False) -> torch.Tensor:
++    """Vocabulary-like weights plus the value classes the format must keep."""
++    generator = torch.Generator(device="cuda").manual_seed(seed)
++    weight = (torch.randn(rows, k, device="cuda", generator=generator) * 0.02).to(torch.bfloat16)
++    bits = weight.view(torch.int16)
++    # Zeros, subnormals, values far below and above the exponent window, and +-1.
++    specials = [0x0000, -0x8000, 0x0001, -0x7FFF, 0x007F, 0x0080, 0x2000, 0x1000, 0x3F80, -0x4080, 0x4500]
++    if infinities:
++        specials += [0x7F7F, 0x7F80, -0x0080]
++    specials = torch.tensor(specials, dtype=torch.int16, device="cuda")
++    bits[3, : specials.numel()] = specials
++    bits[7, 64: 64 + specials.numel()] = specials
++    # Rows with more out-of-window values than a projection tile has rows:
++    # large ones dominate the row's logit, tiny ones barely move it.
++    bits[rows - 2, ::3] = 0x4100
++    bits[rows - 5, 1::4] = 0x2000
++    return weight
++
++
++def _prepared(caps: projection.Caps, config: Config | None):
++    declaration = projection.plan(caps, override=config)
++    source = torch.zeros((caps.max_tokens, caps.in_features), device="cuda", dtype=torch.bfloat16)
++    packed = projection.pack(torch.zeros((caps.out_features, caps.in_features), device="cuda",
++                                         dtype=torch.bfloat16))
++    session = PreparationSession(device=caps.device, autotune=False, compile_workers=2)
++    session.__enter__()
++
++    def prepare_call(state):
++        return PreparedCall(run=lambda: state.run(source, packed.values, packed.exception_rows,
++                                                  packed.exception_entries, packed.row_offsets,
++                                                  packed.exponent_base))
++
++    session.prepare((declaration.request(name="vocab", prepare_call=prepare_call),))
++    return declaration, session
++
++
++def test_shared_memory_estimate_matches_compiler_limits() -> None:
++    # Requirements the compiler reported on GB10 for configurations that do not fit.
++    for (block_n, tokens, stages, step), required in {
++        (16, 16, 8, 256): 102_400, (32, 16, 6, 256): 106_496, (64, 64, 3, 256): 122_880,
++        (16, 64, 8, 128): 138_240, (64, 32, 6, 128): 110_592, (32, 32, 6, 256): 147_456,
++    }.items():
++        config = Config(block_n=block_n, step_k=step, num_warps=4, num_stages=stages, evict_first=True)
++        assert shared_memory_bytes(config, tokens) == required
++    query = projection.PackedBf16VocabProjectionQuery(max_tokens=16, in_features=5_120, out_features=32_320)
++    with pytest.raises(ValueError, match="shared memory"):
++        TUNING.validate_config(query, Config(block_n=32, step_k=256, num_warps=4, num_stages=6,
++                                             evict_first=True), None)
++
++
++def test_default_config_covers_decode_token_counts() -> None:
++    device = DeviceIdentity(vendor="nvidia", compute_capability=(12, 1), sm_count=48, product_name="GB10")
++    for tokens in (1, 6, 16, 32, 48):
++        query = projection.PackedBf16VocabProjectionQuery(max_tokens=tokens, in_features=5_120,
++                                                          out_features=32_320)
++        config = TUNING.configure(query, device=device).default
++        TUNING.validate_config(query, config, device)
++        assert config.step_k == 256
++    assert [block_m(n) for n in (1, 16, 17, 48, 64, 65, 200)] == [16, 16, 32, 64, 64, 64, 64]
++
++
++@cuda_required
++def test_pack_round_trips_every_bit() -> None:
++    weight = _weight(512, 640, infinities=True)
++    packed = projection.pack(weight)
++    assert packed.values.shape == (512, 960)
++    assert packed.exceptions > 300
++    assert torch.equal(projection.unpack(packed).view(torch.int16), weight.view(torch.int16))
++    offsets = packed.row_offsets.cpu()
++    assert offsets[0] == 0 and offsets[-1] == packed.exceptions
++    assert torch.all(offsets[1:] >= offsets[:-1])
++
++
++@cuda_required
++def test_pack_without_exceptions_and_rejects_bad_shapes() -> None:
++    weight = torch.full((16, 128), 0.5, device="cuda", dtype=torch.bfloat16)
++    packed = projection.pack(weight)
++    assert packed.exceptions == 0 and packed.exception_rows.numel() == 1
++    assert torch.equal(projection.unpack(packed), weight)
++    with pytest.raises(ValueError):
++        projection.pack(torch.zeros((16, 96), device="cuda", dtype=torch.bfloat16))
++    with pytest.raises(TypeError):
++        projection.pack(torch.zeros((16, 128), device="cuda", dtype=torch.float16))
++
++
++def _project(packed, source, max_tokens, config=None):
++    caps = projection.Caps(device="cuda", max_tokens=max_tokens, in_features=source.shape[1],
++                           out_features=packed.out_features)
++    declaration, session = _prepared(caps, config)
++    try:
++        return projection.run(projection.bind(declaration, source=source.contiguous(), weight=packed))
++    finally:
++        session.__exit__(None, None, None)
++
++
++@cuda_required
++def test_projection_matches_reference_and_is_batch_and_config_invariant() -> None:
++    torch.manual_seed(3)
++    k, n = 512, 4_100
++    packed = projection.pack(_weight(n, k, seed=5))
++    source = torch.randn(80, k, device="cuda", dtype=torch.bfloat16)
++    reference = source.float() @ projection.unpack(packed).float().T
++    # Each token's logits computed alone, with the default single-token configuration.
++    probes = (0, 4, 36, 79)
++    alone = {row: _project(packed, source[row:row + 1], 1)[0] for row in probes}
++    configs = [
++        Config(block_n=block_n, step_k=step_k, num_warps=warps, num_stages=stages, evict_first=evict)
++        for block_n, step_k, (warps, stages), evict in itertools.product(
++            (16, 32, 64), (128, 256), ((2, 2), (4, 6)), (False, True))
++    ]
++    for tokens, max_tokens in ((1, 1), (5, 6), (37, 48), (80, 80)):
++        fitting = [c for c in configs if shared_memory_bytes(c, max_tokens) <= SHARED_MEMORY_LIMIT]
++        for config in [None] + (fitting if tokens in (1, 37) else []):
++            actual = _project(packed, source[:tokens], max_tokens, config)
++            torch.testing.assert_close(actual.float(), reference[:tokens], rtol=1e-2, atol=2e-2)
++            for row in probes:
++                if row < tokens:
++                    assert torch.equal(actual[row].view(torch.int16), alone[row].view(torch.int16)), (
++                        tokens, config, row)
++
++
++@cuda_required
++def test_prepared_projection_replays_graph() -> None:
++    torch.manual_seed(4)
++    k, n = 256, 4_096
++    packed = projection.pack(_weight(n, k, seed=9))
++    source = torch.randn(6, k, device="cuda", dtype=torch.bfloat16)
++    caps = projection.Caps(device="cuda", max_tokens=6, in_features=k, out_features=n)
++    declaration, session = _prepared(caps, None)
++    try:
++        binding = projection.bind(declaration, source=source, weight=packed)
++        expected = projection.run(binding).clone()
++        graph = torch.cuda.CUDAGraph()
++        with session.capture(), torch.cuda.graph(graph):
++            actual = projection.run(binding)
++        actual.fill_(float("nan"))
++        graph.replay()
++        torch.cuda.synchronize()
++    finally:
++        session.__exit__(None, None, None)
++    assert torch.equal(actual.view(torch.int16), expected.view(torch.int16))
++    reference = source.float() @ projection.unpack(packed).float().T
++    torch.testing.assert_close(actual.float(), reference, rtol=1e-2, atol=2e-2)
+-- 
+2.54.0 (Apple Git-157)
+

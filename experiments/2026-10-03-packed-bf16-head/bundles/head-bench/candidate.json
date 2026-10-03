@@ -1,0 +1,12 @@
+{
+  "description": "B12X's packed BF16 vocabulary projection on the real DS4.1 head shards (TP4 rank 0, TP3 rank 2) against cuBLAS BF16, with the default prepared configuration, timed under CUDA graphs, with exact round-trip, accuracy and batch-invariance checks.",
+  "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-packedhead-v1",
+  "env": {"HF_HUB_OFFLINE": "1"},
+  "workdir": "/opt/spark3/candidate/vllm",
+  "argv": ["/b/bench_head.py"],
+  "verdict": "exit",
+  "mounts": [
+    ["bench_head.py", "/b/bench_head.py"],
+    ["~/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash", "/m"]
+  ]
+}

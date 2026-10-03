@@ -1,0 +1,513 @@
+From aa9b98f23419b7a5789d0fd3e1a56df458c4767e Mon Sep 17 00:00:00 2001
+From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
+Date: Sat, 3 Oct 2026 23:50:32 +0200
+Subject: [PATCH] Serve the DeepSeek V4.1 target head from exact 12-bit packed
+ BF16
+
+Upstream base: 04c30fa98e7917fee0a24c739ea503ce1e22538d, after the
+spark3 vLLM 0001-0026 series and 0027-explicit-collective-policy.
+Requires B12X's packed_bf16_vocab_projection.
+
+The BF16 vocabulary head is read in full for every target verification and
+every first draft position, so its cost is its bytes. With
+VLLM_DS41_PACKED_BF16_LM_HEAD=1 the DS4.1 target head (which a DSpark
+drafter without its own head shares) loads its checkpoint BF16 tensor
+unchanged and then packs it with B12X: one sign-and-mantissa byte plus a
+4-bit exponent code per value, with out-of-window values kept exactly in a
+per-row exception list. The packed bytes replace the BF16 tensor, so the
+display carve-out moves them like any streamed weight. The logits
+processor declares, prepares and runs B12X's packed projection per token
+capacity, as it does the BF16 one.
+
+Quality: lossless. Packing refuses to start unless unpacking reproduces
+every bit, and each logit is the exact BF16 products accumulated in FP32
+in a fixed order, so a token's logits are the same bits at any batch size.
+Logits differ from cuBLAS BF16 only by accumulation order.
+Tests: the packed head loads, round-trips exactly, matches BF16 logits,
+keeps a token's logits bit-identical across batch sizes, is shared by the
+drafter's logits processor and replays in a CUDA graph; the existing
+shared and Markov logits-head preparation test still passes.
+Upstream status: local experimental patch, not submitted.
+---
+ ...test_deepseek_v4_1_prepared_projections.py |  79 +++++++++++++
+ vllm/envs.py                                  |   7 ++
+ .../model_executor/layers/logits_processor.py |  76 +++++++++++-
+ .../layers/quantization/online/packed_bf16.py | 111 ++++++++++++++++++
+ .../layers/vocab_parallel_embedding.py        |  42 ++++++-
+ vllm/models/deepseek_v41/nvidia/model.py      |   3 +
+ vllm/utils/b12x.py                            |   5 +
+ 7 files changed, 318 insertions(+), 5 deletions(-)
+ create mode 100644 vllm/model_executor/layers/quantization/online/packed_bf16.py
+
+diff --git a/tests/models/test_deepseek_v4_1_prepared_projections.py b/tests/models/test_deepseek_v4_1_prepared_projections.py
+index 9613e947f..bc3546c64 100644
+--- a/tests/models/test_deepseek_v4_1_prepared_projections.py
++++ b/tests/models/test_deepseek_v4_1_prepared_projections.py
+@@ -386,3 +386,82 @@ def test_weights_collection_prepares_shared_and_markov_logits_heads(
+             torch.testing.assert_close(bias, expected_bias, rtol=0.008, atol=1e-4)
+         finally:
+             graph.reset()
++
++
++@torch.no_grad()
++def test_packed_shared_logits_head_is_exact_and_batch_invariant(
++    default_vllm_config,
++    dist_init,
++    monkeypatch,
++):
++    from b12x.gemm import packed_bf16_vocab_projection as projection
++    from b12x.preparation import PreparationSession
++
++    from vllm.model_executor.layers.logits_processor import LogitsProcessor
++    from vllm.model_executor.layers.vocab_parallel_embedding import ParallelLMHead
++    from vllm.model_executor.warmup.b12x_prepare import _units_from_modules
++    from vllm.utils.b12x import B12xWorkload
++
++    device = _device()
++    monkeypatch.setattr(default_vllm_config.kernel_config, "linear_backend", "b12x")
++    torch.manual_seed(412)
++    target, draft = torch.nn.Module(), torch.nn.Module()
++    with torch.device(device):
++        target.lm_head = ParallelLMHead(
++            32768, 5120, params_dtype=torch.bfloat16, lm_head_quantization="packed_bf16"
++        )
++    assert target.lm_head.runtime_lm_head_quantization == "packed_bf16"
++    target.lm_head.weight.normal_(std=0.02)
++    target.lm_head.weight[5, :7] = torch.tensor(
++        [0.0, -0.0, 1e-30, 3.0, -2.5, 1e-7, 6e-39], dtype=torch.bfloat16
++    )
++    original = target.lm_head.weight.detach().clone()
++    target.lm_head.quant_method.process_weights_after_loading(target.lm_head)
++    assert target.lm_head.weight.dtype == torch.uint8
++    assert target.lm_head.weight.shape == (32768, 7680)
++    packed = target.lm_head.quant_method.packed_weight(target.lm_head)
++    assert packed.exceptions > 0
++    assert torch.equal(
++        projection.unpack(packed).view(torch.int16), original.view(torch.int16)
++    )
++    target.logits_processor = LogitsProcessor(32768)
++    draft.logits_processor = LogitsProcessor(32768)
++    draft.lm_head = target.lm_head
++    workload = B12xWorkload(
++        stage="weights",
++        token_counts=(1, 8),
++        fixed_token_counts=(1,),
++        output_dtype=torch.bfloat16,
++        max_tokens=8,
++        max_seqs=8,
++        max_model_len=1048576,
++    )
++    seen = set()
++    units = tuple(_units_from_modules(target, workload, seen=seen)) + tuple(
++        _units_from_modules(draft, workload, seen=seen)
++    )
++    assert len(units) == 1 and units[0].stage == "weights"
++    source = torch.randn(8, 5120, dtype=torch.bfloat16, device=device)
++    processors = (target.logits_processor, draft.logits_processor)
++    with PreparationSession(device=device, autotune=False, compile_workers=2) as session:
++        session.prepare(tuple(request for unit in units for request in unit.requests))
++        session.freeze()
++        first = processors[0](target.lm_head, source[:1])
++        for rows in (1, 7, 8):
++            expected = torch.nn.functional.linear(source[:rows].float(), original.float())
++            for processor in processors:
++                actual = processor(target.lm_head, source[:rows])
++                torch.testing.assert_close(actual.float(), expected, rtol=0.008, atol=2e-3)
++                # A token's logits do not depend on what else is in the batch.
++                assert torch.equal(actual[:1].view(torch.int16), first.view(torch.int16))
++        expected = draft.logits_processor(target.lm_head, source).clone()
++        graph = torch.cuda.CUDAGraph()
++        try:
++            with session.capture(), torch.cuda.graph(graph):
++                actual = draft.logits_processor(target.lm_head, source)
++            actual.fill_(float("nan"))
++            graph.replay()
++            torch.cuda.synchronize(device)
++            assert torch.equal(actual.view(torch.int16), expected.view(torch.int16))
++        finally:
++            graph.reset()
+diff --git a/vllm/envs.py b/vllm/envs.py
+index 8052fb1d5..f43e70f50 100755
+--- a/vllm/envs.py
++++ b/vllm/envs.py
+@@ -212,6 +212,7 @@ if TYPE_CHECKING:
+     VLLM_MTP_NVFP4_LM_HEAD: bool = True
+     VLLM_DS41_MARKOV_NVFP4: bool = False
+     VLLM_DS41_DRAFT_NVFP4_HEAD: bool = False
++    VLLM_DS41_PACKED_BF16_LM_HEAD: bool = False
+     VLLM_DS41_ATTENTION_COMPUTE: Literal["bf16", "reference", "auto"] = "bf16"
+     VLLM_DS41_ENGRAM_OVERLAP: bool = True
+     VLLM_QWEN3_8_FLASH_NEXT_OVERLAP: bool = True
+@@ -1754,6 +1755,12 @@ environment_variables: dict[str, Callable[[], Any]] = {
+     "VLLM_DS41_DRAFT_NVFP4_HEAD": lambda: bool(
+         int(os.getenv("VLLM_DS41_DRAFT_NVFP4_HEAD", "0"))
+     ),
++    # Store the DeepSeek V4/V4.1 target vocabulary head (which the DSpark
++    # drafter shares when it has no head of its own) in B12X's exact 12-bit
++    # packed BF16 form: every weight bit is kept, in 75% of the bytes.
++    "VLLM_DS41_PACKED_BF16_LM_HEAD": lambda: bool(
++        int(os.getenv("VLLM_DS41_PACKED_BF16_LM_HEAD", "0"))
++    ),
+     # Arithmetic of the DeepSeek V4.1 b12x sparse attention. "bf16" computes
+     # like DeepSeek's reference sparse_attn (BF16 Q, KV dequantized to BF16,
+     # BF16 P, FP32 accumulation) with split-K decode; "reference" also runs
+diff --git a/vllm/model_executor/layers/logits_processor.py b/vllm/model_executor/layers/logits_processor.py
+index 05bc57e80..2042b8ee2 100644
+--- a/vllm/model_executor/layers/logits_processor.py
++++ b/vllm/model_executor/layers/logits_processor.py
+@@ -25,6 +25,7 @@ from vllm.utils.b12x import (
+     B12xPreparationUnit,
+     B12xWorkload,
+     get_b12x_bf16_vocab_projection,
++    get_b12x_packed_bf16_vocab_projection,
+     set_b12x_preparation_provider,
+ )
+ from vllm.utils.flashinfer import has_flashinfer
+@@ -60,6 +61,14 @@ def _topk(scores: torch.Tensor, k: int) -> tuple[torch.Tensor, torch.Tensor]:
+ 
+ 
+ # --8<-- [start:logits_processor]
++def _is_packed_head(head: torch.nn.Module) -> bool:
++    from vllm.model_executor.layers.quantization.online.packed_bf16 import (
++        PackedBf16LmHeadMethod,
++    )
++
++    return isinstance(getattr(head, "quant_method", None), PackedBf16LmHeadMethod)
++
++
+ @PluggableLayer.register("logits_processor")
+ class LogitsProcessor(PluggableLayer):
+     """Process logits and apply logits processors from sampling metadata.
+@@ -111,6 +120,12 @@ class LogitsProcessor(PluggableLayer):
+             and self._b12x_vocab_projection is not None
+             and self._b12x_vocab_projection.is_supported()
+         )
++        self._b12x_packed_vocab_projection = get_b12x_packed_bf16_vocab_projection()
++        self.use_b12x_packed_vocab_projection = bool(
++            kernel_config.linear_backend == "b12x"
++            and self._b12x_packed_vocab_projection is not None
++            and self._b12x_packed_vocab_projection.is_supported()
++        )
+         if lm_head is not None:
+             self.prepare_b12x_vocab_projection(lm_head)
+ 
+@@ -119,7 +134,14 @@ class LogitsProcessor(PluggableLayer):
+         lm_head: torch.nn.Module,
+     ) -> None:
+         """Register the loaded LM head; preparation happens in worker lifecycle."""
+-        if (
++        if _is_packed_head(lm_head):
++            if (
++                not self.use_b12x_packed_vocab_projection
++                or not hasattr(lm_head, "packed_bf16_exponent_base")
++                or not lm_head.weight.is_cuda
++            ):
++                return
++        elif (
+             not self.use_b12x_vocab_projection
+             or not isinstance(lm_head, VocabParallelEmbedding)
+             or not isinstance(
+@@ -150,6 +172,17 @@ class LogitsProcessor(PluggableLayer):
+         return f"logits.vocab.{id(self):x}.{id(head):x}.m{tokens}"
+ 
+     def _declare_b12x_vocab_plan(self, head: VocabParallelEmbedding, rows: int):
++        if _is_packed_head(head):
++            packed = self._b12x_packed_vocab_projection
++            assert packed is not None
++            return packed.plan(
++                packed.Caps(
++                    device=head.weight.device,
++                    max_tokens=rows,
++                    in_features=head.packed_bf16_in_features,
++                    out_features=int(head.weight.shape[0]),
++                )
++            )
+         projection = self._b12x_vocab_projection
+         assert head is not None and projection is not None
+         out_features, in_features = map(int, head.weight.shape)
+@@ -163,7 +196,10 @@ class LogitsProcessor(PluggableLayer):
+         )
+ 
+     def _b12x_vocab_call(self, head: VocabParallelEmbedding, rows: int):
+-        in_features = int(head.weight.shape[1])
++        packed = _is_packed_head(head)
++        in_features = (
++            head.packed_bf16_in_features if packed else int(head.weight.shape[1])
++        )
+ 
+         def call(state):
+             from b12x.preparation import PreparedCall
+@@ -184,6 +220,25 @@ class LogitsProcessor(PluggableLayer):
+                 ).reshape_as(source)
+                 source.copy_((indices.remainder(53).sub_(26)).mul_(1 / 32))
+ 
++            if packed:
++                weight = head.quant_method.packed_weight(head)
++                return PreparedCall(
++                    run=lambda: state.run(
++                        source,
++                        weight.values,
++                        weight.exception_rows,
++                        weight.exception_entries,
++                        weight.row_offsets,
++                        weight.exponent_base,
++                    ),
++                    produce=produce,
++                    owners=(
++                        weight.values,
++                        weight.exception_rows,
++                        weight.exception_entries,
++                        weight.row_offsets,
++                    ),
++                )
+             return PreparedCall(
+                 run=lambda: state.run(source, head.weight),
+                 produce=produce,
+@@ -292,6 +347,23 @@ class LogitsProcessor(PluggableLayer):
+     ) -> torch.Tensor:
+         """Project hidden states through the lm_head, honoring head_dtype."""
+         if self.head_dtype is None or self.head_dtype == hidden_states.dtype:
++            if (
++                _is_packed_head(lm_head)
++                and self.use_b12x_packed_vocab_projection
++                and embedding_bias is None
++            ):
++                # The packed head's bytes are its only copy of the weights.
++                flat = hidden_states.reshape(-1, hidden_states.shape[-1])
++                plan = self._b12x_vocab_plan_for(lm_head, int(flat.shape[0]))
++                packed = self._b12x_packed_vocab_projection
++                assert packed is not None
++                binding = packed.bind(
++                    plan,
++                    source=flat,
++                    weight=lm_head.quant_method.packed_weight(lm_head),
++                )
++                logits = packed.run(binding)
++                return logits.reshape(*hidden_states.shape[:-1], -1)
+             if (
+                 self.use_b12x_vocab_projection
+                 and embedding_bias is None
+diff --git a/vllm/model_executor/layers/quantization/online/packed_bf16.py b/vllm/model_executor/layers/quantization/online/packed_bf16.py
+new file mode 100644
+index 000000000..d642a0037
+--- /dev/null
++++ b/vllm/model_executor/layers/quantization/online/packed_bf16.py
+@@ -0,0 +1,111 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Vocabulary heads stored in B12X's exact 12-bit packed BF16 form.
++
++The checkpoint's BF16 head loads unchanged; after loading it is packed into
++one sign-and-mantissa byte plus a 4-bit exponent code per value, with the
++rare out-of-window values kept exactly in a per-row exception list. Packing
++verifies that every bit round-trips and refuses otherwise, so the served head
++is the checkpoint tensor in 75% of the bytes, not an approximation.
++
++The packed head runs only through the logits processor's prepared B12X
++projection, which reads the packed bytes directly.
++"""
++
++import torch
++from torch.nn import Parameter
++
++from vllm.logger import init_logger
++from vllm.model_executor.layers.quantization.base_config import QuantizeMethodBase
++from vllm.model_executor.utils import replace_parameter, set_weight_attrs
++from vllm.utils.b12x import get_b12x_packed_bf16_vocab_projection
++
++logger = init_logger(__name__)
++
++
++def packed_bf16_supported(input_size: int, params_dtype: torch.dtype) -> bool:
++    projection = get_b12x_packed_bf16_vocab_projection()
++    return (
++        projection is not None
++        and projection.is_supported()
++        and params_dtype == torch.bfloat16
++        and input_size % 128 == 0
++    )
++
++
++class PackedBf16LmHeadMethod(QuantizeMethodBase):
++    """A BF16 LM head served from its exact 12-bit packed form."""
++
++    def create_weights(
++        self,
++        layer: torch.nn.Module,
++        input_size_per_partition: int,
++        output_partition_sizes: list[int],
++        input_size: int,
++        output_size: int,
++        params_dtype: torch.dtype,
++        **extra_weight_attrs,
++    ):
++        weight = Parameter(
++            torch.empty(
++                sum(output_partition_sizes),
++                input_size_per_partition,
++                dtype=params_dtype,
++            ),
++            requires_grad=False,
++        )
++        set_weight_attrs(weight, {"input_dim": 1, "output_dim": 0})
++        layer.register_parameter("weight", weight)
++        set_weight_attrs(weight, extra_weight_attrs)
++
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        if getattr(layer, "_already_called_process_weights_after_loading", False):
++            return
++        projection = get_b12x_packed_bf16_vocab_projection()
++        assert projection is not None
++        weight = layer.weight.data
++        packed = projection.pack(weight.contiguous())
++        in_features = int(weight.shape[1])
++        replace_parameter(layer, "weight", packed.values)
++        replace_parameter(layer, "weight_exception_rows", packed.exception_rows)
++        replace_parameter(layer, "weight_exception_entries", packed.exception_entries)
++        replace_parameter(layer, "weight_row_offsets", packed.row_offsets)
++        layer.packed_bf16_in_features = in_features
++        layer.packed_bf16_exponent_base = packed.exponent_base
++        layer.packed_bf16_exceptions = packed.exceptions
++        layer._already_called_process_weights_after_loading = True
++        logger.info_once(
++            "Packed the BF16 LM head exactly into 12 bits per weight: "
++            "exponents %d..%d, %d out-of-window values kept exactly per shard.",
++            packed.exponent_base,
++            packed.exponent_base + 14,
++            packed.exceptions,
++        )
++
++    @staticmethod
++    def packed_weight(layer: torch.nn.Module):
++        """The layer's current packed tensors (after any relocation)."""
++        projection = get_b12x_packed_bf16_vocab_projection()
++        assert projection is not None
++        return projection.PackedBf16Weight(
++            layer.weight,
++            layer.packed_bf16_exponent_base,
++            layer.weight_exception_rows,
++            layer.weight_exception_entries,
++            layer.weight_row_offsets,
++            layer.packed_bf16_exceptions,
++        )
++
++    def apply(
++        self,
++        layer: torch.nn.Module,
++        x: torch.Tensor,
++        bias: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        raise RuntimeError(
++            "A packed BF16 LM head runs only through the logits processor's "
++            "prepared B12X projection (linear backend b12x, no bias)."
++        )
++
++    def embedding(self, layer: torch.nn.Module, input_: torch.Tensor) -> torch.Tensor:
++        raise RuntimeError("A packed BF16 LM head is not an input embedding.")
+diff --git a/vllm/model_executor/layers/vocab_parallel_embedding.py b/vllm/model_executor/layers/vocab_parallel_embedding.py
+index faacb7d04..8750c62c9 100644
+--- a/vllm/model_executor/layers/vocab_parallel_embedding.py
++++ b/vllm/model_executor/layers/vocab_parallel_embedding.py
+@@ -334,7 +334,7 @@ class VocabParallelEmbedding(PluggableLayer):
+         disable_tp: bool = False,
+         quant_method: QuantizeMethodBase | None = None,
+         parallel_group: GroupCoordinator | None = None,
+-        lm_head_quantization: Literal["mxfp8", "nvfp4"] | None = None,
++        lm_head_quantization: Literal["mxfp8", "nvfp4", "packed_bf16"] | None = None,
+     ):
+         super().__init__()
+ 
+@@ -385,7 +385,43 @@ class VocabParallelEmbedding(PluggableLayer):
+         head_quantization = lm_head_quantization
+         if head_quantization is None and envs.VLLM_MXFP8_LM_HEAD:
+             head_quantization = "mxfp8"
+-        self.runtime_lm_head_quantization: Literal["mxfp8", "nvfp4"] | None = None
++        self.runtime_lm_head_quantization: (
++            Literal["mxfp8", "nvfp4", "packed_bf16"] | None
++        ) = None
++        if not is_embedding_layer and head_quantization == "packed_bf16":
++            # Lossless: the BF16 head is packed exactly, never re-quantized.
++            from vllm.config import get_current_vllm_config
++            from vllm.model_executor.layers.linear import UnquantizedLinearMethod
++            from vllm.model_executor.layers.quantization.online.packed_bf16 import (
++                PackedBf16LmHeadMethod,
++                packed_bf16_supported,
++            )
++
++            config = get_current_vllm_config()
++            tied = getattr(
++                getattr(config.model_config, "hf_text_config", None),
++                "tie_word_embeddings",
++                False,
++            )
++            if tied or not isinstance(
++                quant_method, (UnquantizedEmbeddingMethod, UnquantizedLinearMethod)
++            ):
++                raise ValueError(
++                    "A packed BF16 LM head needs an untied, unquantized checkpoint head"
++                )
++            if config.kernel_config.linear_backend != "b12x" or not (
++                packed_bf16_supported(
++                    embedding_dim, params_dtype or torch.get_default_dtype()
++                )
++            ):
++                raise ValueError(
++                    "A packed BF16 LM head needs B12X's packed vocabulary "
++                    "projection: linear backend b12x, BF16 weights and K "
++                    "divisible by 128"
++                )
++            quant_method = PackedBf16LmHeadMethod()
++            self.runtime_lm_head_quantization = "packed_bf16"
++            head_quantization = None
+         if not is_embedding_layer and head_quantization is not None:
+             from vllm.config import get_current_vllm_config
+             from vllm.model_executor.layers.linear import UnquantizedLinearMethod
+@@ -793,7 +829,7 @@ class ParallelLMHead(VocabParallelEmbedding):
+         prefix: str = "",
+         *,
+         disable_tp: bool = False,
+-        lm_head_quantization: Literal["mxfp8", "nvfp4"] | None = None,
++        lm_head_quantization: Literal["mxfp8", "nvfp4", "packed_bf16"] | None = None,
+     ):
+         super().__init__(
+             num_embeddings,
+diff --git a/vllm/models/deepseek_v41/nvidia/model.py b/vllm/models/deepseek_v41/nvidia/model.py
+index 9c9719e97..2adeb2753 100644
+--- a/vllm/models/deepseek_v41/nvidia/model.py
++++ b/vllm/models/deepseek_v41/nvidia/model.py
+@@ -1100,6 +1100,9 @@ class DeepseekV41LLMForCausalLM(
+                 config.vocab_size,
+                 config.hidden_size,
+                 prefix=maybe_prefix(prefix, "lm_head"),
++                lm_head_quantization=(
++                    "packed_bf16" if envs.VLLM_DS41_PACKED_BF16_LM_HEAD else None
++                ),
+             )
+         else:
+             self.lm_head = PPMissingLayer()
+diff --git a/vllm/utils/b12x.py b/vllm/utils/b12x.py
+index cb7a950f8..cc2fafff6 100644
+--- a/vllm/utils/b12x.py
++++ b/vllm/utils/b12x.py
+@@ -269,6 +269,7 @@ _B12X_SUBMODULES = {
+         "b12x.gemm.bf16_vocab_projection",
+         "b12x.gemm.blockscaled",
+         "b12x.gemm.mla_query_projection",
++        "b12x.gemm.packed_bf16_vocab_projection",
+         "b12x.gemm.wo_projection",
+         "b12x.norm.mhc",
+         # TODO: Remove once B12X exposes the scale-swizzle API publicly.
+@@ -309,6 +310,10 @@ def get_b12x_bf16_vocab_projection() -> ModuleType | None:
+     return _get_submodule("b12x.gemm.bf16_vocab_projection")
+ 
+ 
++def get_b12x_packed_bf16_vocab_projection() -> ModuleType | None:
++    return _get_submodule("b12x.gemm.packed_bf16_vocab_projection")
++
++
+ def get_b12x_mla_query_projection() -> ModuleType | None:
+     return _get_submodule("b12x.gemm.mla_query_projection")
+ 
+-- 
+2.54.0 (Apple Git-157)
+

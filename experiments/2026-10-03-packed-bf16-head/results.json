@@ -1,0 +1,306 @@
+{
+ "schema_version": 1,
+ "window_utc": [
+  "2026-10-03T22:19:50Z",
+  "2026-10-03T22:35:51Z"
+ ],
+ "arms": {
+  "control": {
+   "config": "experiments/2026-10-03-packed-bf16-head/control.json",
+   "config_sha256": "efaeaa28cbbd231d684ecffd02cd1a8687f34a6ea7ba06e8ae1f7e0b47aa30a9",
+   "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-v1",
+   "image_id": "sha256:e72ba6a454a728135967edf09f3d174c3c7e2e7b5724084f3be0475aa1f8fe20",
+   "quality": {
+    "passed": 5,
+    "of": 5
+   },
+   "decode": {
+    "prose-c1": {
+     "tps": {
+      "n": 3,
+      "mean": 61.707,
+      "ci95_pct": 11.04
+     },
+     "step_ms": {
+      "n": 3,
+      "mean": 33.604,
+      "ci95_pct": 1.57
+     },
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.151,
+      "ci95_pct": 20.43
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 3.05,
+      "ci95_pct": 7.1
+     }
+    },
+    "prose-c8": {
+     "tps": {
+      "n": 3,
+      "mean": 215.975,
+      "ci95_pct": 1.0
+     },
+     "step_ms": null,
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.162,
+      "ci95_pct": 4.03
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 1.767,
+      "ci95_pct": 2.76
+     }
+    },
+    "code-c1": {
+     "tps": {
+      "n": 3,
+      "mean": 76.942,
+      "ci95_pct": 29.82
+     },
+     "step_ms": {
+      "n": 3,
+      "mean": 37.821,
+      "ci95_pct": 9.98
+     },
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 2.081,
+      "ci95_pct": 61.72
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 4.131,
+      "ci95_pct": 7.34
+     }
+    },
+    "code-c8": {
+     "tps": {
+      "n": 3,
+      "mean": 250.734,
+      "ci95_pct": 8.07
+     },
+     "step_ms": null,
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.943,
+      "ci95_pct": 19.08
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 2.655,
+      "ci95_pct": 13.72
+     }
+    }
+   },
+   "prefill": {
+    "1024": {
+     "prompt_tokens": 947,
+     "tps": {
+      "n": 2,
+      "mean": 2656.467,
+      "ci95_pct": 36.63
+     }
+    },
+    "32768": {
+     "prompt_tokens": 28907,
+     "tps": {
+      "n": 2,
+      "mean": 4725.642,
+      "ci95_pct": 9.23
+     }
+    },
+    "65536": {
+     "prompt_tokens": 64943,
+     "tps": {
+      "n": 2,
+      "mean": 4744.518,
+      "ci95_pct": 10.13
+     }
+    },
+    "262144": {
+     "prompt_tokens": 240637,
+     "tps": {
+      "n": 2,
+      "mean": 4565.83,
+      "ci95_pct": 3.1
+     }
+    }
+   },
+   "memory_min_available_gib": {
+    "dgx1": 30.63,
+    "dgx2": 31.93,
+    "dgx3": 31.91,
+    "dgx4": 31.39
+   },
+   "vocabulary_head": {
+    "kernel": "cuBLAS BF16 (cutlass_80_wmma)",
+    "median_ms_per_read": {
+     "rank0": 1.311,
+     "rank3": 1.336
+    },
+    "reads_per_six_row_step": 2,
+    "step_end_tail_ms": 6.09
+   }
+  },
+  "packed": {
+   "config": "experiments/2026-10-03-packed-bf16-head/packed.json",
+   "config_sha256": "94a67b72085a48752c5dc6f88c2d1de2751ca5b71d4de4d6cc1233b5aa92c565",
+   "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-packedhead-v1",
+   "image_id": "sha256:5e11250300ef87d6fba3b6090c44400583fcb7d30fd780ee69a5aa6fd482d895",
+   "quality": {
+    "passed": 5,
+    "of": 5
+   },
+   "decode": {
+    "prose-c1": {
+     "tps": {
+      "n": 3,
+      "mean": 61.809,
+      "ci95_pct": 11.08
+     },
+     "step_ms": {
+      "n": 3,
+      "mean": 33.0,
+      "ci95_pct": 8.9
+     },
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.135,
+      "ci95_pct": 40.63
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 2.702,
+      "ci95_pct": 29.85
+     }
+    },
+    "prose-c8": {
+     "tps": {
+      "n": 3,
+      "mean": 216.913,
+      "ci95_pct": 2.96
+     },
+     "step_ms": null,
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.13,
+      "ci95_pct": 2.26
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 1.8,
+      "ci95_pct": 2.25
+     }
+    },
+    "code-c1": {
+     "tps": {
+      "n": 3,
+      "mean": 75.925,
+      "ci95_pct": 4.48
+     },
+     "step_ms": {
+      "n": 3,
+      "mean": 37.101,
+      "ci95_pct": 5.41
+     },
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.956,
+      "ci95_pct": 13.44
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 3.888,
+      "ci95_pct": 10.26
+     }
+    },
+    "code-c8": {
+     "tps": {
+      "n": 3,
+      "mean": 248.703,
+      "ci95_pct": 4.33
+     },
+     "step_ms": null,
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.686,
+      "ci95_pct": 9.58
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 2.282,
+      "ci95_pct": 6.82
+     }
+    }
+   },
+   "prefill": {
+    "1024": {
+     "prompt_tokens": 947,
+     "tps": {
+      "n": 2,
+      "mean": 2650.041,
+      "ci95_pct": 27.81
+     }
+    },
+    "32768": {
+     "prompt_tokens": 28907,
+     "tps": {
+      "n": 2,
+      "mean": 4708.823,
+      "ci95_pct": 6.85
+     }
+    },
+    "65536": {
+     "prompt_tokens": 64943,
+     "tps": {
+      "n": 2,
+      "mean": 4736.801,
+      "ci95_pct": 9.58
+     }
+    },
+    "262144": {
+     "prompt_tokens": 240637,
+     "tps": {
+      "n": 2,
+      "mean": 4557.6,
+      "ci95_pct": 3.02
+     }
+    }
+   },
+   "memory_min_available_gib": {
+    "dgx1": 30.09,
+    "dgx2": 31.14,
+    "dgx3": 31.09,
+    "dgx4": 30.64
+   },
+   "vocabulary_head": {
+    "kernel": "B12X packed_bf16_vocab_projection",
+    "median_ms_per_read": {
+     "rank0": 1.075,
+     "rank3": 1.095
+    },
+    "reads_per_six_row_step": 2,
+    "step_end_tail_ms": 5.49,
+    "packing": {
+     "exponent_window": [
+      112,
+      126
+     ],
+     "exceptions": {
+      "rank0": 25992,
+      "rank3": 27034
+     }
+    },
+    "display_carveout_mib": {
+     "control": 631.2,
+     "packed": 552.3
+    }
+   }
+  }
+ },
+ "profile_note": "Median over profiled six-row decode steps of rank 0 (and rank 3 for the head kernel), main stream, from the decode profile of each arm."
+}

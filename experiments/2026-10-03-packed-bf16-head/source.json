@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-03",
+  "vllm": {
+    "base_revision": "04c30fa98e7917fee0a24c739ea503ce1e22538d",
+    "patch_series": "experiments/2026-10-03-packed-bf16-head/vllm/series",
+    "patchset_sha256": "4117be4f44a257a9ee615f2355ff8d7efec8f996d2c96075b58decf81e491deb",
+    "expected_tree": "1f54f7235b88780d450db44ba989612c571dd9b5",
+    "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.vllm.tree matches",
+    "patch_head": "69564806c384e3c3d52952fea377388b8f6b2286",
+    "capabilities": [
+      "packed-bf16-lm-head"
+    ]
+  },
+  "b12x": {
+    "base_revision": "f8069b2c0be1311df3b112591c6b8876a843f8be",
+    "patch_series": "experiments/2026-10-03-packed-bf16-head/b12x/series",
+    "patchset_sha256": "9bfd65014ea37bf2a4bd246442a0c3d6df486b1a20fc950206f5b31984d54c79",
+    "patch_head": "b6e868bdf6bf678d81324b05369ddafe4fbf7423",
+    "expected_tree": "bd2d95c4800acf8f8f7a38c754cf4c61de211ec6",
+    "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.b12x.tree matches",
+    "capabilities": [
+      "packed-bf16-vocab-projection",
+      "rocenante-mesh4",
+      "rocenante-mesh4-fourpaths",
+      "rocenante-ring4",
+      "rocenante-ring4-bidirectional"
+    ]
+  },
+  "nccl": {
+    "base_revision": "73cf112295c33aee2b895f329f592f2a9b4b0f97",
+    "patch_series": "experiments/2026-10-03-balanced-policy/nccl-adaptive/series",
+    "patchset_sha256": "06f133b1709622d64b0ab87fc32f29d167f4617ca9386117596008d400a8d40c",
+    "patch_head": "eeacf1c6343f0499e4e7ab20ec7eecfb6f62eda6",
+    "expected_tree": "6af10aa730a64fcee8781d62340a9c9184e79469",
+    "verification": "bin/spark3 build prepare applies the series to the pinned tag and checks this patch head and tree; image label local.spark3.nccl.tree matches, and the image build checks the installed libnccl.so.2 against the built one",
+    "capabilities": [
+      "switchless-bidirectional-ring"
+    ]
+  },
+  "runtime_foundation": {
+    "vllm_base_image_digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "vllm_base_source_revision": "af1c01499b289be555c475669ba50a88e96d846e",
+    "flashinfer_version": "0.6.18.post1",
+    "flashinfer_evidence": "installed in the runtime base image; not rebuilt",
+    "cutlass_revision": "cb4247394dd82148787aed73e5dc7cef33cbf862",
+    "cutlass_release_tag": "v4.7.1",
+    "cutlass_dsl_version": "4.7.1",
+    "cutlass_dsl_lockfile": "requirements/cutlass-dsl-aarch64.txt",
+    "build_recipe": "bin/spark3 build (docker/Dockerfile)",
+    "build_deployment_commit": null
+  },
+  "deployment_artifacts": {}
+}

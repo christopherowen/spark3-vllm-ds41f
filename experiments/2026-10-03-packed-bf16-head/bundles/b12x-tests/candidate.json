@@ -1,0 +1,9 @@
+{
+  "description": "The packed BF16 vocabulary projection tests of B12X patch 0012, run from the candidate image's own B12X tree: exact round trip including zeros, subnormals, infinities and out-of-window values; reference match; bit-identical logits across batch sizes and every tile configuration; CUDA graph replay; the shared-memory model; and the registry contract.",
+  "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-packedhead-v1",
+  "env": {"HF_HUB_OFFLINE": "1"},
+  "workdir": "/opt/spark3/candidate/b12x",
+  "argv": ["-m", "pytest", "-q", "-p", "no:cacheprovider",
+           "tests/gemm/test_packed_bf16_vocab_projection.py", "tests/test_registry.py"],
+  "verdict": "exit"
+}

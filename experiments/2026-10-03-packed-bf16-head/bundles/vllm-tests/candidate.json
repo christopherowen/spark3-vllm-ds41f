@@ -1,0 +1,10 @@
+{
+  "description": "The DS4.1 logits-head preparation tests of vLLM patch 0028, run from the candidate image's own vLLM tree: the packed target head loads, round-trips exactly, matches BF16 logits, keeps a token's logits bit-identical across batch sizes, is shared by the drafter's logits processor and replays in a CUDA graph; the existing shared and Markov head preparation still passes. ds41_fixtures.py supplies the two conftest fixtures without the conftest's test-only imports.",
+  "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-packedhead-v1",
+  "env": {"HF_HUB_OFFLINE": "1", "PYTHONPATH": "/b"},
+  "workdir": "/opt/spark3/candidate/vllm",
+  "argv": ["-m", "pytest", "-q", "-p", "no:cacheprovider", "--noconftest", "-p", "ds41_fixtures",
+           "tests/models/test_deepseek_v4_1_prepared_projections.py", "-k", "packed_shared or shared_and_markov"],
+  "verdict": "exit",
+  "mounts": [["ds41_fixtures.py", "/b/ds41_fixtures.py"]]
+}

@@ -1,0 +1,12 @@
+../../../patches/b12x/0001-switchless-rocenante.patch
+../../../patches/b12x/0002-cutlass-dsl-4.7.1.patch
+../../../patches/b12x/0003-dsa-topk-position-ties.patch
+../../../patches/b12x/0004-gemm-fence-stage-reads-before-tma-refill.patch
+../../../patches/b12x/0005-fence-stage-reads-three-kernels.patch
+../../2026-10-02-rocenante-ring4/b12x/0006-rocenante-ring4.patch
+../../2026-10-02-rocenante-mesh4/b12x/0007-rocenante-mesh4.patch
+../../2026-10-02-mesh4-fourpaths/b12x/0008-four-path-mesh.patch
+../../2026-10-03-ring4-bidirectional/b12x/0009-bidirectional-relay.patch
+../../2026-10-03-balanced-policy/b12x/0010-dispatch-capacity.patch
+../../2026-10-03-balanced-policy/b12x/0011-loader-abi.patch
+0012-packed-bf16-vocab-projection.patch
