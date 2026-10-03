@@ -1,4 +1,4 @@
-From 70e1a5e204c1197d803407038bdc746edbb1f318 Mon Sep 17 00:00:00 2001
+From 913af87c02c4dab21c099d336161147632614d66 Mon Sep 17 00:00:00 2001
 From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Sat, 3 Oct 2026 18:09:37 +0200
 Subject: [PATCH] feat(deepseek-v4.1): TileLang kernel backend
@@ -15,7 +15,7 @@ The TileLang family adds:
   interleaves layers), the MXFP4 indexer (query quantization and index-key
   writes with B12X's exact rounding, scores bounded by each row's live
   length, an exact top-k with multi-level merges, candidate publishing and
-  reindexing), MXFP8 block-32 and batch-invariant BF16 GEMMs, and routed
+  reindexing), MXFP8 block-32 and BF16 GEMMs, and routed
   experts (dispatch, grouped FP8 x FP4 GEMMs over tile-major weights,
   TileKernels' fused SwiGLU with the route weight before the down
   projection, combine). Plans hold no buffers; scratch comes from the vLLM
@@ -29,6 +29,16 @@ The TileLang family adds:
   64 columns as compact tile tails: they are copied with cp.async into the
   same unpacked shared layout and multiplied over those 64 columns. No
   operand or scale is padded.
+- Decode-shaped projections at full speed. Decode rows (up to 64) read one
+  whole 64-row activation tile from the padded workspace and store only
+  their live rows: a partial tile cost about 0.4 us per missing row on
+  SM121, so one row ran nearly three times slower than 64. BF16 projections
+  with few output tiles (the 384-expert router) split K until tiles x shards
+  covers the SMs, with FP32 partials reduced in shard order; the large-row
+  kernel folds the same shards, so every path stays batch-invariant.
+- The vocabulary heads keep B12X's online NVFP4/MXFP8 kernels under the
+  tilelang linear backend; the DSpark draft and transition heads had fallen
+  back to BF16 cuBLAS.
 - AttentionBackendEnum.TILELANG and DeepseekV41TileLangAttention, which
   override the layer's indexer and attention hooks.
 - tilelang linear and MoE backends: TileLangFP8LinearMethod,
@@ -50,11 +60,13 @@ requirements/cuda.txt moves to tilelang 0.1.15.
  requirements/cuda.txt                         |    2 +-
  .../attention/test_deepseek_v41_tilelang.py   |  563 ++++++++
  .../moe/test_deepseek_v41_tilelang_moe.py     |  121 ++
- .../test_deepseek_v41_tilelang_linear.py      |  120 ++
+ .../test_deepseek_v41_tilelang_linear.py      |  136 ++
  vllm/config/kernel.py                         |    5 +
  vllm/envs.py                                  |    8 +
+ .../model_executor/kernels/linear/__init__.py |    3 +
  .../layers/fused_moe/oracle/mxfp4.py          |   26 +-
  .../layers/fused_moe/tilelang.py              |  245 ++++
+ .../layers/vocab_parallel_embedding.py        |    3 +-
  vllm/model_executor/models/config.py          |   34 +-
  vllm/models/deepseek_v4_1/attention.py        |  403 +++---
  vllm/models/deepseek_v4_1/b12x_layers.py      |   48 +-
@@ -64,14 +76,14 @@ requirements/cuda.txt moves to tilelang 0.1.15.
  vllm/models/deepseek_v4_1/quant_config.py     |   66 +-
  .../models/deepseek_v4_1/tilelang/__init__.py |   16 +
  .../deepseek_v4_1/tilelang/attention.py       |  238 ++++
- vllm/models/deepseek_v4_1/tilelang/gemm.py    |  200 +++
+ vllm/models/deepseek_v4_1/tilelang/gemm.py    |  334 +++++
  vllm/models/deepseek_v4_1/tilelang/indexer.py | 1187 +++++++++++++++++
- vllm/models/deepseek_v4_1/tilelang/linear.py  |  175 +++
+ vllm/models/deepseek_v4_1/tilelang/linear.py  |  233 ++++
  vllm/models/deepseek_v4_1/tilelang/moe.py     |  931 +++++++++++++
  vllm/models/deepseek_v4_1/tilelang/norm.py    |   38 +
  .../deepseek_v4_1/tilelang/sparse_mla.py      |  840 ++++++++++++
  vllm/v1/attention/backends/registry.py        |    3 +
- 24 files changed, 5109 insertions(+), 263 deletions(-)
+ 26 files changed, 5322 insertions(+), 264 deletions(-)
  create mode 100644 tests/kernels/attention/test_deepseek_v41_tilelang.py
  create mode 100644 tests/kernels/moe/test_deepseek_v41_tilelang_moe.py
  create mode 100644 tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py
@@ -797,10 +809,10 @@ index 000000000..73da08ea5
 +        assert torch.equal(solo[0], out[r]), f"row {r} changed with batch composition"
 diff --git a/tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py b/tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py
 new file mode 100644
-index 000000000..d4cd9c54d
+index 000000000..78715b286
 --- /dev/null
 +++ b/tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,136 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1 TileLang GEMMs and RMSNorm against torch references."""
@@ -819,10 +831,14 @@ index 000000000..d4cd9c54d
 +tile_kernels = pytest.importorskip("tile_kernels")
 +
 +from vllm.models.deepseek_v4_1.tilelang.gemm import (  # noqa: E402
++    DECODE_ROWS,
 +    bf16_gemm,
++    bf16_gemm_partials,
++    bf16_shards,
 +    default_config,
 +    mxfp8_gemm,
 +    pack_scale_words,
++    splitk_reduce,
 +)
 +from vllm.models.deepseek_v4_1.tilelang.norm import TileLangRMSNorm  # noqa: E402
 +
@@ -870,18 +886,22 @@ index 000000000..d4cd9c54d
 +    x = torch.randn((max(ROWS), k), generator=_gen(2), device=DEVICE).bfloat16()
 +    xq, sf, x_values = _mxfp8(x)
 +    ref = x_values @ weight_values.T
++    words = sf.contiguous().view(torch.uint32)
++    decode = mxfp8_gemm(n, k, **default_config(DECODE_ROWS, k), padded_rows=True)
++    large = mxfp8_gemm(n, k, **default_config(DECODE_ROWS + 1, k))
 +    outs = {}
 +    for rows in ROWS:
-+        gemm = mxfp8_gemm(n, k, **default_config(rows, k))
 +        out = torch.empty((rows, n), dtype=torch.bfloat16, device=DEVICE)
-+        gemm(
-+            xq[:rows], weight, sf[:rows].contiguous().view(torch.uint32), weight_sf, out
-+        )
++        if rows <= DECODE_ROWS:
++            # Decode rows read one whole 64-row tile; only live rows are stored.
++            decode(xq[:DECODE_ROWS], weight, words[:DECODE_ROWS], weight_sf, out)
++        else:
++            large(xq[:rows], weight, words[:rows], weight_sf, out)
 +        torch.testing.assert_close(
 +            out.float(), ref[:rows], rtol=1e-2, atol=1e-2 * ref.abs().max().item()
 +        )
 +        outs[rows] = out
-+    # Rows agree bit for bit across batch sizes and tile configurations.
++    # Rows agree bit for bit across batch sizes, padding and tile configurations.
 +    for rows, out in outs.items():
 +        assert torch.equal(out, outs[max(ROWS)][:rows]), (
 +            f"rows={rows} differs from the full batch"
@@ -889,25 +909,33 @@ index 000000000..d4cd9c54d
 +
 +
 +@pytest.mark.parametrize("out_dtype", [torch.bfloat16, torch.float32])
-+@pytest.mark.parametrize("n, k", [(32, 4096), (384, 512), (100, 200)])
++# The router (384 x 5120) splits K eight ways; (100, 200) cannot split.
++@pytest.mark.parametrize("n, k", [(32, 4096), (384, 512), (384, 5120), (100, 200)])
 +def test_bf16_gemm(n, k, out_dtype):
 +    gen = _gen(3)
 +    weight = torch.randn((n, k), generator=gen, device=DEVICE).bfloat16()
 +    x = torch.randn((max(ROWS), k), generator=gen, device=DEVICE).bfloat16()
-+    gemm = bf16_gemm(
-+        n,
-+        k,
-+        out_dtype={torch.bfloat16: "bfloat16", torch.float32: "float32"}[out_dtype],
-+    )
++    tl_dtype = {torch.bfloat16: "bfloat16", torch.float32: "float32"}[out_dtype]
++    shards = bf16_shards(n, k)
++    gemm = bf16_gemm(n, k, out_dtype=tl_dtype, shards=shards)
 +    ref = x.float() @ weight.float().T
 +    full = torch.empty((max(ROWS), n), dtype=out_dtype, device=DEVICE)
 +    gemm(x, weight, full)
 +    torch.testing.assert_close(
 +        full.float(), ref, rtol=1e-2, atol=1e-2 * ref.abs().max().item()
 +    )
++    if shards > 1:
++        partials = bf16_gemm_partials(n, k, shards)
++        reduce = splitk_reduce(n, shards, out_dtype=tl_dtype)
 +    for rows in ROWS:
 +        out = torch.empty((rows, n), dtype=out_dtype, device=DEVICE)
-+        gemm(x[:rows], weight, out)
++        if shards > 1 and rows <= DECODE_ROWS:
++            # Decode rows: split-K partials, reduced in shard order.
++            p = torch.empty((shards, rows, n), dtype=torch.float32, device=DEVICE)
++            partials(x[:rows], weight, p)
++            reduce(p, out)
++        else:
++            gemm(x[:rows], weight, out)
 +        assert torch.equal(out, full[:rows]), f"rows={rows} differs from the full batch"
 +
 +
@@ -984,6 +1012,20 @@ index 8052fb1d5..a2c287f13 100755
      # Read DeepSeek V4.1 disk Engram rows while the target graph starts.
      "VLLM_DS41_ENGRAM_OVERLAP": lambda: bool(
          int(os.getenv("VLLM_DS41_ENGRAM_OVERLAP", "1"))
+diff --git a/vllm/model_executor/kernels/linear/__init__.py b/vllm/model_executor/kernels/linear/__init__.py
+index 39d48e0ca..b6a645dd5 100644
+--- a/vllm/model_executor/kernels/linear/__init__.py
++++ b/vllm/model_executor/kernels/linear/__init__.py
+@@ -252,6 +252,9 @@ def _get_linear_backend(*, quantization: str) -> str:
+ 
+ # Kernel classes covered by each --linear-backend value.
+ _LINEAR_BACKEND_KERNEL_MAP: dict[str, set[type]] = {
++    # DS4.1's TileLang family runs its projections as DS4.1 linear methods;
++    # the online-quantized vocabulary heads keep B12X's shared kernels.
++    "tilelang": {B12xMxfp8LinearKernel, B12xNvFp4LinearKernel},
+     "b12x": {
+         B12xFp8BlockScaledMMKernel,
+         B12xMxFp4LinearKernel,
 diff --git a/vllm/model_executor/layers/fused_moe/oracle/mxfp4.py b/vllm/model_executor/layers/fused_moe/oracle/mxfp4.py
 index 1c38e4378..4315c4c16 100644
 --- a/vllm/model_executor/layers/fused_moe/oracle/mxfp4.py
@@ -1314,6 +1356,20 @@ index 000000000..ad9191026
 +
 +    def moe_sum(self, input: torch.Tensor, output: torch.Tensor) -> None:
 +        raise NotImplementedError("LoRA is not supported for TileLangExperts")
+diff --git a/vllm/model_executor/layers/vocab_parallel_embedding.py b/vllm/model_executor/layers/vocab_parallel_embedding.py
+index faacb7d04..cc0da0b65 100644
+--- a/vllm/model_executor/layers/vocab_parallel_embedding.py
++++ b/vllm/model_executor/layers/vocab_parallel_embedding.py
+@@ -85,7 +85,8 @@ def _supports_default_lm_head_quantization(
+         or params_dtype != torch.bfloat16
+         or input_size % 128
+         or output_size % 8
+-        or config.kernel_config.linear_backend not in ("auto", "b12x")
++        # DS4.1's TileLang family keeps B12X's NVFP4 and MXFP8 head kernels.
++        or config.kernel_config.linear_backend not in ("auto", "b12x", "tilelang")
+         or not current_platform.is_cuda()
+         or not current_platform.is_device_capability_family(120)
+     ):
 diff --git a/vllm/model_executor/models/config.py b/vllm/model_executor/models/config.py
 index 8c5ac89c6..1d355a44a 100644
 --- a/vllm/model_executor/models/config.py
@@ -2535,10 +2591,10 @@ index 000000000..5a3aed28e
 +__all__ = ["DeepseekV41TileLangAttention", "DeepseekV41TileLangBackend"]
 diff --git a/vllm/models/deepseek_v4_1/tilelang/gemm.py b/vllm/models/deepseek_v4_1/tilelang/gemm.py
 new file mode 100644
-index 000000000..db61cad83
+index 000000000..0ae8c636e
 --- /dev/null
 +++ b/vllm/models/deepseek_v4_1/tilelang/gemm.py
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,334 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1-Flash block-32 FP8 linear for SM120 / SM121.
@@ -2596,6 +2652,7 @@ index 000000000..db61cad83
 +    num_stages: int = 2,
 +    threads: int = 128,
 +    out_dtype: T.dtype = T.bfloat16,
++    padded_rows: bool = False,
 +):
 +    """``C[M, N] = (A * SFA) @ (B * SFB)^T`` for MXFP8 ``A[M, K]``, ``B[N, K]``.
 +
@@ -2604,13 +2661,21 @@ index 000000000..db61cad83
 +    off a 128-element boundary reads the two words it straddles and tells the
 +    MMA where it starts (``k_start``), so no operand is padded.
 +
-+    Each output accumulates over K in the same order whatever the tile shape,
-+    so a row's result does not depend on M or on the configuration chosen.
++    With ``padded_rows``, ``A`` and ``SFA`` have ``Mp >= M`` rows, a multiple
++    of ``block_M`` (the decode workspace): every activation tile is loaded
++    whole and only the ``M`` live rows are stored. A partial tile's missing
++    rows otherwise cost about 0.4 us each on SM121, which made one decode row
++    nearly three times slower than 64.
++
++    Each output accumulates over K in the same order whatever the tile shape
++    or padding, so a row's result does not depend on M or the configuration.
 +    """
 +    assert K % block_K == 0 and block_K % 64 == 0, (
 +        "block_K must divide K and be a multiple of 64"
 +    )
++    k_blocks = K // block_K
 +    M = T.dynamic("M")
++    Mp = T.dynamic("Mp") if padded_rows else M
 +    in_dtype = T.float8_e4m3fn
 +    accum_dtype = T.float32
 +    sf_words = scale_words(K)
@@ -2618,9 +2683,9 @@ index 000000000..db61cad83
 +
 +    @T.prim_func
 +    def main(
-+        A: T.Tensor((M, K), in_dtype),
++        A: T.Tensor((Mp, K), in_dtype),
 +        B: T.Tensor((N, K), in_dtype),
-+        SFA: T.Tensor((M, sf_words), T.uint32),
++        SFA: T.Tensor((Mp, sf_words), T.uint32),
 +        SFB: T.Tensor((N, sf_words), T.uint32),
 +        C: T.Tensor((M, N), out_dtype),
 +    ):
@@ -2632,16 +2697,16 @@ index 000000000..db61cad83
 +            SFA_shared = T.alloc_shared((block_M, block_words), T.uint32)
 +            SFB_shared = T.alloc_shared((block_N, block_words), T.uint32)
 +            C_local = T.alloc_fragment((block_M, block_N), accum_dtype)
-+
 +            T.clear(C_local)
-+            for ko in T.Pipelined(K // block_K, num_stages=num_stages):
++            for ko in T.Pipelined(k_blocks, num_stages=num_stages):
 +                T.copy(A[by * block_M, ko * block_K], A_shared)
 +                T.copy(B[bx * block_N, ko * block_K], B_shared)
 +                # Edge tiles clamp their scale rows; those rows are never stored.
 +                word0 = ko * block_K // SF_WORD_K
 +                for i, w in T.Parallel(block_M, block_words):
 +                    SFA_shared[i, w] = SFA[
-+                        T.min(by * block_M + i, M - 1), T.min(word0 + w, sf_words - 1)
++                        T.min(by * block_M + i, Mp - 1),
++                        T.min(word0 + w, sf_words - 1),
 +                    ]
 +                for j, w in T.Parallel(block_N, block_words):
 +                    SFB_shared[j, w] = SFB[
@@ -2666,6 +2731,38 @@ index 000000000..db61cad83
 +
 +
 +@tilelang.jit
++def splitk_reduce(
++    N: int,
++    shards: int,
++    out_dtype: T.dtype = T.bfloat16,
++    block_N: int = 128,
++    threads: int = 128,
++):
++    """``C[m, n] = P[0, m, n] + P[1, m, n] + ...``, added in shard order in FP32.
++
++    The sum starts from shard 0 itself, not from zero, so it matches the
++    in-kernel shard accumulation of ``bf16_gemm`` bit for bit, signed zeros
++    included.
++    """
++    assert N % block_N == 0
++    M = T.dynamic("M")
++
++    @T.prim_func
++    def main(P: T.Tensor((shards, M, N), T.float32), C: T.Tensor((M, N), out_dtype)):
++        with T.Kernel(N // block_N, M, threads=threads) as (bx, m):
++            acc = T.alloc_fragment((block_N,), T.float32)
++            for j in T.Parallel(block_N):
++                acc[j] = P[0, m, bx * block_N + j]
++            for s in T.serial(1, shards):
++                for j in T.Parallel(block_N):
++                    acc[j] += P[s, m, bx * block_N + j]
++            for j in T.Parallel(block_N):
++                C[m, bx * block_N + j] = acc[j]
++
++    return main
++
++
++@tilelang.jit
 +def bf16_gemm(
 +    N: int,
 +    K: int,
@@ -2675,16 +2772,19 @@ index 000000000..db61cad83
 +    num_stages: int = 3,
 +    threads: int = 128,
 +    out_dtype: T.dtype = T.bfloat16,
++    shards: int = 1,
 +):
 +    """``C[M, N] = A @ B^T`` for BF16 ``A[M, K]`` and ``B[N, K]``, accumulated in FP32.
 +
-+    M is dynamic.
-+
-+    One configuration serves every M, so a row's result never depends on the
-+    batch it runs in.
++    M is dynamic. With ``shards`` > 1 each K shard is summed from zero and
++    the shards added in order, the arithmetic of ``bf16_gemm_partials`` plus
++    ``splitk_reduce``, so a row's result never depends on the batch it runs in.
 +    """
++    k_blocks = tilelang.cdiv(K, block_K)
++    assert shards == 1 or (K % block_K == 0 and k_blocks % shards == 0)
 +    M = T.dynamic("M")
 +    dtype = T.bfloat16
++    shard_blocks = k_blocks // shards
 +
 +    @T.prim_func
 +    def main(
@@ -2698,12 +2798,76 @@ index 000000000..db61cad83
 +            A_shared = T.alloc_shared((block_M, block_K), dtype)
 +            B_shared = T.alloc_shared((block_N, block_K), dtype)
 +            C_local = T.alloc_fragment((block_M, block_N), T.float32)
++            C_total = T.alloc_fragment(
++                (block_M, block_N) if shards > 1 else (1, 1), T.float32
++            )
 +            T.clear(C_local)
-+            for ko in T.Pipelined(T.ceildiv(K, block_K), num_stages=num_stages):
++            if shards > 1:
++                T.clear(C_total)
++            for ko in T.Pipelined(k_blocks, num_stages=num_stages):
 +                T.copy(A[by * block_M, ko * block_K], A_shared)
 +                T.copy(B[bx * block_N, ko * block_K], B_shared)
 +                T.gemm(A_shared, B_shared, C_local, transpose_B=True)
-+            T.copy(C_local, C[by * block_M, bx * block_N])
++                if shards > 1:  # noqa: SIM102
++                    if (ko + 1) % shard_blocks == 0:
++                        for i, j in T.Parallel(block_M, block_N):
++                            C_total[i, j] = T.if_then_else(
++                                ko + 1 == shard_blocks,
++                                C_local[i, j],
++                                C_total[i, j] + C_local[i, j],
++                            )
++                        T.clear(C_local)
++            if shards > 1:
++                T.copy(C_total, C[by * block_M, bx * block_N])
++            else:
++                T.copy(C_local, C[by * block_M, bx * block_N])
++
++    return main
++
++
++@tilelang.jit
++def bf16_gemm_partials(
++    N: int,
++    K: int,
++    shards: int,
++    block_M: int = 64,
++    block_N: int = 64,
++    block_K: int = 64,
++    num_stages: int = 3,
++    threads: int = 128,
++):
++    """Split-K BF16 GEMM for decode rows: FP32 ``P[s] = A @ B^T`` over K shard ``s``."""
++    assert K % block_K == 0 and (K // block_K) % shards == 0
++    M = T.dynamic("M")
++    dtype = T.bfloat16
++    shard_blocks = K // block_K // shards
++
++    @T.prim_func
++    def main(
++        A: T.Tensor((M, K), dtype),
++        B: T.Tensor((N, K), dtype),
++        P: T.Tensor((shards, M, N), T.float32),
++    ):
++        with T.Kernel(
++            T.ceildiv(N, block_N), shards, T.ceildiv(M, block_M), threads=threads
++        ) as (bx, s, by):
++            A_shared = T.alloc_shared((block_M, block_K), dtype)
++            B_shared = T.alloc_shared((block_N, block_K), dtype)
++            C_local = T.alloc_fragment((block_M, block_N), T.float32)
++            T.clear(C_local)
++            for kb in T.Pipelined(shard_blocks, num_stages=num_stages):
++                ko = s * shard_blocks + kb
++                T.copy(A[by * block_M, ko * block_K], A_shared)
++                T.copy(B[bx * block_N, ko * block_K], B_shared)
++                T.gemm(A_shared, B_shared, C_local, transpose_B=True)
++            T.copy(
++                C_local,
++                P[
++                    s,
++                    by * block_M : (by + 1) * block_M,
++                    bx * block_N : (bx + 1) * block_N,
++                ],
++            )
 +
 +    return main
 +
@@ -2729,6 +2893,29 @@ index 000000000..db61cad83
 +    return exponents.contiguous().view(torch.uint32)
 +
 +
++# SMs of one GB10; a decode split-K grid aims to cover them once.
++DECODE_CTAS = 48
++DECODE_ROWS = 64  # rows served by the decode tile configuration
++
++
++def bf16_shards(N: int, K: int, block_N: int = 64, block_K: int = 64) -> int:
++    """K shards for a BF16 projection: the most that keep one CTA per SM.
++
++    Few output tiles (the 384-expert router has six) leave most SMs idle and
++    each CTA latency-bound on a long K loop; splitting K until tiles x shards
++    reaches the SM count fixes both. Every row count uses the same split, so
++    results stay batch-invariant.
++    """
++    if K % block_K:
++        return 1
++    tiles, k_blocks = tilelang.cdiv(N, block_N), K // block_K
++    best = 1
++    for shards in range(1, k_blocks // 2 + 1):
++        if k_blocks % shards == 0 and tiles * shards <= DECODE_CTAS:
++            best = shards
++    return best
++
++
 +def default_config(M: int, K: int) -> dict:
 +    """Tile choice by row count: decode needs more, smaller N tiles to fill the GPU.
 +
@@ -2736,9 +2923,12 @@ index 000000000..db61cad83
 +    with cp.async scale staging intermittently read stale scales. The large
 +    tiles keep K blocks of 128 or 64 to stay within 99 KiB of shared memory.
 +    """
-+    if M <= 64:
-+        return dict(block_M=64, block_N=64, block_K=pick_block_K(K), num_stages=3)
-+    return dict(block_M=128, block_N=128, block_K=pick_block_K(K, 128), num_stages=2)
++    if M <= DECODE_ROWS:
++        return dict(
++            block_M=DECODE_ROWS, block_N=64, block_K=pick_block_K(K), num_stages=3
++        )
++    block_K = pick_block_K(K, 128)
++    return dict(block_M=128, block_N=128, block_K=block_K, num_stages=2)
 diff --git a/vllm/models/deepseek_v4_1/tilelang/indexer.py b/vllm/models/deepseek_v4_1/tilelang/indexer.py
 new file mode 100644
 index 000000000..973feca5b
@@ -3934,18 +4124,21 @@ index 000000000..973feca5b
 +        return out, scores
 diff --git a/vllm/models/deepseek_v4_1/tilelang/linear.py b/vllm/models/deepseek_v4_1/tilelang/linear.py
 new file mode 100644
-index 000000000..cdc2fd297
+index 000000000..a064e5f77
 --- /dev/null
 +++ b/vllm/models/deepseek_v4_1/tilelang/linear.py
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,233 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""TileLang linear methods for DeepSeek-V4.1 (``--linear-backend tilelang``).
 +
 +Block-32 FP8 projections quantize activations to MXFP8 with TileKernels'
 +per-token cast (DeepSeek's E4M3, one UE8M0 scale per 32 elements) and run
-+``mxfp8_gemm``. Unquantized projections run ``bf16_gemm``. Both GEMMs keep
-+each row's accumulation order fixed, so results do not depend on the batch.
++``mxfp8_gemm``; decode rows go through whole 64-row activation tiles from the
++padded workspace. Unquantized projections run ``bf16_gemm``; projections with
++few output tiles (the router) split K over the SMs for decode rows and reduce
++the FP32 partials in a fixed order. Every path keeps each row's accumulation
++order fixed, so results do not depend on the batch.
 +
 +The kernels run inside custom ops, which keeps them opaque to torch.compile,
 +and borrow activation scratch from vLLM's workspace.
@@ -3965,16 +4158,19 @@ index 000000000..cdc2fd297
 +)
 +
 +from .gemm import (
++    DECODE_ROWS,
 +    SF_BLOCK,
 +    bf16_gemm,
++    bf16_gemm_partials,
++    bf16_shards,
 +    default_config,
 +    mxfp8_gemm,
 +    pack_scale_words,
 +    scale_words,
++    splitk_reduce,
 +)
 +
 +_LAYERS: WeakValueDictionary[int, nn.Module] = WeakValueDictionary()
-+_SMALL_ROWS = 64  # rows served by the decode tile configuration
 +_TORCH_TO_TL = {torch.bfloat16: "bfloat16", torch.float32: "float32"}
 +
 +
@@ -3985,8 +4181,45 @@ index 000000000..cdc2fd297
 +
 +
 +def _activation_specs(rows: int, k: int):
-+    # TileKernels pads each row's packed UE8M0 exponents to whole words.
-+    return (((rows, k), torch.float8_e4m3fn), ((rows, 4 * scale_words(k)), torch.uint8))
++    """MXFP8 activations and packed scales; decode rows fill one whole tile.
++
++    TileKernels pads each row's packed UE8M0 exponents to whole words. Rows
++    past ``rows`` in a decode tile are never stored by the GEMM.
++    """
++    tile_rows = DECODE_ROWS if rows <= DECODE_ROWS else rows
++    return (
++        ((tile_rows, k), torch.float8_e4m3fn),
++        ((tile_rows, 4 * scale_words(k)), torch.uint8),
++    )
++
++
++def _partial_specs(layer: nn.Module, rows: int):
++    """FP32 split-K partials of a BF16 projection's decode rows, if it splits."""
++    shards = layer.tilelang_shards
++    if shards == 1 or rows > DECODE_ROWS:
++        return ()
++    return (((shards, rows, layer.weight.shape[0]), torch.float32),)
++
++
++def _spec_bytes(specs) -> int:
++    total = 0
++    for shape, dtype in specs:
++        nbytes = dtype.itemsize
++        for dim in shape:
++            nbytes *= dim
++        total += (nbytes + 255) // 256 * 256
++    return total
++
++
++def _scratch(specs, scratch: torch.Tensor | None):
++    """Views of ``specs`` in the caller's scratch, else in vLLM's workspace."""
++    if scratch is None:
++        scratch = current_preallocated_workspace()
++    if scratch is not None:
++        return _carve(scratch.view(-1).view(torch.uint8), specs)
++    views = current_workspace_manager().get_simultaneous(*specs)
++    retain_cuda_graph_capture_resource(views[0])
++    return views
 +
 +
 +def _carve(scratch: torch.Tensor, specs):
@@ -4011,18 +4244,16 @@ index 000000000..cdc2fd297
 +    n, k = layer.weight.shape
 +    x = x.reshape(-1, k)
 +    rows = x.shape[0]
-+    specs = _activation_specs(rows, k)
-+    if scratch is None:
-+        scratch = current_preallocated_workspace()
-+    if scratch is not None:
-+        xq, sf = _carve(scratch.view(-1).view(torch.uint8), specs)
-+    else:
-+        xq, sf = current_workspace_manager().get_simultaneous(*specs)
-+        retain_cuda_graph_capture_resource(xq)
++    xq, sf = _scratch(_activation_specs(rows, k), scratch)
 +    _tile_kernels().quant.per_token_cast(
-+        x, "e4m3", SF_BLOCK, round_sf=True, use_packed_ue8m0=True, out=(xq, sf)
++        x,
++        "e4m3",
++        SF_BLOCK,
++        round_sf=True,
++        use_packed_ue8m0=True,
++        out=(xq[:rows], sf[:rows]),
 +    )
-+    gemm = layer.tilelang_gemms[0 if rows <= _SMALL_ROWS else 1]
++    gemm = layer.tilelang_gemms[0 if rows <= DECODE_ROWS else 1]
 +    gemm(
 +        xq,
 +        layer.weight,
@@ -4037,16 +4268,27 @@ index 000000000..cdc2fd297
 +    return None
 +
 +
-+@torch.library.custom_op("vllm::dsv41_tilelang_bf16_linear", mutates_args=("out",))
-+def _bf16_linear(x: torch.Tensor, out: torch.Tensor, key: int) -> None:
++@torch.library.custom_op(
++    "vllm::dsv41_tilelang_bf16_linear", mutates_args=("out", "scratch")
++)
++def _bf16_linear(
++    x: torch.Tensor, out: torch.Tensor, key: int, scratch: torch.Tensor | None
++) -> None:
 +    layer = _LAYERS[key]
 +    n, k = layer.weight.shape
 +    rows = x.numel() // k
-+    layer.tilelang_gemm(x.reshape(rows, k), layer.weight, out.view(rows, n))
++    x, out = x.reshape(rows, k), out.view(rows, n)
++    specs = _partial_specs(layer, rows)
++    if specs:
++        (partials,) = _scratch(specs, scratch)
++        layer.tilelang_partials(x, layer.weight, partials)
++        layer.tilelang_reduce(partials, out)
++    else:
++        layer.tilelang_gemm(x, layer.weight, out)
 +
 +
 +@_bf16_linear.register_fake
-+def _bf16_linear_fake(x, out, key):
++def _bf16_linear_fake(x, out, key, scratch):
 +    return None
 +
 +
@@ -4059,19 +4301,15 @@ index 000000000..cdc2fd297
 +        layer.tilelang_weight_sf = pack_scale_words(
 +            layer.weight_scale_inv.view(torch.uint8), rows=n
 +        )
-+        layer.tilelang_gemms = tuple(
-+            mxfp8_gemm(n, k, **default_config(rows, k))
-+            for rows in (_SMALL_ROWS, _SMALL_ROWS + 1)
++        layer.tilelang_gemms = (
++            mxfp8_gemm(n, k, **default_config(DECODE_ROWS, k), padded_rows=True),
++            mxfp8_gemm(n, k, **default_config(DECODE_ROWS + 1, k)),
 +        )
 +        layer.tilelang_key = id(layer)
 +        _LAYERS[layer.tilelang_key] = layer
 +
 +    def get_workspace_size(self, layer, num_tokens: int) -> int:
-+        k = layer.weight.shape[1]
-+        return sum(
-+            (dtype.itemsize * rows_ * cols + 255) // 256 * 256
-+            for (rows_, cols), dtype in _activation_specs(num_tokens, k)
-+        )
++        return _spec_bytes(_activation_specs(num_tokens, layer.weight.shape[1]))
 +
 +    def apply(self, layer, x, bias=None):
 +        if bias is not None:
@@ -4093,8 +4331,12 @@ index 000000000..cdc2fd297
 +
 +    def process_weights_after_loading(self, layer: nn.Module) -> None:
 +        n, k = layer.weight.shape
-+        out_dtype = getattr(layer, "out_dtype", torch.bfloat16)
-+        layer.tilelang_gemm = bf16_gemm(n, k, out_dtype=_TORCH_TO_TL[out_dtype])
++        out_dtype = _TORCH_TO_TL[getattr(layer, "out_dtype", torch.bfloat16)]
++        shards = layer.tilelang_shards = bf16_shards(n, k)
++        layer.tilelang_gemm = bf16_gemm(n, k, out_dtype=out_dtype, shards=shards)
++        if shards > 1:
++            layer.tilelang_partials = bf16_gemm_partials(n, k, shards)
++            layer.tilelang_reduce = splitk_reduce(n, shards, out_dtype=out_dtype)
 +        layer.tilelang_key = id(layer)
 +        _LAYERS[layer.tilelang_key] = layer
 +
@@ -4108,8 +4350,14 @@ index 000000000..cdc2fd297
 +            dtype=getattr(layer, "out_dtype", torch.bfloat16),
 +            device=x.device,
 +        )
-+        _bf16_linear(x, out, layer.tilelang_key)
++        scratch = (
++            None if torch.compiler.is_compiling() else current_preallocated_workspace()
++        )
++        _bf16_linear(x, out, layer.tilelang_key, scratch)
 +        return out
++
++    def get_workspace_size(self, layer, num_tokens: int) -> int:
++        return _spec_bytes(_partial_specs(layer, num_tokens))
 +
 +
 +__all__ = ["TileLangFP8LinearMethod", "TileLangLinearMethod"]

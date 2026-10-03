@@ -4,9 +4,9 @@
   "vllm": {
     "base_revision": "04c30fa98e7917fee0a24c739ea503ce1e22538d",
     "patch_series": "experiments/2026-10-03-tilelang-kernels/tp3/vllm/series",
-    "patchset_sha256": "103704f7217e91a3592eacb43c248fc0a877fddffa36be8e993705fd7f0f906e",
-    "patch_head": "642003ef12bd08c0238c918d6496ffd2f3779521",
-    "expected_tree": "645354cdfda5c20e814779f1344977584cebc992",
+    "patchset_sha256": "34764ff5aedb6447a22717593cc8800c4a4ef939338839f6620f5f685f5df028",
+    "patch_head": "c695d8c19cb173e21d3756b65df1b82acc39b80f",
+    "expected_tree": "5c61e8c7c313221ff11440e3292d081ddc849a2b",
     "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.vllm.tree matches",
     "capabilities": [
       "tilelang-kernels"

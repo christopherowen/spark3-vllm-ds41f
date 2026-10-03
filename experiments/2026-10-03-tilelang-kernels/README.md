@@ -23,8 +23,8 @@ the kernel policy changed:
 
 | Profile | Mirrors | Image | vLLM tree |
 | --- | --- | --- | --- |
-| [tp3/cluster.json](tp3/cluster.json) | `config/cluster-64k.json` (promoted TP3) | `vllm-ds41f-kkref:04c30fa98e79-r5o-tilelang-v3` | `645354cd` |
-| [tp4/cluster.json](tp4/cluster.json) | [the TP4 candidate](../2026-10-03-collective-contract/candidate.json) | `vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v2` | `8e951196` |
+| [tp3/cluster.json](tp3/cluster.json) | `config/cluster-64k.json` (promoted TP3) | `vllm-ds41f-kkref:04c30fa98e79-r5o-tilelang-v4` | `5c61e8c7` |
+| [tp4/cluster.json](tp4/cluster.json) | [the TP4 candidate](../2026-10-03-collective-contract/candidate.json) | `vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v3` | `fe2f92f6` |
 
 The delta in both, with the settings doctor requires:
 
@@ -107,13 +107,48 @@ Both vLLM series end with the same
 
 | Series | Before the TileLang patch | Patch head | Tree | Fingerprint |
 | --- | --- | --- | --- | --- |
-| [tp3/vllm/series](tp3/vllm/series) | the 26 promoted patches | `642003ef` | `645354cd` | `103704f7…` |
-| [tp4/vllm/series](tp4/vllm/series) | the 26 promoted patches and the [explicit collective policy](../2026-10-03-collective-contract/README.md) | `e05ff916` | `8e951196` | `13a03ae0…` |
+| [tp3/vllm/series](tp3/vllm/series) | the 26 promoted patches | `c695d8c1` | `5c61e8c7` | `34764ff5…` |
+| [tp4/vllm/series](tp4/vllm/series) | the 26 promoted patches and the [explicit collective policy](../2026-10-03-collective-contract/README.md) | `4206484e` | `fe2f92f6` | `41c2da77…` |
 
 B12X and NCCL are the mirrored profile's: the promoted trees for TP3, the
 balanced-policy trees for TP4. Each vLLM record carries capability
 `tilelang-kernels`, and the image label `local.spark3.vllm.tree` expects its
 tree.
+
+## Decode projections and vocabulary heads
+
+The first TP4 profile ([TP4 performance](../2026-10-03-tilelang-tp4-performance/README.md))
+put the whole decode gap to B12X in the dense projections, and found the DSpark
+draft and transition heads running BF16 cuBLAS under the TileLang family:
+
+- Decode rows (up to 64) now read one whole 64-row MXFP8 activation tile from
+  the padded workspace and store only their live rows. A partial tile cost
+  about 0.4 us per missing row on SM121 (q_b: 43 us at one row, 16 us at 64);
+  with whole tiles every decode row count runs at the 64-row speed.
+- BF16 projections with few output tiles (the 384-expert router: six) split K
+  until tiles x shards covers the 48 SMs (eight shards), with FP32 partials
+  from the reserved workspace reduced in shard order. The large-row kernel
+  folds the same shards, so decode and prefill rows stay bit-identical.
+- `_supports_default_lm_head_quantization` accepted only the `auto` and `b12x`
+  linear backends, so the online NVFP4 draft head and transition head fell
+  back to BF16 cuBLAS (about six vocabulary GEMMs per step on the critical
+  tail). The `tilelang` backend now keeps B12X's head kernels, as the policy
+  states.
+
+Kernel-lab microbenchmarks on dgx4 under CUDA graphs, warm L2 (per call):
+
+| Projection | Before | After | B12X in serving |
+| --- | ---: | ---: | ---: |
+| Router gate, BF16, 384 x 5120 | 27 us | 9.4-9.9 us (6.4-6.7 at 16-48 rows) | ~11 us |
+| Q-B, 8192 x 1280 | 43 us | 15 us | ~22 us |
+| Fused Q-A/KV, 1792 x 5120 | 33-36 us | 15 us | ~19 us |
+| Indexer Q-B, 4096 x 1280 | 19-22 us | 9.4 us | |
+| Shared expert gate/up, 1152 x 5120 | 23-25 us | 15 us | |
+| Shared expert down, 5120 x 576 | 14-15 us | 6.6 us | |
+
+The one projection whose weights exceed L2 (6400 x 5120, 33 MB) stays
+DRAM-bound at about 145 us either way. Every result matches a torch reference,
+and every row is bit-identical across 1-200 rows and both kernel paths.
 
 ## vLLM patch 0027
 
