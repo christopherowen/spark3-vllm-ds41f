@@ -1,4 +1,4 @@
-From 5eaec68b406e2d6bbe503c03550216148dcb3d4b Mon Sep 17 00:00:00 2001
+From 75cf78a4e7ef2f904e62bc152f9b58ab93de6794 Mon Sep 17 00:00:00 2001
 From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Sat, 3 Oct 2026 18:09:37 +0200
 Subject: [PATCH] feat(deepseek-v4.1): TileLang kernel backend
@@ -36,9 +36,10 @@ The TileLang family adds:
   with few output tiles (the 384-expert router) split K until tiles x shards
   covers the SMs, with FP32 partials reduced in shard order; the large-row
   kernel folds the same shards, so every path stays batch-invariant.
-- The vocabulary heads keep B12X's online NVFP4/MXFP8 kernels under the
-  tilelang linear backend; the DSpark draft and transition heads had fallen
-  back to BF16 cuBLAS.
+- The vocabulary heads keep B12X's kernels under the tilelang linear
+  backend, as the family policy states: the BF16 vocabulary projection of
+  the logits processor (the DSpark transition head had fallen back to BF16
+  cuBLAS) and, when configured, the online-quantized heads.
 - AttentionBackendEnum.TILELANG and DeepseekV41TileLangAttention, which
   override the layer's indexer and attention hooks.
 - tilelang linear and MoE backends: TileLangFP8LinearMethod,
@@ -66,6 +67,7 @@ requirements/cuda.txt moves to tilelang 0.1.15.
  .../model_executor/kernels/linear/__init__.py |    3 +
  .../layers/fused_moe/oracle/mxfp4.py          |   26 +-
  .../layers/fused_moe/tilelang.py              |  245 ++++
+ .../model_executor/layers/logits_processor.py |    3 +-
  .../layers/vocab_parallel_embedding.py        |    3 +-
  vllm/model_executor/models/config.py          |   34 +-
  vllm/models/deepseek_v4_1/attention.py        |  403 +++---
@@ -83,7 +85,7 @@ requirements/cuda.txt moves to tilelang 0.1.15.
  vllm/models/deepseek_v4_1/tilelang/norm.py    |   38 +
  .../deepseek_v4_1/tilelang/sparse_mla.py      |  840 ++++++++++++
  vllm/v1/attention/backends/registry.py        |    3 +
- 26 files changed, 5325 insertions(+), 264 deletions(-)
+ 27 files changed, 5327 insertions(+), 265 deletions(-)
  create mode 100644 tests/kernels/attention/test_deepseek_v41_tilelang.py
  create mode 100644 tests/kernels/moe/test_deepseek_v41_tilelang_moe.py
  create mode 100644 tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py
@@ -1356,6 +1358,20 @@ index 000000000..ad9191026
 +
 +    def moe_sum(self, input: torch.Tensor, output: torch.Tensor) -> None:
 +        raise NotImplementedError("LoRA is not supported for TileLangExperts")
+diff --git a/vllm/model_executor/layers/logits_processor.py b/vllm/model_executor/layers/logits_processor.py
+index 05bc57e80..c29bf92c1 100644
+--- a/vllm/model_executor/layers/logits_processor.py
++++ b/vllm/model_executor/layers/logits_processor.py
+@@ -107,7 +107,8 @@ class LogitsProcessor(PluggableLayer):
+         self._b12x_vocab_plans: dict[int, dict[int, object]] = {}
+         self._b12x_vocab_heads: dict[int, VocabParallelEmbedding] = {}
+         self.use_b12x_vocab_projection = bool(
+-            kernel_config.linear_backend == "b12x"
++            # DS4.1's TileLang family keeps B12X's BF16 vocabulary projection.
++            kernel_config.linear_backend in ("b12x", "tilelang")
+             and self._b12x_vocab_projection is not None
+             and self._b12x_vocab_projection.is_supported()
+         )
 diff --git a/vllm/model_executor/layers/vocab_parallel_embedding.py b/vllm/model_executor/layers/vocab_parallel_embedding.py
 index faacb7d04..cc0da0b65 100644
 --- a/vllm/model_executor/layers/vocab_parallel_embedding.py
