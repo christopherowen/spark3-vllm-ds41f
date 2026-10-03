@@ -2,7 +2,9 @@
 
 **Status:** measured 2026-10-03 18:09–18:25 UTC. TileLang passes the quality
 gate and matches B12X on prefill, but decodes 5–10% slower: its single-stream
-step is 4.5–8.8% longer. B12X stays the faster backend at TP4.
+step is 4.5–8.8% longer. A profile attributes the whole gap to the dense
+projection GEMMs at decode row counts; attention, the indexer and the routed
+experts are at parity or faster. B12X stays the faster backend at TP4 for now.
 
 A same-window performance screen of the TileLang kernel backend against its
 B12X twin on the four-node ring. Each arm is the matching tuning profile,
@@ -102,14 +104,56 @@ Source-text prompts, two repeats per size, one output token.
 Every interval crosses zero; TileLang prefill is level with B12X, nominally
 3–5% faster from 32K up.
 
-### Leads for the decode gap
+### Where the decode time goes
 
-- TileLang's compiler reported, 16 times while building the serving kernels,
-  that an 8-wide `T.vectorized` loop was lowered as a serial loop. The kernel
-  is not named in the warning; finding it is the first follow-up.
-- The decode-sized GEMMs (MXFP8 linear at 1–48 rows and the expert GEMMs at
-  one tile per expert) and the per-step indexer are the candidates a torch
-  profile of one decode step should rank against B12X's.
+A second window (18:32–18:38 UTC, hold `tilelang-tp4-profile`, the same
+restoration) booted each arm once more and wrapped the repository's
+`profile_decode.py` (one stream) and `profile_c8.py` (eight streams) in vLLM's
+torch profiler. [step_median.py](step_median.py) takes rank 0's main stream,
+splits it into target steps at the shared SWA cache writer (40 per step) and
+reports the median of every steady six-row decode step (23 TileLang, 25 B12X).
+TileLang kernels all appear as `main_kernel`; each was identified from its
+cached launch geometry and parameter names.
+
+| Median ms per six-row decode step | B12X | TileLang | Change |
+| --- | ---: | ---: | ---: |
+| Dense projections | 2.29 | 5.68 | **+3.39** |
+| Routed experts | 19.43 | 19.19 | −0.24 |
+| Sparse MLA and indexer | 1.49 | 1.28 | −0.21 |
+| Activation quantization and norms | 0.48 | 0.31 | −0.17 |
+| RoCE collectives, waits included | 4.37 | 4.03 | −0.34 |
+| Shared B12X kernels (WO, mHC, rotary, cache writers, head) | 5.79 | 5.33 | −0.46 |
+| Main stream total | 33.84 | 35.82 | +1.97 |
+
+The whole decode gap is in the dense projections at decode row counts:
+
+| Projection, per call | B12X | TileLang |
+| --- | --- | --- |
+| Router gate, BF16, N=384, K=5120 | GEMV, 768 CTAs: ~11 µs | 6 CTAs: ~41 µs |
+| Q-B, N=8192, K=1280 | split over 48 CTAs: ~22 µs | 128 CTAs: ~46 µs |
+| Fused Q-A/KV, N=1792, K=5120 | split over 14 CTAs: ~19 µs | 28 CTAs: ~34 µs |
+
+TileLang's dense GEMMs give each CTA a 64×64 output tile and walk the whole K
+in one pass, the batch-invariant design used for every row count. At six to
+48 rows that leaves the GPU mostly idle (6 CTAs for the router on 48 SMs) and
+each CTA latency-bound on a long serial K loop; B12X uses a GEMV for the router
+and split-K for the projections. The L2 prefetch serves both arms equally:
+its windows fire at the same points, and TileLang's Q-B is slow with its
+weights already in L2.
+
+The components optimized and benchmarked during development hold up in
+serving: sparse MLA and the indexer are faster than B12X, and the routed
+experts (including TP4's compact K tails) are at parity. The dense GEMMs were
+only checked for correctness and batch invariance, never timed against B12X.
+
+TileLang's compiler also reports that the FP8-to-BF16 dequantization of staged
+KV records in all twelve sparse-MLA variants is lowered as an eight-element
+serial loop; attention is still ahead of B12X, so this is a smaller follow-up.
+
+The next change is a decode path for the dense projections: a fixed split-K
+(same split for every row count, so outputs stay batch-invariant) for the MXFP8
+projections and a GEMV-shaped kernel for the BF16 router. Removing the 3.4 ms
+would put TileLang about 1.4 ms per step ahead of B12X on this profile.
 
 ## Window
 
