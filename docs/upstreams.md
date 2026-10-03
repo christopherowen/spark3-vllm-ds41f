@@ -47,6 +47,15 @@ Inference Lab integration branch is the serving source.
 | `cutlass` | `NVIDIA/cutlass` | not created yet | SM121 stable-extension headers at `v4.7.1` |
 | `cutlass_dsl` | NVIDIA packages on PyPI | not applicable | SHA-256-locked ARM64 CuTe DSL wheel set |
 | `model` | `deepseek-ai/DeepSeek-V4.1-Flash` | not applicable | unchanged native model weights and tokenizer |
+| `tilelang` | `tile-ai/tilelang` (`main`) | `christopherowen/tilelang` | TileLang kernel backend candidate only: TileLang 0.1.15 with `patches/tilelang`, built with its submodules |
+| `tile_kernels` | `deepseek-ai/TileKernels` (`main`) | not applicable | TileLang kernel backend candidate only: DeepSeek's TileLang kernels, unchanged |
+
+`tilelang` and `tile_kernels` are optional sources: a lock builds them only
+when it lists them, and the promoted lock does not. The
+[TileLang candidate](../experiments/2026-10-03-tilelang-kernels/README.md)
+lists them; see [kernel-backends.md](kernel-backends.md). The TileLang patches
+are the first three commits of the fork's `deepseek-v41-sm120` branch; its
+later commits are TileLang examples, not build inputs.
 
 The URL and full immutable revision in `upstreams.lock.json`, not a directory
 name or Docker tag, define identity. The `tracking_ref` says which canonical
@@ -59,6 +68,7 @@ Prepare an isolated tree:
 ```sh
 bin/spark3 upstream prepare vllm
 bin/spark3 upstream prepare b12x
+bin/spark3 --cluster-config experiments/2026-10-03-tilelang-kernels/tp3/cluster.json upstream prepare tilelang
 ```
 
 The helper clones the canonical repository as `upstream`, adds Christopher's fork
@@ -76,7 +86,10 @@ quack-kernels, B12X, FlashInfer and the cuDNN frontend; the locked wheel set in
 not be older than the version the vLLM base image installs. When a component
 pins an older version, patch the component's pin forward and qualify it rather
 than downgrading the others. The image build checks each consumer's declared
-requirement and fails on a mismatch.
+requirement and fails on a mismatch. The same rule covers `apache-tvm-ffi`,
+which TileLang and B12X's CuTe DSL stack share, and `tilelang` itself: the
+TileLang image checks every installed consumer and the candidate vLLM's
+`requirements/cuda.txt`, which must move its `tilelang==0.1.12` pin forward.
 
 ## Contributing back
 

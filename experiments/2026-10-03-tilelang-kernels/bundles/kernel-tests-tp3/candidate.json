@@ -1,0 +1,21 @@
+{
+  "description": "The TileLang kernel tests of vLLM patch 0027, run from the TP3 candidate image's own vLLM tree against torch references: sparse MLA at 16, 24 and 64 heads (TP4, TP3, TP1 per rank), MXFP4 query quantization and index-key writes, the indexers and exact top-k, MXFP8 GEMMs with K blocks of 128, 192 and 64, the BF16 GEMM, RMSNorm, and the routed experts at 256-, 576- and 320-wide expert rows.",
+  "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-tilelang-v6",
+  "env": {
+    "HF_HUB_OFFLINE": "1",
+    "TILELANG_CACHE_DIR": "/c/tilelang"
+  },
+  "workdir": "/opt/spark3/candidate/vllm",
+  "argv": [
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--noconftest",
+    "tests/kernels/attention/test_deepseek_v41_tilelang.py",
+    "tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py",
+    "tests/kernels/moe/test_deepseek_v41_tilelang_moe.py"
+  ],
+  "verdict": "exit"
+}

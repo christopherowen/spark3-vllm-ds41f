@@ -865,7 +865,8 @@ def verdicts_agree(verdicts: list[dict]) -> bool:
     by_bundle = {}
     for verdict in verdicts:
         key = (tuple((g["op"], g["groups"]) for g in verdict.get("groups", [])),
-               tuple((b["bits"], tuple(b.get("differs_at", []))) for b in verdict.get("bits", [])))
+               tuple((b["bits"], tuple(b.get("differs_at", []))) for b in verdict.get("bits", [])),
+               tuple(verdict.get("failed", [])))
         by_bundle.setdefault(verdict["bundle"], set()).add(key)
     return all(len(keys) == 1 for keys in by_bundle.values())
 
@@ -1098,8 +1099,31 @@ def bundle_command(bundle: Path, candidate: dict, out: Path) -> list[str]:
     return command
 
 
+def suite_verdict(lines: list[str]) -> dict:
+    """A test-suite bundle ("verdict": "exit", e.g. pytest): it passes when tests passed and none
+    failed; kernel_local also requires exit status 0. Failed test ids are what nodes must agree on."""
+    failed = sorted({line.split(" - ", 1)[0].split(" ", 1)[1].strip()
+                     for line in lines if line.startswith(("FAILED ", "ERROR ")) and " " in line})
+    summary = next((line.strip("= \n") for line in reversed(lines)
+                    if re.search(r"\b\d+ (passed|failed|errors?|skipped)\b", line)), "")
+    return {
+        "passed": not failed and re.search(r"\b\d+ passed\b", summary) is not None
+                  and re.search(r"\b\d+ (failed|errors?)\b", summary) is None,
+        "summary": summary,
+        "failed": failed,
+        "batch_variant": [],
+        "bits_unequal": [],
+        "errors": failed[:20],
+        "groups": [],
+        "bits": [],
+        "timings": [],
+    }
+
+
 def verdict_from_lines(lines: list[str], candidate: dict) -> dict:
     """Pass when every invariant configuration has one row group and every expected-equal pair matches."""
+    if candidate.get("verdict") == "exit":
+        return suite_verdict(lines)
     exempt = tuple(candidate.get("variant_configs", ["production", "ref2"]))
     groups, bits, timings, errors = [], [], [], []
     for line in lines:

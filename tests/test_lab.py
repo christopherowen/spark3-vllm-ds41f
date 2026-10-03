@@ -252,6 +252,24 @@ class KernelLabTest(unittest.TestCase):
         self.assertFalse(lab.verdict_from_lines(crashed, self.CANDIDATE)["passed"])
         self.assertFalse(lab.verdict_from_lines([], self.CANDIDATE)["passed"])
 
+    def test_suite_bundles_pass_on_passing_tests_only(self) -> None:
+        suite = dict(self.CANDIDATE, verdict="exit")
+        good = ["tests/kernels/moe/test_x.py ....", "===== 18 passed, 1 warning in 40.2s ====="]
+        verdict = lab.verdict_from_lines(good, suite)
+        self.assertTrue(verdict["passed"])
+        self.assertEqual(verdict["summary"], "18 passed, 1 warning in 40.2s")
+        failed = ["FAILED tests/kernels/moe/test_x.py::test_a[1] - AssertionError: rows differ",
+                  "===== 1 failed, 17 passed in 41.0s ====="]
+        verdict = lab.verdict_from_lines(failed, suite)
+        self.assertFalse(verdict["passed"])
+        self.assertEqual(verdict["failed"], ["tests/kernels/moe/test_x.py::test_a[1]"])
+        for lines in ([], ["===== 3 skipped in 1.0s ====="], ["===== 2 passed, 1 error in 3.0s ====="]):
+            with self.subTest(lines=lines):
+                self.assertFalse(lab.verdict_from_lines(lines, suite)["passed"])
+        a = dict(lab.verdict_from_lines(failed, suite), bundle="b")
+        self.assertFalse(lab.verdicts_agree([a, dict(lab.verdict_from_lines(good, suite), bundle="b")]))
+        self.assertTrue(lab.verdicts_agree([a, dict(a, node="dgx4")]))
+
     def test_nodes_must_agree_on_groups_and_bits(self) -> None:
         a = {"bundle": "b", "groups": [{"op": "x", "groups": 1}], "bits": [{"bits": "p", "differs_at": []}]}
         b = dict(a, node="dgx2")

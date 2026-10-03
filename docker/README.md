@@ -47,6 +47,10 @@ A hash of those inputs names the directory:
   images/<image id>.json # receipt for each image built from it
 ```
 
+A lock that lists the optional `tilelang` and `tile_kernels` sources adds
+`src/tilelang` (with its submodules), `src/tile_kernels` and their
+`*-source` contexts; see [TileLang kernel backend](#tilelang-kernel-backend).
+
 The same lock always yields the same directory with the same contents.
 
 **Patch heads:** `git am` runs with a fixed committer and
@@ -67,7 +71,31 @@ checkouts, which put about 100 MB of `.git` history into the image and
 changed the build cache key on every fresh clone.
 
 **CI:** CI runs `bin/spark3 build prepare --only vllm` and `--only b12x` to
-check that the series still apply and reproduce the recorded trees.
+check that the series still apply and reproduce the recorded trees, and
+`--only vllm,tilelang,tile_kernels` for the TileLang candidate.
+
+**Missing patches:** a series entry whose patch file does not exist yet stops
+`prepare`, `check` and `image` with the missing path. `prepare --only` still
+prepares the other parts.
+
+## TileLang kernel backend
+
+For a lock that lists `tilelang` and `tile_kernels`
+([kernel-backends.md](../docs/kernel-backends.md)), `prepare` checks out
+TileLang's submodules recursively at the commits the patched tree records and
+refuses commits that differ from the source manifest. `build image` passes
+their contexts, `TILELANG_*` and `TILE_KERNELS_*` arguments (revision, patch
+head, tree and version), the compile jobs as `TILELANG_COMPILE_JOBS`, and
+`RUNTIME_STAGE=runtime-tilelang`. That stage starts from the B12X runtime
+stage, builds wheels of both, replaces the base image's `tilelang` 0.1.12,
+installs TileKernels without dependencies, and checks the installed files,
+versions and every shared `apache-tvm-ffi` and `tilelang` requirement. The
+image gains `local.spark3.tilelang.*` and `local.spark3.tile_kernels.*`
+labels, and the GPU smoke imports both packages.
+
+Without those sources the command has no new argument, BuildKit skips the
+TileLang stages and their contexts, and the image is the unchanged `runtime`
+stage.
 
 ## Resource policy on DGX Spark
 

@@ -12,6 +12,10 @@ the open levers, measured dead ends, and the lean screening routine.
   (default: `config/nodes.json`). The default is git-ignored and initialized
   from `config/nodes.example.json`. Candidate profiles may select a separate map;
   `cluster sync` preserves and copies the selected site map.
+- `kernel_backend` in a cluster profile selects the model compute kernels:
+  `b12x` (the default and the promoted backend) or `tilelang`.
+  `docs/kernel-backends.md` lists the settings, sources and image labels
+  doctor requires for each.
 - `upstreams.lock.json` owns the promoted external source URLs and revisions.
   Experimental cluster profiles may select a repository-relative
   `upstreams_config` lock with their own source manifest and patch series.
@@ -80,7 +84,7 @@ between; restore it once, when the window closes. See `docs/lab.md`.
 
 ## Upstream work
 
-Never make durable changes in exported vLLM or B12X trees. Start from the commit in
+Never make durable changes in exported vLLM, B12X or TileLang trees. Start from the commit in
 `upstreams.lock.json`, apply the ordered patch series, and work on a named branch.
 Prepared trees under `.work/upstreams/` and `.work/build/` are disposable, not sources
 of truth.

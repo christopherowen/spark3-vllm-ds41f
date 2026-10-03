@@ -8,6 +8,11 @@
 # commits after it with no native-source changes in between, so only the two
 # stable CUDA extensions are rebuilt from the overlaid source.
 ARG BASE_IMAGE=docker.io/vllm/vllm-openai@sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf
+# The image is the `runtime` stage unless the lock lists the TileLang sources;
+# `bin/spark3 build image` then selects `runtime-tilelang`. BuildKit builds
+# only the stages the selected one needs, so a B12X-only build neither builds
+# TileLang nor needs its contexts, and its layers are unchanged.
+ARG RUNTIME_STAGE=runtime
 
 FROM ${BASE_IMAGE} AS vllm-native-builder
 
@@ -86,7 +91,37 @@ RUN set -eux; \
     cp -L /workspace/nccl/build/lib/libnccl.so.2 /opt/nccl/libnccl.so.2; \
     sha256sum /opt/nccl/libnccl.so.2 | cut -d" " -f1 > /opt/nccl/libnccl.so.2.sha256
 
-FROM ${BASE_IMAGE}
+# TileLang 0.1.15 from tile-ai/tilelang with patches/tilelang and its pinned
+# submodules, and DeepSeek's TileKernels, as wheels for the TileLang kernel
+# backend. TileLang's CUDA stubs leave kernel compilation to run time, so no
+# GPU architecture is fixed here. The isolated build environment is held to
+# the base image's z3-solver, which TileLang links and loads at run time.
+# TileKernels takes its version from setuptools-scm, which an export without
+# Git metadata cannot supply.
+FROM ${BASE_IMAGE} AS tilelang-builder
+
+USER root
+
+COPY --from=tilelang-source . /workspace/tilelang/
+COPY --from=tile_kernels-source . /workspace/tile_kernels/
+ARG TILELANG_COMPILE_JOBS=4
+ARG TILE_KERNELS_VERSION=unrecorded
+RUN set -eux; \
+    z3=$(python3 -c 'import importlib.metadata as m; print(m.version("z3-solver"))'); \
+    printf 'z3-solver==%s\n' "$z3" > /tmp/tilelang-build-constraints.txt; \
+    export PIP_CONSTRAINT=/tmp/tilelang-build-constraints.txt; \
+    export PIP_BUILD_CONSTRAINT=/tmp/tilelang-build-constraints.txt; \
+    CMAKE_BUILD_PARALLEL_LEVEL=${TILELANG_COMPILE_JOBS} \
+    CMAKE_ARGS="-DUSE_CUDA=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc" \
+    NO_VERSION_LABEL=1 \
+      python3 -m pip wheel --no-cache-dir --no-deps --wheel-dir /opt/tilelang \
+        /workspace/tilelang; \
+    SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TILE_KERNELS=${TILE_KERNELS_VERSION} \
+      python3 -m pip wheel --no-cache-dir --no-deps --wheel-dir /opt/tilelang \
+        /workspace/tile_kernels; \
+    ls /opt/tilelang/tilelang-*.whl /opt/tilelang/tile_kernels-*.whl
+
+FROM ${BASE_IMAGE} AS runtime
 
 ARG BASE_IMAGE_NAME=unrecorded
 ARG BASE_IMAGE_DIGEST=unrecorded
@@ -246,3 +281,113 @@ for name in ("_C_stable_libtorch", "_moe_C_stable_libtorch"):
         assert handle.read(4) == b"\x7fELF"
 print("B12X build checks passed")
 PY
+
+# The TileLang kernel backend: the patched TileLang replaces the base image's
+# tilelang 0.1.12 (vLLM's pin), and TileKernels is added, both without
+# dependencies. Every requirement must already hold; no shared package moves
+# back to suit one consumer (docs/upstreams.md).
+FROM runtime AS runtime-tilelang
+
+ARG TILELANG_UPSTREAM=unrecorded
+ARG TILELANG_REF=unrecorded
+ARG TILELANG_REVISION=unrecorded
+ARG TILELANG_PATCH_HEAD=unrecorded
+ARG TILELANG_TREE=unrecorded
+ARG TILELANG_VERSION=unrecorded
+ARG TILE_KERNELS_UPSTREAM=unrecorded
+ARG TILE_KERNELS_REF=unrecorded
+ARG TILE_KERNELS_REVISION=unrecorded
+ARG TILE_KERNELS_PATCH_HEAD=unrecorded
+ARG TILE_KERNELS_TREE=unrecorded
+ARG TILE_KERNELS_VERSION=unrecorded
+
+LABEL local.spark3.tilelang.upstream="${TILELANG_UPSTREAM}" \
+      local.spark3.tilelang.ref="${TILELANG_REF}" \
+      local.spark3.tilelang.revision="${TILELANG_REVISION}" \
+      local.spark3.tilelang.patch-head="${TILELANG_PATCH_HEAD}" \
+      local.spark3.tilelang.tree="${TILELANG_TREE}" \
+      local.spark3.tile_kernels.upstream="${TILE_KERNELS_UPSTREAM}" \
+      local.spark3.tile_kernels.ref="${TILE_KERNELS_REF}" \
+      local.spark3.tile_kernels.revision="${TILE_KERNELS_REVISION}" \
+      local.spark3.tile_kernels.patch-head="${TILE_KERNELS_PATCH_HEAD}" \
+      local.spark3.tile_kernels.tree="${TILE_KERNELS_TREE}"
+
+RUN --mount=type=bind,from=tilelang-builder,source=/opt/tilelang,target=/tmp/tilelang-wheels \
+    python3 -m pip install --no-cache-dir --no-deps --force-reinstall \
+      /tmp/tilelang-wheels/tilelang-*.whl /tmp/tilelang-wheels/tile_kernels-*.whl
+RUN --mount=type=bind,from=tilelang-builder,source=/opt/tilelang,target=/tmp/tilelang-wheels \
+    TILELANG_VERSION=${TILELANG_VERSION} TILE_KERNELS_VERSION=${TILE_KERNELS_VERSION} \
+    python3 - <<'PY'
+import base64
+import csv
+import hashlib
+import importlib.metadata as metadata
+import io
+import os
+import zipfile
+from pathlib import Path
+
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.utils import canonicalize_name
+
+built = {
+    "tilelang": os.environ["TILELANG_VERSION"],
+    "tile_kernels": os.environ["TILE_KERNELS_VERSION"],
+}
+for name, version in built.items():
+    installed = metadata.version(name)
+    assert installed == version, f"{name} {installed} is installed, expected {version}"
+    copies = [d for d in metadata.distributions() if canonicalize_name(d.metadata["Name"] or "") == canonicalize_name(name)]
+    assert len(copies) == 1, f"{len(copies)} {name} distributions are installed"
+    # Every file of the wheel built above is installed unchanged.
+    [wheel] = Path("/tmp/tilelang-wheels").glob(f"{name}-*.whl")
+    with zipfile.ZipFile(wheel) as archive:
+        record = next(n for n in archive.namelist() if n.endswith(".dist-info/RECORD"))
+        for path, digest, _ in csv.reader(io.TextIOWrapper(archive.open(record), "utf-8")):
+            if not digest or ".dist-info/" in path or ".data/" in path:
+                continue
+            algorithm, wanted = digest.split("=", 1)
+            data = Path(copies[0].locate_file(path)).read_bytes()
+            actual = base64.urlsafe_b64encode(hashlib.new(algorithm, data).digest()).rstrip(b"=").decode()
+            assert actual == wanted, f"{name}: installed {path} is not the built file"
+
+
+def check(consumer: str, raw: str, shared: set[str] | None = None) -> None:
+    try:
+        requirement = Requirement(raw)
+    except InvalidRequirement:
+        return
+    if shared is not None and canonicalize_name(requirement.name) not in shared:
+        return
+    if requirement.marker and not requirement.marker.evaluate({"extra": ""}):
+        return
+    try:
+        installed = metadata.version(requirement.name)
+    except metadata.PackageNotFoundError:
+        raise RuntimeError(f"{consumer} requires {requirement}, which is not installed") from None
+    if requirement.specifier and not requirement.specifier.contains(installed, prereleases=True):
+        raise RuntimeError(f"{consumer} requires {requirement}, but {installed} is installed")
+
+
+for name in built:
+    for raw in metadata.requires(name) or ():
+        check(name, raw)
+
+# TileLang and B12X's CuTe DSL stack share apache-tvm-ffi, and TileKernels
+# needs TileLang: every consumer must accept the installed versions. The
+# serving vLLM is the candidate source, so its requirements/cuda.txt pins
+# apply rather than the base image's vLLM metadata.
+SHARED = {"apache-tvm-ffi", "tilelang"}
+for dist in metadata.distributions():
+    consumer = canonicalize_name(dist.metadata["Name"] or "")
+    if consumer != "vllm":
+        for raw in dist.requires or ():
+            check(consumer, raw, SHARED)
+for line in Path("/opt/spark3/candidate/vllm/requirements/cuda.txt").read_text().splitlines():
+    line = line.split("#", 1)[0].strip()
+    if line and not line.startswith("-"):
+        check("vllm (requirements/cuda.txt)", line, SHARED)
+print("TileLang build checks passed")
+PY
+
+FROM ${RUNTIME_STAGE}

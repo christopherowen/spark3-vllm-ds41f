@@ -82,7 +82,11 @@ Overlay files are mounted over `/opt/spark3/candidate/<package>/<package>/...`.
 - `mounts`: `[source, destination]` pairs. A source is resolved from the bundle first, then
   from `~/spark3-lab/inputs`, then from the node's checkout;
 - `sync`: inputs that are not in Git, copied to `~/spark3-lab/inputs` on the other nodes;
-- `variant_configs`: configurations allowed more than one row group, such as production.
+- `variant_configs`: configurations allowed more than one row group, such as production;
+- `workdir`: the container working directory (default `/opt/spark3/candidate/b12x`);
+- `verdict`: `"exit"` for a test-suite bundle, such as pytest over the image's own
+  `/opt/spark3/candidate/vllm/tests`. It passes on exit status 0 with tests passed and none
+  failed, and records the failed test ids, which the nodes must agree on.
 
 Before replaying, a kernel job brings its nodes below the bench's cooling threshold
 (55 °C hottest zone). If any is hotter, all of them cool together at the maximum fan
@@ -106,5 +110,8 @@ A verdict passes when:
 - every configuration not listed in `variant_configs` has one row group;
 - every compared pair is bit-equal;
 - nothing crashed.
+
+A test-suite verdict passes when the suite exits 0 and reports passed tests and no
+failures or errors.
 
 Compile caches persist per node in `~/.cache/spark3-lab/compile`.
