@@ -1,0 +1,294 @@
+{
+ "schema_version": 1,
+ "arms": {
+  "control": {
+   "config": "experiments/2026-10-03-packed-bf16-head/tilelang-tp4/control.json",
+   "config_sha256": "0e9ab38d3506a2202da2afd7bce6f162f5b20ce3f70df23a70362ba2badab052",
+   "quality": {
+    "passed": 5,
+    "of": 5
+   },
+   "decode": {
+    "prose-c1": {
+     "tps": {
+      "n": 3,
+      "mean": 62.365,
+      "ci95_pct": 0.35
+     },
+     "step_ms": {
+      "n": 3,
+      "mean": 33.455,
+      "ci95_pct": 0.35
+     },
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.178,
+      "ci95_pct": 0.0
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 3.136,
+      "ci95_pct": 0.0
+     }
+    },
+    "prose-c8": {
+     "tps": {
+      "n": 3,
+      "mean": 214.105,
+      "ci95_pct": 3.37
+     },
+     "step_ms": null,
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.165,
+      "ci95_pct": 10.8
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 1.752,
+      "ci95_pct": 7.61
+     }
+    },
+    "code-c1": {
+     "tps": {
+      "n": 3,
+      "mean": 79.949,
+      "ci95_pct": 1.33
+     },
+     "step_ms": {
+      "n": 3,
+      "mean": 36.542,
+      "ci95_pct": 0.55
+     },
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 2.096,
+      "ci95_pct": 0.0
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 3.868,
+      "ci95_pct": 0.0
+     }
+    },
+    "code-c8": {
+     "tps": {
+      "n": 3,
+      "mean": 246.279,
+      "ci95_pct": 0.36
+     },
+     "step_ms": null,
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.82,
+      "ci95_pct": 0.0
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 2.809,
+      "ci95_pct": 0.0
+     }
+    }
+   },
+   "prefill": {
+    "1024": {
+     "prompt_tokens": 947,
+     "tps": {
+      "n": 2,
+      "mean": 2606.599,
+      "ci95_pct": 30.47
+     }
+    },
+    "32768": {
+     "prompt_tokens": 28907,
+     "tps": {
+      "n": 2,
+      "mean": 4927.028,
+      "ci95_pct": 9.96
+     }
+    },
+    "65536": {
+     "prompt_tokens": 64943,
+     "tps": {
+      "n": 2,
+      "mean": 4922.72,
+      "ci95_pct": 13.12
+     }
+    },
+    "262144": {
+     "prompt_tokens": 240637,
+     "tps": {
+      "n": 2,
+      "mean": 4674.411,
+      "ci95_pct": 0.78
+     }
+    }
+   },
+   "memory_min_available_gib": {
+    "dgx1": 29.21,
+    "dgx2": 29.29,
+    "dgx3": 30.87,
+    "dgx4": 30.86
+   },
+   "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v5",
+   "image_id": "sha256:200f366507cd",
+   "dspark_cost_curves": "pinned before the window",
+   "vocabulary_head": {
+    "kernel": "cuBLAS BF16",
+    "median_ms_per_read": {
+     "rank0": 1.305,
+     "rank3": 1.328
+    },
+    "reads_per_six_row_step": 2
+   },
+   "routed_experts_ms_per_six_row_step": 18.26
+  },
+  "packed": {
+   "config": "experiments/2026-10-03-packed-bf16-head/tilelang-tp4/packed.json",
+   "config_sha256": "2cd49baafc39b84f10bcae330105a6c796e1db3a0f7e9072e2369de776969d66",
+   "quality": {
+    "passed": 5,
+    "of": 5
+   },
+   "decode": {
+    "prose-c1": {
+     "tps": {
+      "n": 3,
+      "mean": 62.259,
+      "ci95_pct": 0.31
+     },
+     "step_ms": {
+      "n": 3,
+      "mean": 33.578,
+      "ci95_pct": 0.66
+     },
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.178,
+      "ci95_pct": 0.0
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 4.051,
+      "ci95_pct": 0.0
+     }
+    },
+    "prose-c8": {
+     "tps": {
+      "n": 3,
+      "mean": 213.57,
+      "ci95_pct": 0.19
+     },
+     "step_ms": null,
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.181,
+      "ci95_pct": 0.0
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 1.805,
+      "ci95_pct": 0.0
+     }
+    },
+    "code-c1": {
+     "tps": {
+      "n": 3,
+      "mean": 80.806,
+      "ci95_pct": 1.0
+     },
+     "step_ms": {
+      "n": 3,
+      "mean": 36.734,
+      "ci95_pct": 1.03
+     },
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 2.134,
+      "ci95_pct": 0.0
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 4.268,
+      "ci95_pct": 0.0
+     }
+    },
+    "code-c8": {
+     "tps": {
+      "n": 3,
+      "mean": 247.533,
+      "ci95_pct": 1.96
+     },
+     "step_ms": null,
+     "accepted_per_draft": {
+      "n": 3,
+      "mean": 1.842,
+      "ci95_pct": 4.41
+     },
+     "verified_per_draft": {
+      "n": 3,
+      "mean": 2.637,
+      "ci95_pct": 5.64
+     }
+    }
+   },
+   "prefill": {
+    "1024": {
+     "prompt_tokens": 947,
+     "tps": {
+      "n": 2,
+      "mean": 2574.95,
+      "ci95_pct": 18.49
+     }
+    },
+    "32768": {
+     "prompt_tokens": 28907,
+     "tps": {
+      "n": 2,
+      "mean": 4884.803,
+      "ci95_pct": 7.42
+     }
+    },
+    "65536": {
+     "prompt_tokens": 64943,
+     "tps": {
+      "n": 2,
+      "mean": 4908.266,
+      "ci95_pct": 10.36
+     }
+    },
+    "262144": {
+     "prompt_tokens": 240637,
+     "tps": {
+      "n": 2,
+      "mean": 4651.43,
+      "ci95_pct": 2.96
+     }
+    }
+   },
+   "memory_min_available_gib": {
+    "dgx1": 26.33,
+    "dgx2": 28.9,
+    "dgx3": 30.98,
+    "dgx4": 29.94
+   },
+   "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-packedhead-v1",
+   "image_id": "sha256:5bcbc860108e2abf1742e252c463763935b9986f90332498658eaf9f4d7c6829",
+   "dspark_cost_curves": "profiled and pinned at this boot",
+   "vocabulary_head": {
+    "kernel": "B12X packed_bf16_vocab_projection",
+    "median_ms_per_read": {
+     "rank0": 1.088,
+     "rank3": 1.119
+    },
+    "reads_per_six_row_step": 2
+   },
+   "routed_experts_ms_per_six_row_step": 18.86
+  }
+ },
+ "window_utc": [
+  "2026-10-03T22:55:00Z",
+  "2026-10-03T23:09:42Z"
+ ],
+ "routed_expert_boot_spread_note": "TileLang routed-expert kernel time per six-row step on rank 0 across boots: round 2 16.15 ms, round 3 18.23 ms, this control 18.26 ms, this packed arm 18.86 ms; B12X's stays within 21.82-22.25 ms."
+}
