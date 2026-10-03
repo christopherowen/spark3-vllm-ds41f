@@ -37,9 +37,9 @@ The delta in both, with the settings doctor requires:
 - the image, its source lock and the expected source-tree labels.
 
 TP4 also keeps its per-boot artifacts apart from the B12X arm's: pinned DSpark
-cost curves under `/cache/kkref/dspark-costs/ring4-tilelang-20261003` (the
+cost curves under `/cache/kkref/dspark-costs/ring4-tilelang-v3-20261003` (the
 curves are keyed by shapes only, so sharing the B12X directory would reuse
-B12X timings) and profiler traces under
+B12X timings; each TileLang image version pins its own for the same reason) and profiler traces under
 `/cache/kkref/profiles/ring4-tilelang-20261003`.
 
 The node maps, transport, collective limits and NCCL settings (RoCEnante plus

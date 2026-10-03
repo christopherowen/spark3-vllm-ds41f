@@ -155,7 +155,7 @@
     "NCCL_IB_SUBNET_PREFIX_LEN": "24",
     "B12X_ROCE_TOPOLOGY": "ring4",
     "B12X_ROCE_MESH_ROTATE": "0",
-    "SPARK3_DSPARK_COST_DIR": "/cache/kkref/dspark-costs/ring4-tilelang-20261003",
+    "SPARK3_DSPARK_COST_DIR": "/cache/kkref/dspark-costs/ring4-tilelang-v3-20261003",
     "NCCL_SWITCHLESS_BIDIRECTIONAL": "2",
     "NCCL_MIN_TRAFFIC_PER_CHANNEL": "512",
     "NCCL_THREAD_THRESHOLDS": "-2 -2 -2 1 1 1",

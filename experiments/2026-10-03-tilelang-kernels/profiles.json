@@ -26,7 +26,7 @@
     },
     "tp4": {
       "base_config": "experiments/2026-10-03-tilelang-kernels/tp4/cluster.json",
-      "base_sha256": "30fc6eff78c81d59a2239324acf0cff59f51a0182aff941c5645c48929fcbc27",
+      "base_sha256": "44c37b138eb0151d1c73931b10a4ad05b5c5f78b2eacda3d917cacc9afd2ead7",
       "status": "TileLang kernels on the TP4 candidate's balanced transport and policy adapter. Image build and qualification pending.",
       "node_count": 4,
       "transport": "rocenante-ring4",

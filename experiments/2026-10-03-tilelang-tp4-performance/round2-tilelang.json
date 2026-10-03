@@ -155,7 +155,7 @@
     "NCCL_IB_SUBNET_PREFIX_LEN": "24",
     "B12X_ROCE_TOPOLOGY": "ring4",
     "B12X_ROCE_MESH_ROTATE": "0",
-    "SPARK3_DSPARK_COST_DIR": "/cache/kkref/dspark-costs/ring4-tilelang-20261003",
+    "SPARK3_DSPARK_COST_DIR": "/cache/kkref/dspark-costs/ring4-tilelang-v3-20261003",
     "NCCL_SWITCHLESS_BIDIRECTIONAL": "2",
     "NCCL_MIN_TRAFFIC_PER_CHANNEL": "512",
     "NCCL_THREAD_THRESHOLDS": "-2 -2 -2 1 1 1",
@@ -252,10 +252,10 @@
   "upstreams_config": "experiments/2026-10-03-tilelang-kernels/tp4/upstreams.lock.json",
   "tuning_origin": {
     "catalog": "experiments/2026-10-03-tilelang-kernels/profiles.json",
-    "catalog_sha256": "b3fc52f00fa6cddf71563ed864f57f48d1b7e0e5cca229f83d67c67583248135",
+    "catalog_sha256": "0d4c74716d19ce0c27ce699404371a4effcf8557f6552499d20dfe53432a7ed0",
     "profile": "tp4",
     "base_config": "experiments/2026-10-03-tilelang-kernels/tp4/cluster.json",
-    "base_sha256": "30fc6eff78c81d59a2239324acf0cff59f51a0182aff941c5645c48929fcbc27",
+    "base_sha256": "44c37b138eb0151d1c73931b10a4ad05b5c5f78b2eacda3d917cacc9afd2ead7",
     "derived_layout": {
       "authority": "derived audit, not runtime options or a live observation",
       "audit_file": "experiments/2026-10-03-transport-profiles/model-layout.json",

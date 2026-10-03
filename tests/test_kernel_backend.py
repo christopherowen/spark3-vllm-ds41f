@@ -32,8 +32,10 @@ TWINS = {
             "config/examples/nodes-ring4.json"),
 }
 # Per-boot artifacts a TileLang arm keeps apart from its twin's: pinned DSpark
-# cost curves are keyed by shapes only, and profiler traces by directory.
+# cost curves are keyed by shapes only (so each kernel image pins its own), and
+# profiler traces by directory.
 ARTIFACT_DIRS = {"tp4": ("ring4-collective-20261003", "ring4-tilelang-20261003")}
+COST_DIRS = {"tp4": ("ring4-collective-20261003", "ring4-tilelang-v3-20261003")}
 
 
 def speculative(cluster: dict) -> dict:
@@ -161,8 +163,9 @@ class KernelBackendTest(unittest.TestCase):
                         cluster["deployment"].pop(key, None)
                     cluster["environment"].pop(kernel_backend.ENVIRONMENT, None)
                     if before:
+                        twin_cost, own_cost = COST_DIRS[name]
                         cluster["environment"]["SPARK3_DSPARK_COST_DIR"] = (
-                            cluster["environment"]["SPARK3_DSPARK_COST_DIR"].replace(after, before))
+                            cluster["environment"]["SPARK3_DSPARK_COST_DIR"].replace(own_cost, twin_cost))
                         profiler = spark3.topology.argument(cluster, "--profiler-config")
                         spark3.topology.set_argument(cluster, "--profiler-config", profiler.replace(after, before))
                 self.assertEqual(candidate, base)
