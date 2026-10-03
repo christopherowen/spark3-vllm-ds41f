@@ -44,6 +44,13 @@ make its implementation tensor-parallel.
 
 ## NVFP4 storage
 
+This layout applies only to a head a profile re-quantizes to NVFP4
+(`VLLM_DS41_DRAFT_NVFP4_HEAD=1`, `VLLM_DS41_MARKOV_NVFP4=1`). The TP4 candidate
+keeps both heads at the checkpoint's BF16
+([native drafter heads](../2026-10-03-native-drafter-heads/README.md)); the
+report then lists their native shapes under `drafter.head_formats`, and the
+BF16 draft head is the target head's own tensor.
+
 The draft LM head has K=5,120; the Markov output projection has K=256.
 Both use packed values `[N, K/2]` (two values per byte), one E4M3 scale per
 16 values, and swizzled scales with rows rounded to 128 and columns to four.

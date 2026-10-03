@@ -17,6 +17,13 @@ The authored vLLM branch is `explicit-collective-policy`.
 The measured image and profiles remain frozen; their measurements do not qualify
 this successor image. No cluster operations were performed for this change.
 
+**Drafter heads:** since 2026-10-03 the candidate keeps the DSpark draft and
+Markov heads at the checkpoint's BF16 (`VLLM_DS41_DRAFT_NVFP4_HEAD=0`,
+`VLLM_DS41_MARKOV_NVFP4=0`) with its own DSpark cost directory
+(`ring4-collective-nativeheads-20261003`). The
+[native drafter heads record](../2026-10-03-native-drafter-heads/README.md)
+has the audit and the TP4 measurement.
+
 ## One policy in execution and reporting
 
 | Quantity | Selected value | Meaning |

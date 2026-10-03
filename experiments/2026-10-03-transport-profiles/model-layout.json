@@ -25,8 +25,6 @@
   "checkpoint_config": "experiments/2026-10-03-transport-profiles/checkpoint-config.json",
   "checkpoint_config_sha256": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
   "required_environment": {
-    "VLLM_DS41_DRAFT_NVFP4_HEAD": "1",
-    "VLLM_DS41_MARKOV_NVFP4": "1",
     "SPARK3_DSPARK_MAIN_PROJ_TP": "1",
     "SPARK3_DSPARK_VOCAB_PARALLEL": "1",
     "VLLM_USE_V2_MODEL_RUNNER": "1",

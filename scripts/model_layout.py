@@ -32,6 +32,11 @@ def nvfp4_storage(rows: int, columns: int, alignment: dict) -> dict:
     }
 
 
+def bf16_storage(rows: int, columns: int) -> dict:
+    """The checkpoint's native BF16 tensor, stored unchanged."""
+    return {"logical_shape": [rows, columns], "bf16_bytes": rows * columns * 2}
+
+
 def describe(root: Path, cluster: dict, capacity_bytes: int) -> dict:
     raw = (root / LAYOUT_PATH).read_bytes()
     audit = json.loads(raw)
@@ -48,6 +53,13 @@ def describe(root: Path, cluster: dict, capacity_bytes: int) -> dict:
     for key, expected in audit["required_environment"].items():
         if cluster["environment"].get(key) != expected:
             raise ValueError(f"model layout audit requires {key}={expected}")
+    head_flags = {}
+    for key in ("VLLM_DS41_DRAFT_NVFP4_HEAD", "VLLM_DS41_MARKOV_NVFP4"):
+        value = cluster["environment"].get(key, "0")
+        if value not in ("0", "1"):
+            raise ValueError(f"model layout audit needs {key} set to 0 (native BF16) or 1 (NVFP4)")
+        head_flags[key] = value == "1"
+    nvfp4_head, nvfp4_markov = head_flags.values()
     if cluster["environment"].get("VLLM_DS41_BATCH_INVARIANT", "0") != "0":
         raise ValueError("batch-invariant execution needs its own model layout audit")
     tp = int(topology.argument(cluster, "--tensor-parallel-size"))
@@ -142,18 +154,23 @@ def describe(root: Path, cluster: dict, capacity_bytes: int) -> dict:
         "drafter": {
             "vocabulary_shards": vocabulary_shards,
             "vocabulary_note": "Target head, draft head and Markov output share these token partitions. Padded token logits are masked; scale-only rows are not token IDs.",
-            "lm_head_nvfp4": nvfp4_storage(shard_rows, dims["hidden_size"], alignment),
-            "markov_output_nvfp4": nvfp4_storage(shard_rows, dims["dspark_markov_rank"], alignment),
+            "head_formats": {"lm_head": "nvfp4" if nvfp4_head else "bf16",
+                             "markov_output": "nvfp4" if nvfp4_markov else "bf16"},
+            **({"lm_head_nvfp4": nvfp4_storage(shard_rows, dims["hidden_size"], alignment)} if nvfp4_head
+               else {"lm_head_bf16": {**bf16_storage(shard_rows, dims["hidden_size"]),
+                                      "shared_with_target_head": True}}),
+            **({"markov_output_nvfp4": nvfp4_storage(shard_rows, dims["dspark_markov_rank"], alignment)}
+               if nvfp4_markov else {"markov_output_bf16": bf16_storage(shard_rows, dims["dspark_markov_rank"])}),
             "markov_input_embedding": {"replicated_shape": [dims["vocabulary_rows"], dims["dspark_markov_rank"]], "padding_rows": 0},
             "aux_projection_input_width": dims["hidden_size"] * dims["dspark_auxiliary_layers"],
             "aux_context_bf16_buffer_shape": [context_limit, dims["hidden_size"] * dims["dspark_auxiliary_layers"]],
             "quantized_activation_examples": [
                 {"rows_passed_to_head": m,
-                 "lm_head": nvfp4_storage(m, dims["hidden_size"], alignment),
-                 "markov_output": nvfp4_storage(m, dims["dspark_markov_rank"], alignment)}
+                 **({"lm_head": nvfp4_storage(m, dims["hidden_size"], alignment)} if nvfp4_head else {}),
+                 **({"markov_output": nvfp4_storage(m, dims["dspark_markov_rank"], alignment)} if nvfp4_markov else {})}
                 for m in (1, 8, 48)
-            ],
-            "storage_note": "Serialized tensor storage only: excludes scalar scales, allocator rounding and plan-dependent GEMM workspaces. Activation examples use actual head input rows, not necessarily the scheduled batch rows.",
+            ] if nvfp4_head or nvfp4_markov else [],
+            "storage_note": "Serialized tensor storage only: excludes scalar scales, allocator rounding and plan-dependent GEMM workspaces. A BF16 draft head is the target head's own tensor, not a second copy. Activation examples use actual head input rows, not necessarily the scheduled batch rows.",
         },
         "kernel_scratch": {
             "compact_moe_n64_path": expert % 128 == 64,

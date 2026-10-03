@@ -26,7 +26,7 @@
     },
     "tp4": {
       "base_config": "experiments/2026-10-03-collective-contract/candidate.json",
-      "base_sha256": "cd15b6caa6c02559f90831099c70e7dab500b5118b1004b365109d73027497aa",
+      "base_sha256": "b0ec9a61742390df3d969d683e914e8ccdbc35c61e775a7c7a6a80b3a5e00b1d",
       "status": "Candidate: measured balanced transport plus source-tested policy adapter; image build and final qualification pending.",
       "node_count": 4,
       "transport": "rocenante-ring4",

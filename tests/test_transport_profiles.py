@@ -72,12 +72,25 @@ class TransportProfilesTest(unittest.TestCase):
                              [43136, 43136, 43008] if tp3 else [32320] * 4)
             self.assertEqual([r["padding_rows"] for r in draft["vocabulary_shards"]],
                              [0, 0, 128] if tp3 else [0] * 4)
-            self.assertEqual(draft["lm_head_nvfp4"]["packed_values_uint8_shape"],
-                             [43136 if tp3 else 32320, 2560])
-            self.assertEqual(draft["lm_head_nvfp4"]["swizzled_scales_e4m3_storage_shape"],
-                             [43136 if tp3 else 32384, 320])
-            self.assertEqual(draft["lm_head_nvfp4"]["scale_alignment_extra_bytes"], 0 if tp3 else 20480)
-            self.assertEqual(draft["markov_output_nvfp4"]["scale_alignment_extra_bytes"], 0 if tp3 else 1024)
+            if tp3:
+                # The promoted TP3 profile still re-quantizes both drafter heads.
+                self.assertEqual(draft["head_formats"], {"lm_head": "nvfp4", "markov_output": "nvfp4"})
+                self.assertEqual(draft["lm_head_nvfp4"]["packed_values_uint8_shape"], [43136, 2560])
+                self.assertEqual(draft["lm_head_nvfp4"]["swizzled_scales_e4m3_storage_shape"], [43136, 320])
+                self.assertEqual(draft["lm_head_nvfp4"]["scale_alignment_extra_bytes"], 0)
+                self.assertEqual(draft["markov_output_nvfp4"]["scale_alignment_extra_bytes"], 0)
+                self.assertEqual(len(draft["quantized_activation_examples"]), 3)
+            else:
+                # The TP4 candidate keeps the checkpoint's BF16 heads; the draft
+                # head is the target head's own tensor.
+                self.assertEqual(draft["head_formats"], {"lm_head": "bf16", "markov_output": "bf16"})
+                self.assertEqual(draft["lm_head_bf16"],
+                                 {"logical_shape": [32320, 5120], "bf16_bytes": 330956800,
+                                  "shared_with_target_head": True})
+                self.assertEqual(draft["markov_output_bf16"],
+                                 {"logical_shape": [32320, 256], "bf16_bytes": 16547840})
+                self.assertNotIn("lm_head_nvfp4", draft)
+                self.assertEqual(draft["quantized_activation_examples"], [])
             self.assertEqual(draft["aux_context_bf16_buffer_shape"], [48, 15360])
             self.assertEqual(report["model_dimensions"]["draft_aux_projection_output"]["allocated_per_rank"],
                              1728 if tp3 else 1280)
@@ -86,9 +99,22 @@ class TransportProfilesTest(unittest.TestCase):
             self.assertEqual(graphs["draft_query_graph_capacities_if_full_supported"], [6, 12, 18, 24, 30, 36, 42, 48])
             self.assertIn({"requests": 1, "rows": 5}, graphs["target_exact_low_concurrency_graphs"])
 
+    def test_layout_describes_either_drafter_head_format(self):
+        _, base = self.resolve("tp4")
+        cluster = copy.deepcopy(base)
+        cluster["environment"]["VLLM_DS41_DRAFT_NVFP4_HEAD"] = "1"
+        draft = spark3.model_layout.describe(ROOT, cluster, 2097152)["drafter"]
+        self.assertEqual(draft["head_formats"], {"lm_head": "nvfp4", "markov_output": "bf16"})
+        self.assertEqual(draft["lm_head_nvfp4"]["swizzled_scales_e4m3_storage_shape"], [32384, 320])
+        self.assertEqual(draft["lm_head_nvfp4"]["scale_alignment_extra_bytes"], 20480)
+        self.assertIn("markov_output_bf16", draft)
+        self.assertEqual([sorted(e) for e in draft["quantized_activation_examples"]],
+                         [["lm_head", "rows_passed_to_head"]] * 3)
+
     def test_layout_rejects_incompatible_execution_flags(self):
         _, base = self.resolve("tp4")
-        for key, value in (("VLLM_DS41_DRAFT_NVFP4_HEAD", "0"),
+        for key, value in (("VLLM_DS41_DRAFT_NVFP4_HEAD", "2"),
+                           ("VLLM_DS41_MARKOV_NVFP4", "yes"),
                            ("SPARK3_DSPARK_MAIN_PROJ_TP", "0"),
                            ("VLLM_USE_V2_MODEL_RUNNER", "0"),
                            ("VLLM_ENABLE_ROCE_ALLREDUCE", "0"),

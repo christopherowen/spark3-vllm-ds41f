@@ -74,9 +74,11 @@ def main():
         ns = {"torch": fake_torch}
         function(custom_ops, "create_fp4_scale_tensor", ns)
         quant = function(custom_ops, "create_fp4_output_tensors", ns)
-        layouts = [report["drafter"][key] for key in ("lm_head_nvfp4", "markov_output_nvfp4")]
-        for example in report["drafter"]["quantized_activation_examples"]:
-            layouts.extend(example[key] for key in ("lm_head", "markov_output"))
+        # Only heads the profile stores as NVFP4 have packed layouts to check.
+        draft = report["drafter"]
+        layouts = [draft[key] for key in ("lm_head_nvfp4", "markov_output_nvfp4") if key in draft]
+        for example in draft["quantized_activation_examples"]:
+            layouts.extend(example[key] for key in ("lm_head", "markov_output") if key in example)
         with mock.patch.dict(sys.modules, {"vllm.utils.math_utils": SimpleNamespace(round_up=model_layout.round_up)}):
             for layout in layouts:
                 values, scales = quant(*layout["logical_shape"], "cpu", True)
