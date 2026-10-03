@@ -1,4 +1,4 @@
-From 913af87c02c4dab21c099d336161147632614d66 Mon Sep 17 00:00:00 2001
+From 5eaec68b406e2d6bbe503c03550216148dcb3d4b Mon Sep 17 00:00:00 2001
 From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Sat, 3 Oct 2026 18:09:37 +0200
 Subject: [PATCH] feat(deepseek-v4.1): TileLang kernel backend
@@ -76,14 +76,14 @@ requirements/cuda.txt moves to tilelang 0.1.15.
  vllm/models/deepseek_v4_1/quant_config.py     |   66 +-
  .../models/deepseek_v4_1/tilelang/__init__.py |   16 +
  .../deepseek_v4_1/tilelang/attention.py       |  238 ++++
- vllm/models/deepseek_v4_1/tilelang/gemm.py    |  334 +++++
+ vllm/models/deepseek_v4_1/tilelang/gemm.py    |  337 +++++
  vllm/models/deepseek_v4_1/tilelang/indexer.py | 1187 +++++++++++++++++
  vllm/models/deepseek_v4_1/tilelang/linear.py  |  233 ++++
  vllm/models/deepseek_v4_1/tilelang/moe.py     |  931 +++++++++++++
  vllm/models/deepseek_v4_1/tilelang/norm.py    |   38 +
  .../deepseek_v4_1/tilelang/sparse_mla.py      |  840 ++++++++++++
  vllm/v1/attention/backends/registry.py        |    3 +
- 26 files changed, 5322 insertions(+), 264 deletions(-)
+ 26 files changed, 5325 insertions(+), 264 deletions(-)
  create mode 100644 tests/kernels/attention/test_deepseek_v41_tilelang.py
  create mode 100644 tests/kernels/moe/test_deepseek_v41_tilelang_moe.py
  create mode 100644 tests/kernels/quantization/test_deepseek_v41_tilelang_linear.py
@@ -2591,10 +2591,10 @@ index 000000000..5a3aed28e
 +__all__ = ["DeepseekV41TileLangAttention", "DeepseekV41TileLangBackend"]
 diff --git a/vllm/models/deepseek_v4_1/tilelang/gemm.py b/vllm/models/deepseek_v4_1/tilelang/gemm.py
 new file mode 100644
-index 000000000..0ae8c636e
+index 000000000..a14d792a5
 --- /dev/null
 +++ b/vllm/models/deepseek_v4_1/tilelang/gemm.py
-@@ -0,0 +1,334 @@
+@@ -0,0 +1,337 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1-Flash block-32 FP8 linear for SM120 / SM121.
@@ -2744,20 +2744,23 @@ index 000000000..0ae8c636e
 +    in-kernel shard accumulation of ``bf16_gemm`` bit for bit, signed zeros
 +    included.
 +    """
-+    assert N % block_N == 0
 +    M = T.dynamic("M")
 +
 +    @T.prim_func
 +    def main(P: T.Tensor((shards, M, N), T.float32), C: T.Tensor((M, N), out_dtype)):
-+        with T.Kernel(N // block_N, M, threads=threads) as (bx, m):
++        with T.Kernel(T.ceildiv(N, block_N), M, threads=threads) as (bx, m):
 +            acc = T.alloc_fragment((block_N,), T.float32)
++            # Columns past N (a narrow projection's last block) are skipped.
 +            for j in T.Parallel(block_N):
-+                acc[j] = P[0, m, bx * block_N + j]
++                n = T.min(bx * block_N + j, N - 1)
++                acc[j] = P[0, m, n]
 +            for s in T.serial(1, shards):
 +                for j in T.Parallel(block_N):
-+                    acc[j] += P[s, m, bx * block_N + j]
++                    n = T.min(bx * block_N + j, N - 1)
++                    acc[j] += P[s, m, n]
 +            for j in T.Parallel(block_N):
-+                C[m, bx * block_N + j] = acc[j]
++                if bx * block_N + j < N:
++                    C[m, bx * block_N + j] = acc[j]
 +
 +    return main
 +

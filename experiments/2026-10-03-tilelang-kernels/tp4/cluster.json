@@ -4,9 +4,9 @@
   "kernel_backend": "tilelang",
   "container": {
     "name": "dsv41-karmic-kraken",
-    "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v3",
+    "image": "vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v4",
     "expected_labels": {
-      "local.spark3.vllm.tree": "fe2f92f6c9d2c7cb1aa32b5d3a0ae96932a7de25",
+      "local.spark3.vllm.tree": "ecb0f5e63b20decf1f6c5e3b9ce6bd292fc7b92b",
       "local.spark3.b12x.tree": "cd615bd69ed1a99d6b59217329a3ff429b5277fe",
       "local.spark3.nccl.tree": "6af10aa730a64fcee8781d62340a9c9184e79469",
       "local.spark3.tilelang.tree": "1697ad52fab8379ce78f9abc547c7b1e02cd9c5e",
@@ -155,7 +155,7 @@
     "NCCL_IB_SUBNET_PREFIX_LEN": "24",
     "B12X_ROCE_TOPOLOGY": "ring4",
     "B12X_ROCE_MESH_ROTATE": "0",
-    "SPARK3_DSPARK_COST_DIR": "/cache/kkref/dspark-costs/ring4-tilelang-v3-20261003",
+    "SPARK3_DSPARK_COST_DIR": "/cache/kkref/dspark-costs/ring4-tilelang-v4-20261003",
     "NCCL_SWITCHLESS_BIDIRECTIONAL": "2",
     "NCCL_MIN_TRAFFIC_PER_CHANNEL": "512",
     "NCCL_THREAD_THRESHOLDS": "-2 -2 -2 1 1 1",

@@ -23,8 +23,8 @@ the kernel policy changed:
 
 | Profile | Mirrors | Image | vLLM tree |
 | --- | --- | --- | --- |
-| [tp3/cluster.json](tp3/cluster.json) | `config/cluster-64k.json` (promoted TP3) | `vllm-ds41f-kkref:04c30fa98e79-r5o-tilelang-v4` | `5c61e8c7` |
-| [tp4/cluster.json](tp4/cluster.json) | [the TP4 candidate](../2026-10-03-collective-contract/candidate.json) | `vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v3` | `fe2f92f6` |
+| [tp3/cluster.json](tp3/cluster.json) | `config/cluster-64k.json` (promoted TP3) | `vllm-ds41f-kkref:04c30fa98e79-r5o-tilelang-v5` | `87c319ba` |
+| [tp4/cluster.json](tp4/cluster.json) | [the TP4 candidate](../2026-10-03-collective-contract/candidate.json) | `vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v4` | `ecb0f5e6` |
 
 The delta in both, with the settings doctor requires:
 
@@ -37,7 +37,7 @@ The delta in both, with the settings doctor requires:
 - the image, its source lock and the expected source-tree labels.
 
 TP4 also keeps its per-boot artifacts apart from the B12X arm's: pinned DSpark
-cost curves under `/cache/kkref/dspark-costs/ring4-tilelang-v3-20261003` (the
+cost curves under `/cache/kkref/dspark-costs/ring4-tilelang-v4-20261003` (the
 curves are keyed by shapes only, so sharing the B12X directory would reuse
 B12X timings; each TileLang image version pins its own for the same reason) and profiler traces under
 `/cache/kkref/profiles/ring4-tilelang-20261003`.
@@ -107,8 +107,8 @@ Both vLLM series end with the same
 
 | Series | Before the TileLang patch | Patch head | Tree | Fingerprint |
 | --- | --- | --- | --- | --- |
-| [tp3/vllm/series](tp3/vllm/series) | the 26 promoted patches | `c695d8c1` | `5c61e8c7` | `34764ff5…` |
-| [tp4/vllm/series](tp4/vllm/series) | the 26 promoted patches and the [explicit collective policy](../2026-10-03-collective-contract/README.md) | `4206484e` | `fe2f92f6` | `41c2da77…` |
+| [tp3/vllm/series](tp3/vllm/series) | the 26 promoted patches | `09aa8467` | `87c319ba` | `e25e9328…` |
+| [tp4/vllm/series](tp4/vllm/series) | the 26 promoted patches and the [explicit collective policy](../2026-10-03-collective-contract/README.md) | `0de7777b` | `ecb0f5e6` | `f6c84814…` |
 
 B12X and NCCL are the mirrored profile's: the promoted trees for TP3, the
 balanced-policy trees for TP4. Each vLLM record carries capability
