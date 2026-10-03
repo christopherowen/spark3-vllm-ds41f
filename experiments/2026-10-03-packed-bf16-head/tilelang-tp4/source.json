@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-03",
+  "vllm": {
+    "base_revision": "04c30fa98e7917fee0a24c739ea503ce1e22538d",
+    "patch_series": "experiments/2026-10-03-packed-bf16-head/tilelang-tp4/vllm/series",
+    "patchset_sha256": "6ac54ab92743f6d3ff186fbd573bdecae1014b24f13aef43c397bb653a22e63d",
+    "expected_tree": "6415d579be8ed31704dd26bc91836550286d63b4",
+    "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.vllm.tree matches",
+    "patch_head": "540136203f6af9eaf2c4b699539b1d0d8f78b893",
+    "capabilities": [
+      "packed-bf16-lm-head",
+      "tilelang-kernels"
+    ]
+  },
+  "b12x": {
+    "base_revision": "f8069b2c0be1311df3b112591c6b8876a843f8be",
+    "patch_series": "experiments/2026-10-03-packed-bf16-head/b12x/series",
+    "patchset_sha256": "9bfd65014ea37bf2a4bd246442a0c3d6df486b1a20fc950206f5b31984d54c79",
+    "patch_head": "b6e868bdf6bf678d81324b05369ddafe4fbf7423",
+    "expected_tree": "bd2d95c4800acf8f8f7a38c754cf4c61de211ec6",
+    "verification": "bin/spark3 build prepare applies the series to the pinned revision and checks this patch head and tree; image label local.spark3.b12x.tree matches",
+    "capabilities": [
+      "packed-bf16-vocab-projection",
+      "rocenante-mesh4",
+      "rocenante-mesh4-fourpaths",
+      "rocenante-ring4",
+      "rocenante-ring4-bidirectional"
+    ]
+  },
+  "nccl": {
+    "base_revision": "73cf112295c33aee2b895f329f592f2a9b4b0f97",
+    "patch_series": "experiments/2026-10-03-balanced-policy/nccl-adaptive/series",
+    "patchset_sha256": "06f133b1709622d64b0ab87fc32f29d167f4617ca9386117596008d400a8d40c",
+    "patch_head": "eeacf1c6343f0499e4e7ab20ec7eecfb6f62eda6",
+    "expected_tree": "6af10aa730a64fcee8781d62340a9c9184e79469",
+    "verification": "bin/spark3 build prepare applies the series to the pinned tag and checks this patch head and tree; image label local.spark3.nccl.tree matches, and the image build checks the installed libnccl.so.2 against the built one",
+    "capabilities": [
+      "switchless-bidirectional-ring"
+    ]
+  },
+  "tilelang": {
+    "base_revision": "b95ee4ffb52ae26e15619cad38c6f41e7e0a2b46",
+    "patch_series": "patches/tilelang/series",
+    "patchset_sha256": "3450451492a9c5eff223723dd1d295c9189f98dbf5b893c1feb1ba794d3f45ae",
+    "patch_head": "30d854b6fa4baf55b90f46f33b0ba844d4509924",
+    "expected_tree": "1697ad52fab8379ce78f9abc547c7b1e02cd9c5e",
+    "submodules": {
+      "3rdparty/cutlass": "b2dd65dc864e09688245b316ac46c4a6cd07e15c",
+      "3rdparty/tvm": "4211874e9e4b8770fd20ad0d98ab80afd1df5028",
+      "3rdparty/tvm/3rdparty/OpenCL-Headers": "b590a6bfe034ea3a418b7b523e3490956bcb367a",
+      "3rdparty/tvm/3rdparty/cutlass": "b2dd65dc864e09688245b316ac46c4a6cd07e15c",
+      "3rdparty/tvm/3rdparty/cutlass_fpA_intB_gemm": "72b9883c986a2ff427ca61ac0b14ad59be1dc862",
+      "3rdparty/tvm/3rdparty/cutlass_fpA_intB_gemm/cutlass": "cc85b64cf676c45f98a17e3a47c0aafcf817f088",
+      "3rdparty/tvm/3rdparty/libflash_attn": "07ba35bae96900e51b4d63ef3487ba24850da870",
+      "3rdparty/tvm/3rdparty/libflash_attn/cutlass": "e0aaa3c3b38db9a89c31f04fef91e92123ad5e2e",
+      "3rdparty/tvm/3rdparty/tvm-ffi": "3c35034fd1026011736e19a4e0e1ed0f22058c42",
+      "3rdparty/tvm/3rdparty/tvm-ffi/3rdparty/dlpack": "84d107bf416c6bab9ae68ad285876600d230490d",
+      "3rdparty/tvm/3rdparty/tvm-ffi/3rdparty/libbacktrace": "793921876c981ce49759114d7bb89bb89b2d3a2d"
+    },
+    "verification": "bin/spark3 build prepare applies the series to the pinned revision, checks this patch head and tree, then checks out each submodule at the commit the patched tree records and compares the commits listed here; image label local.spark3.tilelang.tree matches, and the image build checks the installed tilelang against the wheel it built"
+  },
+  "tile_kernels": {
+    "base_revision": "66258df6175d2f630ffecb04c5ab66bff8a2ae6a",
+    "patch_series": null,
+    "patchset_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "patch_head": "66258df6175d2f630ffecb04c5ab66bff8a2ae6a",
+    "expected_tree": "647708813ac13c2fac5bdcd252f6cb8390379b85",
+    "verification": "bin/spark3 build prepare checks out the pinned revision and checks this tree; image label local.spark3.tile_kernels.tree matches, and the image build checks the installed tile_kernels against the wheel it built"
+  },
+  "runtime_foundation": {
+    "vllm_base_image_digest": "sha256:3cf14c52765a0f0c2f09035e05fa79e1e4b2f9788b64afa90fa41c1ff12d29cf",
+    "vllm_base_source_revision": "af1c01499b289be555c475669ba50a88e96d846e",
+    "flashinfer_version": "0.6.18.post1",
+    "flashinfer_evidence": "installed in the runtime base image; not rebuilt",
+    "cutlass_revision": "cb4247394dd82148787aed73e5dc7cef33cbf862",
+    "cutlass_release_tag": "v4.7.1",
+    "cutlass_dsl_version": "4.7.1",
+    "cutlass_dsl_lockfile": "requirements/cutlass-dsl-aarch64.txt",
+    "build_recipe": "bin/spark3 build (docker/Dockerfile)",
+    "build_deployment_commit": null
+  },
+  "deployment_artifacts": {}
+}
