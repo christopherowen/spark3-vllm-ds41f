@@ -3,7 +3,7 @@
   "profiles": {
     "tp3": {
       "base_config": "experiments/2026-10-03-tilelang-kernels/tp3/cluster.json",
-      "base_sha256": "1b71942f16a2a82dd2ed60ac5b6c73d546be6f41634e4752187007b59808ef84",
+      "base_sha256": "16adbd98686f3596f6f7800d9d8a139a3a00548c6e2a137e944f41bb71ed6026",
       "status": "TileLang kernels on the promoted TP3 settings; physical triangle required. Image build and qualification pending.",
       "node_count": 3,
       "transport": "rocenante-direct",
@@ -26,7 +26,7 @@
     },
     "tp4": {
       "base_config": "experiments/2026-10-03-tilelang-kernels/tp4/cluster.json",
-      "base_sha256": "e0333a33baecc00929e1d6656e4ce7d1a0aa3d3008d45762b676108aff07ebbd",
+      "base_sha256": "d8ed913765abde91148b28da64c09af4777130849c52f455cbda837bb461842e",
       "status": "TileLang kernels on the TP4 candidate's balanced transport and policy adapter. Image build and qualification pending.",
       "node_count": 4,
       "transport": "rocenante-ring4",

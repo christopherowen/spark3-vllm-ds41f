@@ -1,4 +1,4 @@
-From ddb79610fc0b49b2327fb266aa72bf4a6d921a3e Mon Sep 17 00:00:00 2001
+From 70e1a5e204c1197d803407038bdc746edbb1f318 Mon Sep 17 00:00:00 2001
 From: Christopher Owen <3221756+christopherowen@users.noreply.github.com>
 Date: Sat, 3 Oct 2026 18:09:37 +0200
 Subject: [PATCH] feat(deepseek-v4.1): TileLang kernel backend
@@ -21,10 +21,14 @@ The TileLang family adds:
   projection, combine). Plans hold no buffers; scratch comes from the vLLM
   workspace, reserved before memory profiling.
 - Both tensor-parallel layouts: TP3 (24 heads and 768-wide expert rows per
-  rank) and TP4 (16 heads, 576-wide rows). The block-scaled GEMMs take any
-  K block that is a multiple of 64 (128 for TP3; 192 and 64 for TP4's
-  K=576), reading the two scale words a block straddles and passing the MMA
-  its offset, so no operand is padded.
+  rank) and TP4 (16 heads, 576-wide rows). The dense MXFP8 GEMM takes any K
+  block that is a multiple of 64 (192 and 64 at K=576), reading the two
+  scale words a block straddles and passing the MMA its offset. The grouped
+  expert GEMMs load E2M1 weights by TMA, which unpacks FP4 only in boxes of
+  128 K elements, so a K that ends 64 past a multiple of 128 keeps its last
+  64 columns as compact tile tails: they are copied with cp.async into the
+  same unpacked shared layout and multiplied over those 64 columns. No
+  operand or scale is padded.
 - AttentionBackendEnum.TILELANG and DeepseekV41TileLangAttention, which
   override the layer's indexer and attention hooks.
 - tilelang linear and MoE backends: TileLangFP8LinearMethod,
@@ -50,7 +54,7 @@ requirements/cuda.txt moves to tilelang 0.1.15.
  vllm/config/kernel.py                         |    5 +
  vllm/envs.py                                  |    8 +
  .../layers/fused_moe/oracle/mxfp4.py          |   26 +-
- .../layers/fused_moe/tilelang.py              |  238 ++++
+ .../layers/fused_moe/tilelang.py              |  245 ++++
  vllm/model_executor/models/config.py          |   34 +-
  vllm/models/deepseek_v4_1/attention.py        |  403 +++---
  vllm/models/deepseek_v4_1/b12x_layers.py      |   48 +-
@@ -63,7 +67,7 @@ requirements/cuda.txt moves to tilelang 0.1.15.
  vllm/models/deepseek_v4_1/tilelang/gemm.py    |  200 +++
  vllm/models/deepseek_v4_1/tilelang/indexer.py | 1187 +++++++++++++++++
  vllm/models/deepseek_v4_1/tilelang/linear.py  |  175 +++
- vllm/models/deepseek_v4_1/tilelang/moe.py     |  938 +++++++++++++
+ vllm/models/deepseek_v4_1/tilelang/moe.py     |  931 +++++++++++++
  vllm/models/deepseek_v4_1/tilelang/norm.py    |   38 +
  .../deepseek_v4_1/tilelang/sparse_mla.py      |  840 ++++++++++++
  vllm/v1/attention/backends/registry.py        |    3 +
@@ -1061,10 +1065,10 @@ index 1c38e4378..4315c4c16 100644
              w2_bias=w2_bias,
 diff --git a/vllm/model_executor/layers/fused_moe/tilelang.py b/vllm/model_executor/layers/fused_moe/tilelang.py
 new file mode 100644
-index 000000000..e5488698a
+index 000000000..ad9191026
 --- /dev/null
 +++ b/vllm/model_executor/layers/fused_moe/tilelang.py
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,245 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""TileLang MXFP4 x MXFP8 routed experts for SM12x (``--moe-backend tilelang``).
@@ -1126,7 +1130,8 @@ index 000000000..e5488698a
 +    ):
 +        super().__init__(moe_config, quant_config)
 +        self._plan = None
-+        self._weights: tuple[torch.Tensor, ...] = ()
++        # The 64-wide K tails of each GEMM's tile-major weights (None without one).
++        self._tails: tuple[torch.Tensor | None, ...] = (None, None)
 +
 +    # -- support --------------------------------------------------------
 +
@@ -1221,14 +1226,19 @@ index 000000000..e5488698a
 +            swiglu_limit=self.moe_config.swiglu_limit if limit is None else limit,
 +        )
 +        # Tile-major copies replace the checkpoint layout, so each GEMM tile's
-+        # weights and scales are contiguous.
-+        tiles = self._plan.prepare_weights(
++        # weights and scales are contiguous. A K that ends 64 past a multiple
++        # of 128 (TP4's 576-wide rows) keeps its last 64 columns as compact tails.
++        (t13, tail13, words13), (t2, tail2, words2) = self._plan.prepare_weights(
 +            w13, layer.w13_weight_scale, w2, layer.w2_weight_scale
 +        )
-+        for name, tensor in zip(
-+            ("w13_weight", "w13_weight_scale", "w2_weight", "w2_weight_scale"), tiles
++        for name, tensor in (
++            ("w13_weight", t13),
++            ("w13_weight_scale", words13),
++            ("w2_weight", t2),
++            ("w2_weight_scale", words2),
 +        ):
 +            replace_parameter(layer, name, tensor)
++        self._tails = (tail13, tail2)
 +        self.quant_config._w1.scale = layer.w13_weight_scale
 +        self.quant_config._w2.scale = layer.w2_weight_scale
 +
@@ -1295,7 +1305,8 @@ index 000000000..e5488698a
 +            raise TypeError("TileLang MoE topk_weights must be contiguous float32")
 +        if not topk_ids.is_contiguous():
 +            raise TypeError("TileLang MoE topk_ids must be contiguous")
-+        weights = (w1, self.w1_scale, w2, self.w2_scale)
++        tail13, tail2 = self._tails
++        weights = ((w1, tail13, self.w1_scale), (w2, tail2, self.w2_scale))
 +        workspace = workspace2.view(-1).view(torch.uint8)
 +        self._plan.run(
 +            hidden_states, topk_ids, topk_weights, weights, output, workspace
@@ -4104,10 +4115,10 @@ index 000000000..cdc2fd297
 +__all__ = ["TileLangFP8LinearMethod", "TileLangLinearMethod"]
 diff --git a/vllm/models/deepseek_v4_1/tilelang/moe.py b/vllm/models/deepseek_v4_1/tilelang/moe.py
 new file mode 100644
-index 000000000..9b24708c5
+index 000000000..082ed739b
 --- /dev/null
 +++ b/vllm/models/deepseek_v4_1/tilelang/moe.py
-@@ -0,0 +1,938 @@
+@@ -0,0 +1,931 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 +"""DeepSeek-V4.1-Flash MoE dispatch and combine for SM120 / SM121.
@@ -4156,10 +4167,7 @@ index 000000000..9b24708c5
 +
 +from .gemm import (
 +    SF_BLOCK,
-+    SF_WORD_K,
-+    block_scale_words,
 +    pack_scale_words,
-+    pick_block_K,
 +    scale_words,
 +)
 +
@@ -4615,6 +4623,11 @@ index 000000000..9b24708c5
 +        return out
 +
 +
++# TMA unpacks E2M1 for the MMA (CU_TENSOR_MAP_DATA_TYPE_16U4_ALIGN16B) only in
++# boxes of exactly 128 K elements, from tensors whose K is a multiple of 128.
++FP4_TMA_K = 128
++
++
 +@tilelang.jit(pass_configs={tilelang.PassConfigKey.TL_DISABLE_WARP_SPECIALIZED: True})
 +def grouped_fp8_fp4_gemm(
 +    num_experts: int,
@@ -4624,154 +4637,123 @@ index 000000000..9b24708c5
 +    gather: bool = True,
 +    block_M: int = 32,
 +    block_N: int = 128,
-+    block_K: int = 128,
 +    num_stages: int = 3,
-+    tiled: bool = False,
 +    threads: int = 128,
 +    out_dtype: T.dtype = T.bfloat16,
 +):
 +    """``C[r] = (A[row(r)] * SFA) @ (B[e] * SFB[e])^T``, ``e`` the expert of row ``r``.
 +
-+    ``A``: ``[rows, K]`` E4M3 with packed UE8M0 words ``SFA[rows, ceil(K / 128)]``;
-+    ``B``: ``[experts, N, K]`` E2M1 (packed bytes) with
-+    ``SFB[experts, N, ceil(K / 128)]``. With ``tiled=True``, ``B`` is in the
-+    tile-major layout of ``tile_expert_weights``, so each tile is contiguous.
++    ``A``: ``[rows, K]`` E4M3 with packed UE8M0 words ``SFA[rows, ceil(K / 128)]``.
++    The weights are E2M1 with ``SFB[experts, N, ceil(K / 128)]``, in the
++    tile-major layout of ``tile_expert_weights``: ``B`` holds the 128-wide K
++    tiles, each a contiguous ``[block_N, 128]`` slab, and when ``K % 128 == 64``
++    ``BT`` holds each row block's 64-wide K tail as packed bytes.
 +
-+    ``block_K`` is any multiple of 64 dividing K. A block that starts off a
-+    128-element boundary reads the two scale words it straddles and tells the
-+    MMA where it starts (``k_start``), so no operand is padded.
-+
-+    A ``num_stages``-deep pipeline loads the next K blocks while the current
-+    one multiplies: the expert's weights by TMA, the gathered activation rows
-+    and the scale words by ``cp.async``.
++    A ``num_stages``-deep pipeline loads the next K blocks while the current one
++    multiplies: the 128-wide weight tiles by TMA, which unpacks E2M1 for the MMA;
++    the tail by ``cp.async``, eight packed bytes into the start of each
++    sixteen-byte group of the same unpacked layout; the gathered activation rows
++    and the scale words by ``cp.async``. The tail block multiplies only its 64
++    columns, so no operand or scale is padded (TP4's 576-wide expert rows are
++    four tiles and a tail).
 +    """
-+    assert K % block_K == 0 and block_K % 64 == 0, (
-+        "block_K must divide K and be a multiple of 64"
-+    )
++    block_K = FP4_TMA_K
++    tail = K % block_K
++    k_full = K // block_K
++    assert tail in (0, 64) and k_full >= 1, "K must be a multiple of 64, at least 128"
++    assert N % block_N == 0, "N must be a multiple of block_N"
++    k_blocks = k_full + (tail > 0)
 +    tokens, tiles = T.dynamic("tokens, tiles")
 +    a_rows = tokens if gather else tiles * block_M
 +    accum_dtype = T.float32
 +    sf_words = scale_words(K)
-+    block_words = block_scale_words(block_K)
-+    k_blocks = K // block_K
-+    a_segments = block_M * block_K // 16  # 16-byte cp.async copies of one A block
++    row_segments = block_K // 16  # 16-byte cp.async copies of one A row
++    a_segments = block_M * row_segments
 +    a_copies = tilelang.cdiv(a_segments, threads)
-+    sfa_copies = tilelang.cdiv(block_M * block_words, threads)
-+    sfb_copies = tilelang.cdiv(block_N * block_words, threads)
++    sfa_copies = tilelang.cdiv(block_M, threads)
++    sfb_copies = tilelang.cdiv(block_N, threads)
++    tail_groups = tail // 16  # sixteen-element groups of one tail row
++    bt_copies = tilelang.cdiv(block_N * tail_groups, threads)
 +    stages = num_stages
 +    assert stages >= 2
-+    assert N % block_N == 0, "N must be a multiple of block_N"
 +    n_blocks = N // block_N
-+    b_shape = (
-+        (num_experts * n_blocks * k_blocks, block_N, block_K)
-+        if tiled
-+        else (num_experts, N, K)
-+    )
++    b_shape = (num_experts * n_blocks * k_full, block_N, block_K)
++    bt_shape = (num_experts * n_blocks, block_N, tail // 2)
 +
 +    @T.macro
-+    def load(
-+        A,
-+        SFA,
-+        B,
-+        SFB,
-+        A_shared,
-+        B_shared,
-+        SFA_shared,
-+        SFB_shared,
-+        a_row,
-+        sfa_row,
-+        loaded,
-+        expert,
-+        bx,
-+        t,
-+        tx,
-+        ko,
-+        s,
-+    ):
-+        if tiled:
-+            tile = (expert * n_blocks + bx) * k_blocks + ko
++    def load(A, SFA, B, BT, SFB, A_shared, B_shared, SFA_shared, SFB_shared,
++             a_row, sfa_row, loaded, expert, bx, tx, ko, s):  # fmt: skip
++        """Stage s <- K block ko: weights, gathered activation rows, scale words."""
++        if ko < k_full:
++            tile = (expert * n_blocks + bx) * k_full + ko
 +            T.tma_copy(
 +                B[tile : tile + 1, 0:block_N, 0:block_K],
 +                B_shared[s : s + 1, :, :],
 +                barrier=loaded[s],
 +            )
-+        else:
-+            T.tma_copy(
-+                B[expert, bx * block_N, ko * block_K],
-+                B_shared[s, :, :],
-+                barrier=loaded[s],
-+            )
-+        # Padding rows (row -1) are zero-filled without reading memory.
++        # The tail exists at trace time (BT); its block is chosen on device.
++        if BT is not None:  # noqa: SIM102
++            if ko == k_full:
++                for c in T.unroll(bt_copies):
++                    e = c * threads + tx
++                    if e < block_N * tail_groups:
++                        n = e // tail_groups
++                        g = e % tail_groups
++                        T.ptx_cp_async(
++                            T.access_ptr(B_shared[s, n, g * 16], "w", 8),
++                            T.access_ptr(BT[expert * n_blocks + bx, n, g * 8], "r", 8),
++                            8,
++                        )
++        # Padding rows (row -1) are zero-filled without reading memory; the
++        # tail block copies only its own columns.
++        columns = T.if_then_else(ko < k_full, row_segments, tail_groups)
 +        for c in T.unroll(a_copies):
 +            e = c * threads + tx
-+            if e < a_segments:
++            if e < a_segments and e % row_segments < columns:
 +                T.ptx_cp_async(
 +                    T.access_ptr(
-+                        A_shared[s, e // (block_K // 16), e % (block_K // 16) * 16],
++                        A_shared[s, e // row_segments, e % row_segments * 16],
 +                        "w",
 +                        16,
 +                    ),
 +                    T.access_ptr(
-+                        A[T.max(a_row[c], 0), ko * block_K + e % (block_K // 16) * 16],
++                        A[T.max(a_row[c], 0), ko * block_K + e % row_segments * 16],
 +                        "r",
 +                        16,
 +                    ),
 +                    16,
 +                    a_row[c] >= 0,
 +                )
-+        # The block's scale words; the last row word may lie past a short row.
-+        word0 = ko * block_K // SF_WORD_K
++        # One scale word per row covers the block's four K32 atoms.
 +        for c in T.unroll(sfa_copies):
-+            e = c * threads + tx
-+            if e < block_M * block_words:
-+                w = e % block_words
++            i = c * threads + tx
++            if i < block_M:
 +                T.ptx_cp_async(
-+                    T.access_ptr(SFA_shared[s, e // block_words, w], "w", 1),
-+                    T.access_ptr(
-+                        SFA[T.max(sfa_row[c], 0), T.min(word0 + w, sf_words - 1)],
-+                        "r",
-+                        1,
-+                    ),
++                    T.access_ptr(SFA_shared[s, i, 0], "w", 1),
++                    T.access_ptr(SFA[T.max(sfa_row[c], 0), ko], "r", 1),
 +                    1,
 +                    sfa_row[c] >= 0,
 +                )
 +        for c in T.unroll(sfb_copies):
-+            e = c * threads + tx
-+            if e < block_N * block_words:
-+                w = e % block_words
++            j = c * threads + tx
++            if j < block_N:
 +                T.ptx_cp_async(
-+                    T.access_ptr(SFB_shared[s, e // block_words, w], "w", 1),
-+                    T.access_ptr(
-+                        SFB[
-+                            expert,
-+                            bx * block_N + e // block_words,
-+                            T.min(word0 + w, sf_words - 1),
-+                        ],
-+                        "r",
-+                        1,
-+                    ),
++                    T.access_ptr(SFB_shared[s, j, 0], "w", 1),
++                    T.access_ptr(SFB[expert, bx * block_N + j, ko], "r", 1),
 +                    1,
 +                )
 +        T.ptx_commit_group()
 +        T.barrier_arrive(loaded[s])
 +
-+    @T.prim_func
-+    def main(
-+        A: T.Tensor((a_rows, K), T.float8_e4m3fn),
-+        SFA: T.Tensor((a_rows, sf_words), T.uint32),
-+        B: T.Tensor(b_shape, T.float4_e2m1fn),
-+        SFB: T.Tensor((num_experts, N, sf_words), T.uint32),
-+        Order: T.Tensor((tiles * block_M,), T.int32),
-+        TileExpert: T.Tensor((tiles,), T.int32),
-+        C: T.Tensor((tiles * block_M, N), out_dtype),
-+    ):
++    @T.macro
++    def body(A, SFA, B, BT, SFB, Order, TileExpert, C):
 +        with T.Kernel(T.ceildiv(N, block_N), tiles, threads=threads) as (bx, t):
 +            A_shared = T.alloc_shared((stages, block_M, block_K), T.float8_e4m3fn)
 +            B_shared = T.alloc_shared(
 +                (stages, block_N, block_K), T.float4_e2m1_unpacked
 +            )
-+            SFA_shared = T.alloc_shared((stages, block_M, block_words), T.uint32)
-+            SFB_shared = T.alloc_shared((stages, block_N, block_words), T.uint32)
++            SFA_shared = T.alloc_shared((stages, block_M, 1), T.uint32)
++            SFB_shared = T.alloc_shared((stages, block_N, 1), T.uint32)
 +            rows_shared = T.alloc_shared((block_M,), T.int32)
 +            a_row = T.alloc_local((a_copies,), T.int32)
 +            sfa_row = T.alloc_local((sfa_copies,), T.int32)
@@ -4791,35 +4773,17 @@ index 000000000..9b24708c5
 +            # Each thread copies the same rows at every K block.
 +            for c in T.unroll(a_copies):
 +                a_row[c] = rows_shared[
-+                    T.min((c * threads + tx) // (block_K // 16), block_M - 1)
++                    T.min((c * threads + tx) // row_segments, block_M - 1)
 +                ]
 +            for c in T.unroll(sfa_copies):
-+                sfa_row[c] = rows_shared[
-+                    T.min((c * threads + tx) // block_words, block_M - 1)
-+                ]
++                sfa_row[c] = rows_shared[T.min(c * threads + tx, block_M - 1)]
 +
 +            T.clear(C_local)
 +            for p in T.unroll(stages - 1):
 +                if p < k_blocks:
-+                    load(
-+                        A,
-+                        SFA,
-+                        B,
-+                        SFB,
-+                        A_shared,
-+                        B_shared,
-+                        SFA_shared,
-+                        SFB_shared,
-+                        a_row,
-+                        sfa_row,
-+                        loaded,
-+                        expert,
-+                        bx,
-+                        t,
-+                        tx,
-+                        p,
-+                        p,
-+                    )
++                    load(A, SFA, B, BT, SFB, A_shared, B_shared, SFA_shared,
++                         SFB_shared, a_row, sfa_row, loaded, expert, bx, tx, p,
++                         p)  # fmt: skip
 +                else:
 +                    T.ptx_commit_group()
 +            for ko in T.serial(k_blocks):
@@ -4827,62 +4791,100 @@ index 000000000..9b24708c5
 +                T.sync_threads()
 +                nxt = ko + stages - 1
 +                if nxt < k_blocks:
-+                    load(
-+                        A,
-+                        SFA,
-+                        B,
-+                        SFB,
-+                        A_shared,
-+                        B_shared,
-+                        SFA_shared,
-+                        SFB_shared,
-+                        a_row,
-+                        sfa_row,
-+                        loaded,
-+                        expert,
-+                        bx,
-+                        t,
-+                        tx,
-+                        nxt,
-+                        nxt % stages,
-+                    )
++                    load(A, SFA, B, BT, SFB, A_shared, B_shared, SFA_shared,
++                         SFB_shared, a_row, sfa_row, loaded, expert, bx, tx, nxt,
++                         nxt % stages)  # fmt: skip
 +                else:
 +                    T.ptx_commit_group()
 +                T.ptx_wait_group(stages - 1)
 +                T.barrier_wait(loaded[ko % stages], (ko // stages) % 2)
 +                T.sync_threads()
-+                # The staged words start at the block's first word; k_start
-+                # places the block inside it.
-+                T.mma_gemm_blockscaled(
-+                    A_shared[ko % stages, :, :],
-+                    B_shared[ko % stages, :, :],
-+                    C_local,
-+                    SFA_shared[ko % stages, :, :],
-+                    SFB_shared[ko % stages, :, :],
-+                    transpose_B=True,
-+                    k_start=ko * block_K % SF_WORD_K,
-+                    sf_a_granularity_k=SF_BLOCK,
-+                    sf_b_granularity_k=SF_BLOCK,
-+                )
++                s = ko % stages
++                if ko < k_full:
++                    T.mma_gemm_blockscaled(
++                        A_shared[s, :, :],
++                        B_shared[s, :, :],
++                        C_local,
++                        SFA_shared[s, :, :],
++                        SFB_shared[s, :, :],
++                        transpose_B=True,
++                        k_start=0,
++                        sf_a_granularity_k=SF_BLOCK,
++                        sf_b_granularity_k=SF_BLOCK,
++                    )
++                if BT is not None:  # noqa: SIM102
++                    if ko == k_full:
++                        T.mma_gemm_blockscaled(
++                            A_shared[s, :, 0:tail],
++                            B_shared[s, :, 0:tail],
++                            C_local,
++                            SFA_shared[s, :, :],
++                            SFB_shared[s, :, :],
++                            transpose_B=True,
++                            k_start=0,
++                            sf_a_granularity_k=SF_BLOCK,
++                            sf_b_granularity_k=SF_BLOCK,
++                        )
 +            # Only real rows are stored; padding rows of the layout stay untouched.
 +            for i, j in T.Parallel(block_M, block_N):
 +                if rows_shared[i] >= 0:
 +                    C[t * block_M + i, bx * block_N + j] = C_local[i, j]
 +
++    if tail:
++
++        @T.prim_func
++        def main(
++            A: T.Tensor((a_rows, K), T.float8_e4m3fn),
++            SFA: T.Tensor((a_rows, sf_words), T.uint32),
++            B: T.Tensor(b_shape, T.float4_e2m1fn),
++            BT: T.Tensor(bt_shape, T.uint8),
++            SFB: T.Tensor((num_experts, N, sf_words), T.uint32),
++            Order: T.Tensor((tiles * block_M,), T.int32),
++            TileExpert: T.Tensor((tiles,), T.int32),
++            C: T.Tensor((tiles * block_M, N), out_dtype),
++        ):
++            body(A, SFA, B, BT, SFB, Order, TileExpert, C)
++
++    else:
++
++        @T.prim_func
++        def main(
++            A: T.Tensor((a_rows, K), T.float8_e4m3fn),
++            SFA: T.Tensor((a_rows, sf_words), T.uint32),
++            B: T.Tensor(b_shape, T.float4_e2m1fn),
++            SFB: T.Tensor((num_experts, N, sf_words), T.uint32),
++            Order: T.Tensor((tiles * block_M,), T.int32),
++            TileExpert: T.Tensor((tiles,), T.int32),
++            C: T.Tensor((tiles * block_M, N), out_dtype),
++        ):
++            body(A, SFA, B, None, SFB, Order, TileExpert, C)
++
 +    return main
 +
 +
-+def tile_expert_weights(b_packed, block_N, block_K):
++def tile_expert_weights(b_packed, block_N):
 +    """Tile-major copy of ``[E, N, K / 2]`` packed E2M1 expert weights.
 +
-+    Tile ``(e, n, k)`` (``block_N`` rows by ``block_K`` columns) becomes one
-+    contiguous ``[block_N, block_K / 2]`` slab, at index
-+    ``(e * N / block_N + n) * K / block_K + k``.
++    Returns ``(tiles, tails)``. Tile ``(e, n, k)`` (``block_N`` rows by 128
++    columns) becomes one contiguous ``[block_N, 64]``-byte slab of ``tiles``,
++    at index ``(e * N / block_N + n) * (K // 128) + k``. When ``K % 128 == 64``,
++    ``tails[e * N / block_N + n]`` holds that row block's last 64 columns as
++    ``[block_N, 32]`` bytes; otherwise ``tails`` is None.
 +    """
 +    E, N, half_k = b_packed.shape
-+    K = 2 * half_k
-+    b = b_packed.view(E, N // block_N, block_N, K // block_K, block_K // 2)
-+    return b.permute(0, 1, 3, 2, 4).reshape(-1, block_N, block_K // 2).contiguous()
++    k_full, tail = divmod(2 * half_k, FP4_TMA_K)
++    b = b_packed.view(E, N // block_N, block_N, half_k)
++    full = b[..., : k_full * FP4_TMA_K // 2]
++    tiles = (
++        full.reshape(E, N // block_N, block_N, k_full, FP4_TMA_K // 2)
++        .permute(0, 1, 3, 2, 4)
++        .reshape(-1, block_N, FP4_TMA_K // 2)
++        .contiguous()
++    )
++    if not tail:
++        return tiles, None
++    tails = b[..., k_full * FP4_TMA_K // 2 :].reshape(-1, block_N, tail // 2)
++    return tiles, tails.contiguous().view(torch.uint8)
 +
 +
 +def _spans(specs):
@@ -4940,19 +4942,13 @@ index 000000000..9b24708c5
 +            intermediate,
 +        )
 +        self.block_M, self.block_N = block_M, block_N
-+        # Each GEMM's K block divides its own K: TP3's 768-wide expert rows
-+        # take 128, TP4's 576 take 192.
-+        self.gate_up_block_K = pick_block_K(hidden)
-+        self.down_block_K = pick_block_K(intermediate)
-+        config = dict(block_N=block_N, num_stages=num_stages, tiled=True)
++        config = dict(block_N=block_N, num_stages=num_stages)
 +        self.gate_up = grouped_fp8_fp4_gemm(
-+            num_experts, 2 * intermediate, hidden, topk, True, block_M,
-+            block_K=self.gate_up_block_K, **config,
-+        )  # fmt: skip
++            num_experts, 2 * intermediate, hidden, topk, True, block_M, **config
++        )
 +        self.down = grouped_fp8_fp4_gemm(
-+            num_experts, hidden, intermediate, topk, False, block_M,
-+            block_K=self.down_block_K, **config,
-+        )  # fmt: skip
++            num_experts, hidden, intermediate, topk, False, block_M, **config
++        )
 +        # Routers emit int32 or int64 expert ids.
 +        self.dispatch = {
 +            dtype: MoeDispatchV41Plan(num_experts, topk, block_M, hidden, dtype)
@@ -4962,14 +4958,16 @@ index 000000000..9b24708c5
 +        self.swiglu = _swiglu_kernel(self.tk, intermediate, num_experts, swiglu_limit)
 +
 +    def prepare_weights(self, w13, w13_scale, w2, w2_scale):
-+        """``(w13 tiles, w13 words, w2 tiles, w2 words)`` from E2M1 and UE8M0."""
-+        block_N = self.block_N
-+        return (
-+            tile_expert_weights(w13.view(torch.int8), block_N, self.gate_up_block_K),
-+            pack_scale_words(w13_scale),
-+            tile_expert_weights(w2.view(torch.int8), block_N, self.down_block_K),
-+            pack_scale_words(w2_scale),
-+        )
++        """Per GEMM ``(tiles, tails, scale words)`` from E2M1 weights and UE8M0.
++
++        ``tails`` is None unless the GEMM's K is 64 past a multiple of 128 (the
++        down projection of TP4's 576-wide expert rows).
++        """
++        return tuple(
++            (*tile_expert_weights(w.view(torch.int8), self.block_N),
++             pack_scale_words(scale))
++            for w, scale in ((w13, w13_scale), (w2, w2_scale))
++        )  # fmt: skip
 +
 +    def workspace_specs(self, rows, idx_dtype=torch.int64):
 +        dispatch = self.dispatch[idx_dtype]
@@ -5002,16 +5000,22 @@ index 000000000..9b24708c5
 +        buffers = carve(workspace, specs)
 +        count = len(dispatch.workspace_specs(rows))
 +        xq, x_sf, h, hq, h_sf, y = buffers[count:]
-+        w13, w13_words, w2, w2_words = weights
++        gate_up, down = weights
 +        layout = dispatch.dispatch(topk_ids, topk_weights, buffers[:count])
 +        self.tk.quant.per_token_cast(
 +            x, "e4m3", SF_BLOCK, round_sf=True, use_packed_ue8m0=True, out=(xq, x_sf)
 +        )
 +        order, tile_expert = layout["order"], layout["tile_expert"]
-+        self.gate_up(xq, x_sf.view(torch.uint32), w13, w13_words, order, tile_expert, h)
++        x_words, h_words = x_sf.view(torch.uint32), h_sf.view(torch.uint32)
++        self.gate_up(xq, x_words, *_present(gate_up), order, tile_expert, h)
 +        self.swiglu(h, hq, h_sf, layout["psum"], layout["layout_weights"], 1.0, None)
-+        self.down(hq, h_sf.view(torch.uint32), w2, w2_words, order, tile_expert, y)
++        self.down(hq, h_words, *_present(down), order, tile_expert, y)
 +        return dispatch.combine(y, layout, out)
++
++
++def _present(weights):
++    """A GEMM's weight arguments: the tiles, the K tails when it has them, the words."""
++    return tuple(w for w in weights if w is not None)
 +
 +
 +def _tile_kernels(block_M):

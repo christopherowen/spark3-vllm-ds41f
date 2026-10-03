@@ -22,8 +22,8 @@ the kernel policy changed:
 
 | Profile | Mirrors | Image | vLLM tree |
 | --- | --- | --- | --- |
-| [tp3/cluster.json](tp3/cluster.json) | `config/cluster-64k.json` (promoted TP3) | `vllm-ds41f-kkref:04c30fa98e79-r5o-tilelang-v2` | `e9e04990` |
-| [tp4/cluster.json](tp4/cluster.json) | [the TP4 candidate](../2026-10-03-collective-contract/candidate.json) | `vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v1` | `15160070` |
+| [tp3/cluster.json](tp3/cluster.json) | `config/cluster-64k.json` (promoted TP3) | `vllm-ds41f-kkref:04c30fa98e79-r5o-tilelang-v3` | `645354cd` |
+| [tp4/cluster.json](tp4/cluster.json) | [the TP4 candidate](../2026-10-03-collective-contract/candidate.json) | `vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v2` | `8e951196` |
 
 The delta in both, with the settings doctor requires:
 
@@ -68,20 +68,24 @@ TileLang's expert GEMMs pad nothing at either width.
 | --- | --- | --- |
 | Attention heads | 24 (72 padded) | 16 |
 | Routed and shared expert rows | 768 | 576 |
-| Expert GEMM K blocks (gate/up, down) | 128, 128 | 128, 192 |
+| Expert GEMM K blocks (gate/up, down) | 128, 128 | 128, 4 x 128 + a 64 tail |
 | Shared expert down K blocks (≤64 rows, more) | 128, 128 | 192, 64 |
 
-The block-scaled GEMMs take any K block that is a multiple of 64. A block that
-starts off a 128-element boundary reads the two packed UE8M0 words it straddles
-and passes the MMA its offset, so no operand or scale is padded. TileKernels'
-packed scales pad each row to whole words (576 columns: 18 exponents in 20
-bytes); the workspace and weight packing use that layout. Each output
-accumulates over K in the same order whatever the block, so rows stay identical
-across batch sizes and tile configurations.
+The expert GEMMs load E2M1 weights by TMA, which unpacks FP4 for the MMA
+(`CU_TENSOR_MAP_DATA_TYPE_16U4_ALIGN16B`) only in boxes of exactly 128 K
+elements. A K that ends 64 past a multiple of 128 (TP4's down projection)
+therefore keeps its last 64 columns as compact tile tails beside the 128-wide
+tiles. The tail is copied with `cp.async`, eight packed bytes into each
+sixteen-byte group of the same unpacked shared layout, and multiplied over its
+64 columns only, so neither weights, activations nor scales are padded. That
+matters because TileKernels leaves the two padding bytes of each 576-wide row's
+packed activation scales unwritten. The dense MXFP8 GEMMs have no such load
+constraint: they take any K block that is a multiple of 64 and read the two
+packed UE8M0 words a block straddles. Each output accumulates over K in the
+same order whatever the block, so rows stay identical across batch sizes and
+tile configurations.
 
-All eight GEMM variants of both widths compile for `sm_121a`. The TP4 down
-projection's 192-wide blocks use 96.6 KiB of shared memory at three stages,
-within the 99 KiB limit.
+All GEMM variants of both widths compile for `sm_121a`.
 
 ## Sources
 
@@ -102,8 +106,8 @@ Both vLLM series end with the same
 
 | Series | Before the TileLang patch | Patch head | Tree | Fingerprint |
 | --- | --- | --- | --- | --- |
-| [tp3/vllm/series](tp3/vllm/series) | the 26 promoted patches | `65a60156` | `e9e04990` | `cab61e96…` |
-| [tp4/vllm/series](tp4/vllm/series) | the 26 promoted patches and the [explicit collective policy](../2026-10-03-collective-contract/README.md) | `bd188b66` | `15160070` | `02f49962…` |
+| [tp3/vllm/series](tp3/vllm/series) | the 26 promoted patches | `642003ef` | `645354cd` | `103704f7…` |
+| [tp4/vllm/series](tp4/vllm/series) | the 26 promoted patches and the [explicit collective policy](../2026-10-03-collective-contract/README.md) | `e05ff916` | `8e951196` | `13a03ae0…` |
 
 B12X and NCCL are the mirrored profile's: the promoted trees for TP3, the
 balanced-policy trees for TP4. Each vLLM record carries capability
