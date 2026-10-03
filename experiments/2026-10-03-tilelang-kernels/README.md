@@ -1,9 +1,10 @@
 # TileLang kernel backend
 
-**Status:** sources complete and verified for TP3 and TP4; no image built.
-TileLang, TileKernels and the DS4.1 TileLang vLLM patch (0027) are pinned,
-prepared and recorded, and doctor passes. Launch is disabled until the images
-are built and qualified. No cluster operation was performed.
+**Status:** both images built on dgx4 and their kernel tests pass; not
+qualified. TileLang, TileKernels and the DS4.1 TileLang vLLM patch (0027) are
+pinned, prepared and recorded, and doctor passes. Launch is disabled until the
+images are qualified against their B12X twins. No cluster operation was
+performed.
 
 Deployment base: `e15547a`. The promoted configuration stays TP3 with B12X
 kernels.
@@ -175,11 +176,19 @@ Completed on 2026-10-03:
     component (attention, linear, MoE, norm) moved B12X by a similar amount,
     which is the truncated model's sensitivity, not a component error.
 
-## After the images exist
+## Images and kernel tests
 
-The kernel tests, now with TP3's 24 heads and TP4's 576-wide GEMMs, run from
-each image's own vLLM tree as kernel-lab bundles
-([kernel-tests-tp3](bundles/kernel-tests-tp3/candidate.json),
+Built on dgx4 with `bin/spark3 build prepare`, `build check` and
+`build image --apply` from deployment commit `681cc2e`:
+
+| Profile | Image | ID | Build |
+| --- | --- | --- | --- |
+| tp3 | `vllm-ds41f-kkref:04c30fa98e79-r5o-tilelang-v3` | `sha256:17ab6c4c…` | 459 s |
+| tp4 | `vllm-ds41f-kkref:04c30fa98e79-r5o-roce-contract-tilelang-v2` | `sha256:a0a5abc0…` | 453 s |
+
+Both passed the GPU and TileLang import smokes. The kernel tests, with TP3's 24
+heads and TP4's 576-wide GEMMs, ran from each image's own vLLM tree as
+kernel-lab bundles ([kernel-tests-tp3](bundles/kernel-tests-tp3/candidate.json),
 [kernel-tests-tp4](bundles/kernel-tests-tp4/candidate.json); see
 [lab.md](../../docs/lab.md)):
 
@@ -187,10 +196,24 @@ each image's own vLLM tree as kernel-lab bundles
 scripts/lab.py kernel-local experiments/2026-10-03-tilelang-kernels/bundles/kernel-tests-tp4
 ```
 
-Then the GPU import smoke and, in a reserved window, each profile against its
-B12X twin: startup and steady memory, the LRU quality gate, the determinism
-checks, one- and eight-stream decode, 32K/64K/256K source-text prefill, prefix
-replay and admission. Kernel output may differ from B12X, so qualification
-compares quality before speed. The TP4 comparison needs the B12X TP4 image as
-well; lab windows run only on the promoted topology, so TP4 runs use explicit
+Each image passed all 49: sparse MLA at 16, 24 and 64 heads, the MXFP4 indexer
+paths and top-k, the MXFP8 GEMMs with K blocks of 128, 192 and 64, the BF16
+GEMM, RMSNorm, and the routed experts at 256-, 576- and 320-wide rows against
+FP32, with rows unchanged by batch composition. The bundles pass
+`--noconftest`: vLLM's root conftest imports test-only packages the serving
+image does not carry, and these tests use no fixtures.
+
+The first run, on an earlier TP3 image, failed the 12 routed-expert cases at
+576 and 320 because TMA cannot unpack FP4 in 192- or 64-wide boxes; the compact
+K tails above fixed it. Images `-r5o-tilelang-v2` and
+`-r5o-roce-contract-tilelang-v1` carry that defect and are superseded.
+
+## Qualification
+
+Next, in a reserved window, each profile against its B12X twin: startup and
+steady memory, the LRU quality gate, the determinism checks, one- and
+eight-stream decode, 32K/64K/256K source-text prefill, prefix replay and
+admission. Kernel output may differ from B12X, so qualification compares
+quality before speed. The TP4 comparison needs the B12X TP4 image as well;
+lab windows run only on the promoted topology, so TP4 runs use explicit
 cluster commands.
