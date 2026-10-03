@@ -35,7 +35,7 @@ TWINS = {
 # cost curves are keyed by shapes only (so each kernel image pins its own), and
 # profiler traces by directory.
 ARTIFACT_DIRS = {"tp4": ("ring4-collective-20261003", "ring4-tilelang-20261003")}
-COST_DIRS = {"tp4": ("ring4-collective-20261003", "ring4-tilelang-v5-20261003")}
+COST_DIRS = {"tp4": ("ring4-collective-nativeheads-20261003", "ring4-tilelang-v5-nativeheads-20261003")}
 
 
 def speculative(cluster: dict) -> dict:
